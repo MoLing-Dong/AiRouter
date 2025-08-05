@@ -1,70 +1,55 @@
 version: '3.8'
 
 services:
+  # PostgreSQL数据库
+  postgres:
+    image: postgres:15-alpine
+    container_name: ai-router-db
+    environment:
+      - POSTGRES_DB=ai_router
+      - POSTGRES_USER=ai_router
+      - POSTGRES_PASSWORD=ai_router_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ai_router -d ai_router"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # AI Router应用
   ai-router:
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.multi
     container_name: ai-router
     ports:
       - "8000:8000"
     environment:
+      # 核心配置
+      - HOST=0.0.0.0
+      - PORT=8000
+      - DEBUG=false
+      
       # 数据库配置
-      - DATABASE_URL=postgresql://ai_router:weibd371327@47.101.144.135:5432/ai_router
+      - DATABASE_URL=postgresql://ai_router:ai_router_password@postgres:5432/ai_router
       
-      # 负载均衡配置
-      - LOAD_BALANCING_STRATEGY=performance_based
-      - LOAD_BALANCING_HEALTH_CHECK_INTERVAL=30
-      - LOAD_BALANCING_MAX_RETRIES=3
-      - LOAD_BALANCING_TIMEOUT=30
-      - LOAD_BALANCING_ENABLE_FALLBACK=true
-      - LOAD_BALANCING_ENABLE_COST_OPTIMIZATION=true
-      
-      # 监控配置
-      - MONITORING_ENABLED=true
-      - MONITORING_METRICS_INTERVAL=60
-      - MONITORING_LOG_LEVEL=INFO
-      
-      # 安全配置
-      - SECURITY_RATE_LIMIT=100
-      - SECURITY_API_KEY_REQUIRED=true
-      - SECURITY_ENABLE_REQUEST_LOGGING=true
-      
-      # API密钥配置（从环境变量或.env文件读取）
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
-      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
-      - AZURE_API_KEY=${AZURE_API_KEY}
-      - THIRD_PARTY_API_KEY=${THIRD_PARTY_API_KEY}
-      - PRIVATE_API_KEY=${PRIVATE_API_KEY}
     volumes:
       - ./logs:/app/logs
       - ./data:/app/data
     restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 40s
-    networks:
-      - ai-router-network
-
-  # Redis服务（可选）
-  redis:
-    image: redis:7-alpine
-    container_name: ai-router-redis
-    ports:
-      - "6379:6379"
-    volumes:
-      - redis_data:/data
-    restart: unless-stopped
-    networks:
-      - ai-router-network
 
 volumes:
-  redis_data:
-
-networks:
-  ai-router-network:
-    driver: bridge 
+  postgres_data: 

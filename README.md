@@ -12,6 +12,7 @@
 - 🚀 **帕累托最优选择**: 从多个模型中智能选择最优模型
 - 💰 **成本优化**: 健康检查屏蔽功能，避免昂贵模型的不必要检查
 - 🐳 **容器化部署**: 完整的Docker支持，开箱即用
+- 🗄️ **数据库支持**: PostgreSQL数据库，支持数据持久化
 
 ## 🏗️ 架构设计
 
@@ -29,12 +30,109 @@
 - **Volcengine**: 火山引擎模型
 - **私有服务器**: 自定义OpenAI兼容API
 
-## 📦 安装
+## 🐳 Docker部署（推荐）
 
 ### 环境要求
 
-- Python 3.8+
-- PostgreSQL
+- Docker 20.10+
+- Docker Compose 2.0+
+- 至少2GB可用内存
+
+### 快速开始
+
+#### 1. 克隆项目
+
+```bash
+git clone <repository-url>
+cd AiRouter
+```
+
+#### 2. 配置环境变量（可选）
+
+如果需要自定义配置，可以创建 `.env` 文件：
+
+```bash
+cat > .env << 'EOF'
+# ========================================
+# AI Router 环境变量配置（可选）
+# ========================================
+
+# 应用配置
+DEBUG=false
+HOST=0.0.0.0
+PORT=8000
+
+# 可选：自定义配置
+LOAD_BALANCING_STRATEGY=performance_based
+SECURITY_RATE_LIMIT=100
+MONITORING_ENABLED=true
+EOF
+```
+
+**注意**: API密钥通过数据库管理，无需在此配置
+
+### 数据库配置
+
+系统支持通过数据库动态管理API密钥和模型配置：
+
+1. **启动服务后**，通过管理界面或API添加提供商和API密钥
+2. **支持动态更新**，无需重启服务
+3. **安全存储**，密钥加密存储在数据库中
+
+#### 3. 启动服务
+
+**方法一：一键部署（推荐）**
+
+```bash
+# 运行部署脚本
+./scripts/setup.sh
+```
+
+**方法二：手动部署**
+
+```bash
+# 构建并启动所有服务
+docker-compose up -d
+
+# 查看服务状态
+docker-compose ps
+
+# 查看日志
+docker-compose logs -f
+```
+
+#### 4. 验证部署
+
+```bash
+# 健康检查
+curl http://localhost:8000/health
+
+# 获取模型列表
+curl http://localhost:8000/v1/models
+```
+
+### 服务架构
+
+```
+┌─────────────────┐    ┌─────────────────┐
+│   AI Router     │    │   PostgreSQL    │
+│   (Port 8000)   │◄──►│   (Port 5432)   │
+└─────────────────┘    └─────────────────┘
+```
+
+### 数据库信息
+
+- **数据库名**: `ai_router`
+- **用户名**: `ai_router`
+- **密码**: `ai_router_password`
+- **端口**: `5432`
+
+## 📦 本地开发安装
+
+### 环境要求
+
+- Python 3.11+
+- PostgreSQL 15+
 
 ### 安装依赖
 
@@ -45,29 +143,15 @@ pip install -r requirements.txt
 
 ### 环境变量配置
 
-```shell
-# windows
-copy .env.example .env
-#Linux/MacOS
+```bash
+# 复制环境变量模板
 cp .env.example .env
+# 编辑.env文件，填入你的API密钥
 ```
 
-## 🏃‍♂️ 快速开始
+## 🏃‍♂️ 使用指南
 
-### 1. 启动服务器
-
-```bash
-python run.py
-```
-
-### 2. 初始化数据库
-
-```bash
-# 添加测试数据
-python scripts/check_database.py add
-```
-
-### 3. 测试API
+### API测试
 
 ```bash
 # 健康检查
@@ -80,9 +164,31 @@ curl http://localhost:8000/v1/models
 curl -X POST "http://localhost:8000/v1/chat/completions" \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "qwen-turbo",
+    "model": "gpt-3.5-turbo",
     "messages": [{"role": "user", "content": "你好"}]
   }'
+```
+
+### 管理命令
+
+```bash
+# 启动服务
+docker-compose up -d
+
+# 停止服务
+docker-compose down
+
+# 重启服务
+docker-compose restart
+
+# 查看日志
+docker-compose logs -f ai-router
+
+# 进入容器
+docker-compose exec ai-router bash
+
+# 更新代码后重新构建
+docker-compose up -d --build
 ```
 
 ## 🔧 配置管理
@@ -102,24 +208,6 @@ curl -X POST "http://localhost:8000/v1/chat/completions" \
 - **加权轮询 (Weighted Round Robin)**: 基于权重的轮询
 - **性能优先 (Performance Based)**: 基于响应时间和成功率
 - **成本优化 (Cost Optimized)**: 基于成本和性能的平衡
-
-## 🐳 Docker部署
-
-### 构建镜像
-
-```bash
-docker build -t ai-router .
-```
-
-### 运行容器
-
-```bash
-docker run -d \
-  --name ai-router \
-  -p 8000:8000 \
-  -v $(pwd)/data:/app/data \
-  ai-router
-```
 
 ## 📊 监控和指标
 
@@ -144,6 +232,27 @@ docker run -d \
 - **访问控制**: 可配置的访问权限
 - **请求限流**: 防止API滥用
 - **日志记录**: 完整的请求日志
+- **非root用户**: 容器内使用非root用户运行
+
+## 🚀 生产环境部署
+
+### 使用生产配置
+
+```bash
+# 设置生产环境变量
+export DEBUG=false
+export DATABASE_URL=postgresql://user:pass@host:5432/db
+
+# 启动生产服务
+docker-compose up -d
+```
+
+### 性能优化
+
+- 使用多阶段构建的Docker镜像
+- PostgreSQL数据持久化
+- 健康检查和自动重启
+- 资源限制和监控
 
 ## 🤝 贡献指南
 
@@ -164,6 +273,35 @@ docker run -d \
 1. 查看 [Issues](../../issues)
 2. 提交新的 Issue
 3. 联系项目维护者
+
+## 🔧 故障排除
+
+### 常见问题
+
+1. **数据库连接失败**
+
+   ```bash
+   # 检查数据库状态
+   docker-compose logs postgres
+   
+   # 重启数据库服务
+   docker-compose restart postgres
+   ```
+
+2. **API密钥配置错误**
+
+   ```bash
+   # 检查环境变量
+   docker-compose exec ai-router env | grep API_KEY
+   ```
+
+3. **端口冲突**
+
+   ```bash
+   # 修改docker-compose.yml中的端口映射
+   ports:
+     - "8001:8000"  # 改为其他端口
+   ```
 
 ---
 
