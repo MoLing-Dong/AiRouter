@@ -2,10 +2,10 @@ import time
 from fastapi import APIRouter, HTTPException
 from app.core.adapters import adapter_manager
 
-models_router = APIRouter(prefix="/v1", tags=["模型管理"])
+models_router = APIRouter(prefix="/v1/models", tags=["模型管理"])
 
 
-@models_router.get("/models")
+@models_router.get("/")
 async def list_models():
     """获取可用模型列表"""
     try:
@@ -17,15 +17,15 @@ async def list_models():
             try:
                 adapters = adapter_manager.get_model_adapters(model_name)
                 if adapters:
-                    # 使用第一个适配器作为代表
-                    adapter = adapters[0]
+
+                    # 获取所有可用的提供商
+                    providers = [adapter.provider for adapter in adapters]
                     models.append(
                         {
                             "id": model_name,
                             "object": "model",
                             "created": int(time.time()),
-                            "owned_by": adapter.provider,
-                            "permission": [],
+                            "permission": providers,
                             "root": model_name,
                             "parent": None,
                             "providers_count": len(adapters),
@@ -44,7 +44,7 @@ async def list_models():
         raise HTTPException(status_code=500, detail=f"获取模型列表失败: {str(e)}")
 
 
-@models_router.get("/models/{model_name}/health")
+@models_router.get("/{model_name}/health")
 async def check_model_health(model_name: str):
     """检查单个模型的健康状态"""
     try:
@@ -80,7 +80,7 @@ async def check_model_health(model_name: str):
         raise HTTPException(status_code=500, detail=f"检查模型健康状态失败: {str(e)}")
 
 
-@models_router.get("/models/{model_name}")
+@models_router.get("/{model_name}")
 async def get_model_details(model_name: str):
     """获取单个模型的详细信息"""
     try:

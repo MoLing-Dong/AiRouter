@@ -174,7 +174,6 @@ async def stream_chat_completion(request: ChatRequest):
         yield f"data: {json.dumps({'error': str(e)})}\n\n"
 
 
-
 @chat_router.post("/embeddings")
 async def create_embeddings(request: Dict[str, Any]):
     """创建文本嵌入"""

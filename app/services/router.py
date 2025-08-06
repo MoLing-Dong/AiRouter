@@ -185,8 +185,6 @@ class SmartRouter:
 
     async def route_request(self, request: ChatRequest) -> ChatResponse:
         """路由请求到最佳提供商"""
-        start_time = time.time()
-
         # 始终使用用户请求的模型
         selected_model = request.model
 

@@ -42,10 +42,6 @@
 
 #### 1. 克隆项目
 
-```bash
-git clone <repository-url>
-cd AiRouter
-```
 
 **注意**: API密钥通过数据库管理，无需在此配置
 

@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from app.api import chat_router, models_router, stats_router, db_router
+from app.api import chat_router, models_router, stats_router, db_router, health_router
 
 
 def register_routes(app):
@@ -9,3 +9,4 @@ def register_routes(app):
     app.include_router(models_router)
     app.include_router(stats_router)
     app.include_router(db_router)
+    app.include_router(health_router)

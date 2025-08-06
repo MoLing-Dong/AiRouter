@@ -109,6 +109,7 @@ class OpenAIAdapter(BaseAdapter):
             try:
                 response = await self.client.get(f"{self.base_url}/models")
                 if response.status_code == 200:
+                    print("OpenAIAdapter健康检查成功 - 获取模型列表")
                     self.health_status = HealthStatus.HEALTHY
                     self.metrics.last_health_check = time.time()
                     return HealthStatus.HEALTHY
@@ -119,6 +120,7 @@ class OpenAIAdapter(BaseAdapter):
             try:
                 response = await self.client.head(f"{self.base_url}/chat/completions")
                 if response.status_code in [200, 405]:  # 405表示方法不允许，但端点存在
+                    print("OpenAI健康检查成功 - 简单的HEAD请求")
                     self.health_status = HealthStatus.HEALTHY
                     self.metrics.last_health_check = time.time()
                     return HealthStatus.HEALTHY
