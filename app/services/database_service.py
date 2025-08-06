@@ -1,7 +1,7 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session
 from typing import List, Dict, Optional, Any
-from ..models.database import (
+from ..models import (
     Base,
     LLMModel,
     LLMProvider,

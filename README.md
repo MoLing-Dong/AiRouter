@@ -47,28 +47,6 @@ git clone <repository-url>
 cd AiRouter
 ```
 
-#### 2. 配置环境变量（可选）
-
-如果需要自定义配置，可以创建 `.env` 文件：
-
-```bash
-cat > .env << 'EOF'
-# ========================================
-# AI Router 环境变量配置（可选）
-# ========================================
-
-# 应用配置
-DEBUG=false
-HOST=0.0.0.0
-PORT=8000
-
-# 可选：自定义配置
-LOAD_BALANCING_STRATEGY=performance_based
-SECURITY_RATE_LIMIT=100
-MONITORING_ENABLED=true
-EOF
-```
-
 **注意**: API密钥通过数据库管理，无需在此配置
 
 ### 数据库配置

@@ -31,7 +31,7 @@ async def get_db_models():
 async def create_db_model(model_data: dict):
     """创建数据库模型"""
     try:
-        from app.models.database import ModelCreate
+        from app.models import LLMModelCreate
 
         # 检查是否已存在相同名称的模型
         existing_model = db_service.get_model_by_name(model_data.get("name"))
@@ -41,7 +41,7 @@ async def create_db_model(model_data: dict):
                 status_code=400, detail=f"模型已存在: {model_data.get('name')}"
             )
 
-        model_create = ModelCreate(**model_data)
+        model_create = LLMModelCreate(**model_data)
         model = db_service.create_model(model_create)
         return {
             "message": "模型创建成功",
@@ -58,7 +58,7 @@ async def create_db_model(model_data: dict):
 async def create_db_provider(provider_data: dict):
     """创建数据库提供商"""
     try:
-        from app.models.database import ProviderCreate
+        from app.models import LLMProviderCreate
 
         # 检查是否已存在相同名称和类型的提供商
         existing_provider = db_service.get_provider_by_name_and_type(
@@ -71,7 +71,7 @@ async def create_db_provider(provider_data: dict):
                 detail=f"提供商已存在: {provider_data.get('name')} ({provider_data.get('provider_type')})",
             )
 
-        provider_create = ProviderCreate(**provider_data)
+        provider_create = LLMProviderCreate(**provider_data)
         provider = db_service.create_provider(provider_create)
         return {
             "message": "提供商创建成功",
@@ -88,7 +88,7 @@ async def create_db_provider(provider_data: dict):
 async def create_db_model_provider(model_provider_data: dict):
     """创建模型-提供商关联"""
     try:
-        from app.models.database import ModelProviderCreate
+        from app.models import LLMModelProviderCreate
 
         # 检查是否已存在相同的模型-提供商关联
         existing_mp = db_service.get_model_provider_by_ids(
@@ -101,7 +101,7 @@ async def create_db_model_provider(model_provider_data: dict):
                 detail=f"模型-提供商关联已存在: 模型ID {model_provider_data.get('llm_id')}, 提供商ID {model_provider_data.get('provider_id')}",
             )
 
-        mp_create = ModelProviderCreate(**model_provider_data)
+        mp_create = LLMModelProviderCreate(**model_provider_data)
         model_provider = db_service.create_model_provider(mp_create)
         return {"message": "模型-提供商关联创建成功", "id": model_provider.id}
     except HTTPException:
@@ -116,7 +116,7 @@ async def create_db_model_provider(model_provider_data: dict):
 async def create_db_model_param(param_data: dict):
     """创建模型参数"""
     try:
-        from app.models.database import ModelParamCreate
+        from app.models import LLMModelParamCreate
 
         # 检查是否已存在相同的模型参数
         existing_param = db_service.get_model_param_by_key(
@@ -131,7 +131,7 @@ async def create_db_model_param(param_data: dict):
                 detail=f"模型参数已存在: 模型ID {param_data.get('llm_id')}, 参数键 {param_data.get('param_key')}",
             )
 
-        param_create = ModelParamCreate(**param_data)
+        param_create = LLMModelParamCreate(**param_data)
         param = db_service.create_model_param(param_create)
         return {"message": "模型参数创建成功", "param_id": param.param_id}
     except HTTPException:

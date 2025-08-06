@@ -1,4 +1,3 @@
-import os
 import uvicorn
 import time
 from contextlib import asynccontextmanager
