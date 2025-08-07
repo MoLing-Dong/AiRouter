@@ -20,25 +20,15 @@ if ! command -v docker-compose &> /dev/null; then
     exit 1
 fi
 
-# 创建.env文件（如果不存在）
+# 复制.env.example文件（如果不存在）
 if [ ! -f .env ]; then
-    echo "📝 创建.env文件..."
-    cat > .env << 'EOF'
-# ========================================
-# AI Router 环境变量配置（可选）
-# ========================================
-
-# 应用配置
-DEBUG=false
-HOST=0.0.0.0
-PORT=8000
-
-# 可选：自定义配置
-LOAD_BALANCING_STRATEGY=performance_based
-SECURITY_RATE_LIMIT=100
-MONITORING_ENABLED=true
-EOF
-    echo "✅ .env文件已创建（API密钥通过数据库管理）"
+    if [ -f .env.example ]; then
+        echo "📝 复制.env.example文件..."
+        cp .env.example .env
+        echo "✅ .env文件已从.env.example复制"
+    else
+        echo "⚠️  .env.example文件不存在，请手动创建.env文件"
+    fi
 else
     echo "✅ .env文件已存在"
 fi

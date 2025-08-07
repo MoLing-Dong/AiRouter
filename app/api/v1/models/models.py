@@ -1,6 +1,6 @@
 import time
 from fastapi import APIRouter, HTTPException
-from app.core.adapters import adapter_manager
+from app.services import adapter_manager
 
 models_router = APIRouter(prefix="/v1/models", tags=["模型管理"])
 
