@@ -39,55 +39,86 @@ class DatabaseService:
         """获取数据库会话"""
         return self.SessionLocal()
 
-    def get_all_models(self) -> List[LLMModel]:
-        """获取所有启用的模型"""
-        with self.get_session() as session:
-            return session.query(LLMModel).filter(LLMModel.is_enabled == True).all()
+    def get_all_models(self, is_enabled: bool = None) -> List[LLMModel]:
+        """获取所有的模型
 
-    def get_model_by_name(self, model_name: str) -> Optional[LLMModel]:
-        """根据模型名称获取模型"""
+        Args:
+            is_enabled: 是否启用，None表示忽略启用状态
+        """
         with self.get_session() as session:
-            return (
-                session.query(LLMModel)
-                .filter(LLMModel.name == model_name, LLMModel.is_enabled == True)
-                .first()
-            )
+            query = session.query(LLMModel)
+            if is_enabled is not None:
+                query = query.filter(LLMModel.is_enabled == is_enabled)
+            return query.all()
 
-    def get_model_providers(self, model_id: int) -> List[LLMModelProvider]:
-        """获取模型的所有提供商"""
+    def get_model_by_name(
+        self, model_name: str, is_enabled: bool = None
+    ) -> Optional[LLMModel]:
+        """根据模型名称获取模型
+
+        Args:
+            model_name: 模型名称
+            is_enabled: 是否启用，None表示忽略启用状态
+        """
         with self.get_session() as session:
-            return (
-                session.query(LLMModelProvider)
-                .filter(
-                    LLMModelProvider.llm_id == model_id,
-                    LLMModelProvider.is_enabled == True,
-                )
-                .order_by(LLMModelProvider.weight.desc())
-                .all()
+            query = session.query(LLMModel).filter(LLMModel.name == model_name)
+            if is_enabled is not None:
+                query = query.filter(LLMModel.is_enabled == is_enabled)
+            return query.first()
+
+    def get_model_providers(
+        self, model_id: int, is_enabled: bool = None
+    ) -> List[LLMModelProvider]:
+        """获取模型的所有提供商
+
+        Args:
+            model_id: 模型ID
+            is_enabled: 是否启用，None表示忽略启用状态
+        """
+        with self.get_session() as session:
+            query = session.query(LLMModelProvider).filter(
+                LLMModelProvider.llm_id == model_id
             )
+            if is_enabled is not None:
+                query = query.filter(LLMModelProvider.is_enabled == is_enabled)
+            return query.order_by(LLMModelProvider.weight.desc()).all()
 
     def get_model_provider_by_ids(
-        self, model_id: int, provider_id: int
+        self, model_id: int, provider_id: int, is_enabled: bool = None
     ) -> Optional[LLMModelProvider]:
-        """根据模型ID和提供商ID获取模型-提供商关联"""
+        """根据模型ID和提供商ID获取模型-提供商关联
+
+        Args:
+            model_id: 模型ID
+            provider_id: 提供商ID
+            is_enabled: 是否启用，None表示忽略启用状态
+        """
         with self.get_session() as session:
-            return (
-                session.query(LLMModelProvider)
-                .filter(
-                    LLMModelProvider.llm_id == model_id,
-                    LLMModelProvider.provider_id == provider_id,
-                )
-                .first()
+            query = session.query(LLMModelProvider).filter(
+                LLMModelProvider.llm_id == model_id,
+                LLMModelProvider.provider_id == provider_id,
             )
+            if is_enabled is not None:
+                query = query.filter(LLMModelProvider.is_enabled == is_enabled)
+            return query.first()
 
     def get_model_params(
-        self, model_id: int, provider_id: Optional[int] = None
+        self, model_id: int, provider_id: Optional[int] = None, is_enabled: bool = None
     ) -> List[LLMModelParam]:
-        """获取模型参数"""
+        """获取模型参数
+
+        Args:
+            model_id: 模型ID
+            provider_id: 提供商ID，None表示获取通用参数
+            is_enabled: 是否启用，None表示忽略启用状态
+        """
         with self.get_session() as session:
             query = session.query(LLMModelParam).filter(
-                LLMModelParam.llm_id == model_id, LLMModelParam.is_enabled == True
+                LLMModelParam.llm_id == model_id
             )
+
+            if is_enabled is not None:
+                query = query.filter(LLMModelParam.is_enabled == is_enabled)
 
             if provider_id is not None:
                 query = query.filter(LLMModelParam.provider_id == provider_id)
@@ -95,46 +126,71 @@ class DatabaseService:
             return query.all()
 
     def get_model_param_by_key(
-        self, model_id: int, provider_id: Optional[int], param_key: str
+        self,
+        model_id: int,
+        provider_id: Optional[int],
+        param_key: str,
+        is_enabled: bool = None,
     ) -> Optional[LLMModelParam]:
-        """根据模型ID、提供商ID和参数键获取模型参数"""
+        """根据模型ID、提供商ID和参数键获取模型参数
+
+        Args:
+            model_id: 模型ID
+            provider_id: 提供商ID，None表示获取通用参数
+            param_key: 参数键
+            is_enabled: 是否启用，None表示忽略启用状态
+        """
         with self.get_session() as session:
             query = session.query(LLMModelParam).filter(
                 LLMModelParam.llm_id == model_id,
                 LLMModelParam.param_key == param_key,
-                LLMModelParam.is_enabled == True,
             )
+
+            if is_enabled is not None:
+                query = query.filter(LLMModelParam.is_enabled == is_enabled)
 
             if provider_id is not None:
                 query = query.filter(LLMModelParam.provider_id == provider_id)
 
             return query.first()
 
-    def get_provider_by_id(self, provider_id: int) -> Optional[LLMProvider]:
-        """根据ID获取提供商"""
-        with self.get_session() as session:
-            return (
-                session.query(LLMProvider)
-                .filter(LLMProvider.id == provider_id, LLMProvider.is_enabled == True)
-                .first()
-            )
+    def get_provider_by_id(
+        self, provider_id: int, is_enabled: bool = None
+    ) -> Optional[LLMProvider]:
+        """根据ID获取提供商
 
-    def get_provider_api_keys(self, provider_id: int) -> List[LLMProviderApiKey]:
-        """获取提供商的所有API密钥"""
+        Args:
+            provider_id: 提供商ID
+            is_enabled: 是否启用，None表示忽略启用状态
+        """
         with self.get_session() as session:
-            return (
-                session.query(LLMProviderApiKey)
-                .filter(
-                    LLMProviderApiKey.provider_id == provider_id,
-                    LLMProviderApiKey.is_enabled == True,
-                )
-                .order_by(LLMProviderApiKey.weight.desc())
-                .all()
+            query = session.query(LLMProvider).filter(LLMProvider.id == provider_id)
+
+            if is_enabled is not None:
+                query = query.filter(LLMProvider.is_enabled == is_enabled)
+
+            return query.first()
+
+    def get_provider_api_keys(
+        self, provider_id: int, is_enabled: bool = None
+    ) -> List[LLMProviderApiKey]:
+        """获取提供商的所有API密钥
+
+        Args:
+            provider_id: 提供商ID
+            is_enabled: 是否启用，None表示忽略启用状态
+        """
+        with self.get_session() as session:
+            query = session.query(LLMProviderApiKey).filter(
+                LLMProviderApiKey.provider_id == provider_id
             )
+            if is_enabled is not None:
+                query = query.filter(LLMProviderApiKey.is_enabled == is_enabled)
+            return query.order_by(LLMProviderApiKey.weight.desc()).all()
 
     def get_best_api_key(self, provider_id: int) -> Optional[LLMProviderApiKey]:
         """获取最佳API密钥（基于权重和偏好）"""
-        api_keys = self.get_provider_api_keys(provider_id)
+        api_keys = self.get_provider_api_keys(provider_id, is_enabled=True)
         if not api_keys:
             return None
 
@@ -200,16 +256,16 @@ class DatabaseService:
 
     def get_model_config_from_db(self, model_name: str) -> Optional[Dict[str, Any]]:
         """从数据库获取模型配置"""
-        model = self.get_model_by_name(model_name)
+        model = self.get_model_by_name(model_name, is_enabled=True)
         if not model:
             return None
 
         # 获取模型的所有提供商
-        model_providers = self.get_model_providers(model.id)
+        model_providers = self.get_model_providers(model.id, is_enabled=True)
         providers = []
 
         for mp in model_providers:
-            provider = self.get_provider_by_id(mp.provider_id)
+            provider = self.get_provider_by_id(mp.provider_id, is_enabled=True)
             if not provider:
                 continue
 
@@ -220,7 +276,9 @@ class DatabaseService:
                 continue
 
             # 获取提供商参数
-            provider_params = self.get_model_params(model.id, provider.id)
+            provider_params = self.get_model_params(
+                model.id, provider.id, is_enabled=True
+            )
             params = {}
             for param in provider_params:
                 # 处理JSON格式的参数值
@@ -230,7 +288,7 @@ class DatabaseService:
                     params[param.param_key] = param.param_value
 
             # 获取通用参数
-            general_params = self.get_model_params(model.id, None)
+            general_params = self.get_model_params(model.id, None, is_enabled=True)
             for param in general_params:
                 if param.param_key not in params:
                     if isinstance(param.param_value, dict):
@@ -275,7 +333,7 @@ class DatabaseService:
 
     def get_all_model_configs_from_db(self) -> Dict[str, Dict[str, Any]]:
         """从数据库获取所有模型配置"""
-        models = self.get_all_models()
+        models = self.get_all_models(is_enabled=True)
         configs = {}
 
         for model in models:
@@ -327,12 +385,17 @@ class DatabaseService:
                 return True
             return False
 
-    def get_all_providers(self) -> List[LLMProvider]:
-        """获取所有提供商"""
+    def get_all_providers(self, is_enabled: bool = None) -> List[LLMProvider]:
+        """获取所有提供商
+
+        Args:
+            is_enabled: 是否启用，None表示忽略启用状态
+        """
         with self.get_session() as session:
-            return (
-                session.query(LLMProvider).filter(LLMProvider.is_enabled == True).all()
-            )
+            query = session.query(LLMProvider)
+            if is_enabled is not None:
+                query = query.filter(LLMProvider.is_enabled == is_enabled)
+            return query.all()
 
     def get_provider_by_name(self, provider_name: str) -> Optional[LLMProvider]:
         """根据名称获取提供商"""

@@ -59,7 +59,7 @@ async def chat_completions(request: ChatCompletionRequest):
     """OpenAI兼容的聊天完成接口"""
     try:
         # 检查模型是否可用
-        from app.core.adapters import adapter_manager
+        from app.services import adapter_manager
 
         available_models = adapter_manager.get_available_models()
 

@@ -1,13 +1,11 @@
+
 import asyncio
 import time
 from typing import Dict, List, Optional, Any
 from enum import Enum
 import random
-from ..core.adapters import (
-    adapter_manager as model_adapter_manager,
-    ChatRequest,
-    ChatResponse,
-)
+from . import adapter_manager as model_adapter_manager
+from ..core.adapters import ChatRequest, ChatResponse
 from ..core.adapters.base import HealthStatus
 from fastapi import HTTPException
 

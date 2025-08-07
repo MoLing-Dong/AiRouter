@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi.responses import JSONResponse
 from config.settings import settings
 from app.core.app import app
-from app.core.adapters import adapter_manager
+from app.services import adapter_manager
 from app.services.router import LoadBalancingStrategy, router
 from app.core.routes import register_routes
 
@@ -40,39 +40,6 @@ async def lifespan(app):
 
 # 设置lifespan事件处理器
 app.router.lifespan_context = lifespan
-
-
-# 健康检查端点
-@app.get("/health")
-async def health_check():
-    """应用健康检查"""
-    try:
-        # 检查所有适配器的健康状态
-        health_status = await adapter_manager.health_check_all()
-
-        # 计算整体健康状态
-        healthy_count = sum(
-            1 for status in health_status.values() if status == "healthy"
-        )
-        total_count = len(health_status)
-
-        overall_status = "healthy" if healthy_count == total_count else "degraded"
-        if healthy_count == 0:
-            overall_status = "unhealthy"
-
-        return {
-            "status": overall_status,
-            "timestamp": time.time(),
-            "models": health_status,
-            "healthy_models": healthy_count,
-            "total_models": total_count,
-            "use_database": adapter_manager.use_database,
-        }
-    except Exception as e:
-        return JSONResponse(
-            status_code=500,
-            content={"status": "unhealthy", "error": str(e), "timestamp": time.time()},
-        )
 
 
 # 根端点

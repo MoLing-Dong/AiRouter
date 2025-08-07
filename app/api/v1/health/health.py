@@ -1,6 +1,6 @@
 import time
 from fastapi import APIRouter, HTTPException
-from app.core.adapters import adapter_manager
+from app.services import adapter_manager
 
 health_router = APIRouter(prefix="/v1/health", tags=["健康检查"])
 

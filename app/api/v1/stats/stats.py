@@ -1,7 +1,7 @@
 import time
 from fastapi import APIRouter, HTTPException
 from app.services.router import router, LoadBalancingStrategy
-from app.core.adapters import adapter_manager
+from app.services import adapter_manager
 from .dto import StrategyRequest, StatsResponse, StrategyResponse, RefreshResponse
 
 stats_router = APIRouter(prefix="/v1/stats", tags=["统计管理"])
