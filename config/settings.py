@@ -39,7 +39,7 @@ class ModelConfig(BaseSettings):
 class LoadBalancingConfig(BaseSettings):
     """负载均衡配置"""
 
-    strategy: str = "performance_based"
+    strategy: str = "auto"  # 更新为新的策略：auto, specified_provider, fallback
     health_check_interval: int = 30
     max_retries: int = 3
     timeout: int = 30

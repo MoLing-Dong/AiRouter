@@ -5,7 +5,6 @@ from fastapi.responses import JSONResponse
 from config.settings import settings
 from app.core.app import app
 from app.services import adapter_manager
-from app.services.router import LoadBalancingStrategy, router
 from app.core.routes import register_routes
 
 # 注册路由
@@ -22,14 +21,9 @@ async def lifespan(app):
     print("📊 从数据库加载模型配置...")
     adapter_manager.load_models_from_database()
 
-    # 设置路由器策略
-    strategy_name = settings.LOAD_BALANCING.strategy
-    try:
-        strategy = LoadBalancingStrategy(strategy_name)
-        router.set_strategy(strategy)
-        print(f"📊 路由策略: {strategy.value}")
-    except ValueError:
-        print(f"⚠️  无效的路由策略: {strategy_name}，使用默认策略")
+    # 显示负载均衡策略信息
+    print("📊 负载均衡策略系统已启用")
+    print(f"📊 支持策略: auto, specified_provider, fallback, weighted_round_robin, least_connections, response_time, cost_optimized, hybrid")
 
     yield
 
@@ -56,6 +50,7 @@ async def root():
         "health": "/health",
         "models": "/v1/models",
         "stats": "/v1/stats",
+        "load_balancing": "/v1/load-balancing",
         "use_database": adapter_manager.use_database,
         "available_models": len(adapter_manager.get_available_models()),
     }

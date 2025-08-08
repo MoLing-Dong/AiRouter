@@ -18,8 +18,7 @@ class AdapterFactory:
             adapter_config = {
                 "provider": provider_config.name,
                 "base_url": provider_config.base_url,
-                "model": model_name
-                or provider_config.name,  # 使用传入的模型名或提供商名
+                "model": model_name or getattr(provider_config, 'model', provider_config.name),  # 优先使用传入的模型名，然后从提供商配置获取，最后使用提供商名
                 "max_tokens": provider_config.max_tokens,
                 "temperature": provider_config.temperature,
                 "cost_per_1k_tokens": provider_config.cost_per_1k_tokens,
@@ -27,6 +26,8 @@ class AdapterFactory:
                 "retry_count": provider_config.retry_count,
                 "weight": provider_config.weight,
             }
+            
+            print(f"🔧 创建适配器: {provider_config.name} -> 模型: {adapter_config['model']}")
 
             # 根据提供商类型创建适配器（大小写不敏感）
             provider_name_lower = provider_config.name.lower()

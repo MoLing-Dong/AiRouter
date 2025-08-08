@@ -1,8 +1,8 @@
 import time
 from fastapi import APIRouter, HTTPException
-from app.services.router import router, LoadBalancingStrategy
+from app.services.router import router
 from app.services import adapter_manager
-from .dto import StrategyRequest, StatsResponse, StrategyResponse, RefreshResponse
+from .dto import StatsResponse, RefreshResponse
 
 stats_router = APIRouter(prefix="/v1/stats", tags=["统计管理"])
 
@@ -19,23 +19,6 @@ async def get_routing_stats():
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"获取统计信息失败: {str(e)}")
-
-
-@stats_router.post("/strategy", response_model=StrategyResponse)
-async def set_routing_strategy(request: StrategyRequest):
-    """设置路由策略"""
-    try:
-        router.set_strategy(LoadBalancingStrategy(request.strategy))
-        return StrategyResponse(
-            message=f"路由策略已设置为: {request.strategy}",
-            strategy=request.strategy,
-        )
-    except ValueError:
-        raise HTTPException(
-            status_code=400, detail=f"无效的路由策略: {request.strategy}"
-        )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"设置路由策略失败: {str(e)}")
 
 
 @stats_router.post("/stats/reset")

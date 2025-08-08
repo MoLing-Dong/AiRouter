@@ -3,7 +3,7 @@ from app.services.adapter_manager import ModelAdapterManager
 from app.core.adapters.base import BaseAdapter, ChatRequest, ChatResponse
 from config.settings import ModelConfig
 
-# 全局适配器管理器实例
+# 全局适配器管理器实例 - 提供统一的服务接口
 adapter_manager = ModelAdapterManager()
 
 

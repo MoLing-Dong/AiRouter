@@ -1,6 +1,7 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session
 from typing import List, Dict, Optional, Any
+from datetime import datetime
 from ..models import (
     Base,
     LLMModel,
@@ -14,6 +15,7 @@ from ..models import (
     LLMModelParamCreate,
     LLMProviderApiKeyCreate,
 )
+from ..models.llm_model_provider import HealthStatusEnum
 from config.settings import settings
 
 
@@ -301,6 +303,7 @@ class DatabaseService:
                 "name": provider.name,
                 "base_url": provider.official_endpoint or provider.third_party_endpoint,
                 "api_key": api_key_obj.api_key,
+                "model": model.name,  # 使用模型的名称
                 "weight": mp.weight,
                 "max_tokens": int(params.get("max_tokens", 4096)),
                 "temperature": float(params.get("temperature", 0.7)),
@@ -436,6 +439,641 @@ class DatabaseService:
                 session.commit()
                 return True
             return False
+
+    # ==================== 以提供商为主的方法 ====================
+
+    def get_best_provider_for_model(self, model_name: str) -> Optional[LLMProvider]:
+        """为指定模型获取最佳提供商"""
+        model = self.get_model_by_name(model_name, is_enabled=True)
+        if not model:
+            return None
+
+        # 获取该模型的所有提供商，按综合评分排序
+        model_providers = self.get_model_providers(model.id, is_enabled=True)
+        if not model_providers:
+            return None
+
+        # 按综合评分排序，选择最佳的
+        best_model_provider = max(model_providers, key=lambda mp: mp.overall_score)
+        return self.get_provider_by_id(best_model_provider.provider_id)
+
+    def get_provider_health_status(self, provider_name: str) -> Dict[str, Any]:
+        """获取提供商的健康状态"""
+        provider = self.get_provider_by_name(provider_name)
+        if not provider:
+            return {}
+
+        # 获取该提供商在所有模型中的表现
+        with self.get_session() as session:
+            model_providers = (
+                session.query(LLMModelProvider)
+                .filter(LLMModelProvider.provider_id == provider.id)
+                .all()
+            )
+
+        if not model_providers:
+            return {}
+
+        # 计算综合健康状态
+        total_score = sum(mp.overall_score for mp in model_providers)
+        avg_score = total_score / len(model_providers)
+        
+        # 确定整体健康状态
+        if avg_score >= 0.8:
+            overall_health = "healthy"
+        elif avg_score >= 0.5:
+            overall_health = "degraded"
+        else:
+            overall_health = "unhealthy"
+
+        return {
+            "provider_name": provider.name,
+            "overall_health": overall_health,
+            "average_score": avg_score,
+            "total_models": len(model_providers),
+            "healthy_models": len([mp for mp in model_providers if mp.health_status == "healthy"]),
+            "degraded_models": len([mp for mp in model_providers if mp.health_status == "degraded"]),
+            "unhealthy_models": len([mp for mp in model_providers if mp.health_status == "unhealthy"]),
+            "model_details": [
+                {
+                    "model_id": mp.llm_id,
+                    "health_status": mp.health_status,
+                    "overall_score": mp.overall_score,
+                    "response_time_avg": mp.response_time_avg,
+                    "success_rate": mp.success_rate,
+                    "cost_per_1k_tokens": mp.cost_per_1k_tokens,
+                }
+                for mp in model_providers
+            ]
+        }
+
+    def get_all_providers_with_health(self) -> List[Dict[str, Any]]:
+        """获取所有提供商及其健康状态"""
+        providers = self.get_all_providers(is_enabled=True)
+        result = []
+
+        for provider in providers:
+            health_info = self.get_provider_health_status(provider.name)
+            if health_info:
+                result.append({
+                    "provider": provider,
+                    "health_info": health_info
+                })
+
+        # 按平均评分排序
+        result.sort(key=lambda x: x["health_info"]["average_score"], reverse=True)
+        return result
+
+    def update_provider_health_status(self, provider_name: str, health_status: str) -> bool:
+        """更新提供商的健康状态（影响所有相关模型）"""
+        provider = self.get_provider_by_name(provider_name)
+        if not provider:
+            return False
+
+        with self.get_session() as session:
+            # 更新该提供商在所有模型中的健康状态
+            model_providers = (
+                session.query(LLMModelProvider)
+                .filter(LLMModelProvider.provider_id == provider.id)
+                .all()
+            )
+
+            for mp in model_providers:
+                mp.health_status = health_status
+                mp.last_health_check = datetime.now()
+                self._recalculate_scores(mp)
+
+            session.commit()
+            return True
+
+    def get_provider_performance_stats(self, provider_name: str) -> Dict[str, Any]:
+        """获取提供商的性能统计"""
+        provider = self.get_provider_by_name(provider_name)
+        if not provider:
+            return {}
+
+        with self.get_session() as session:
+            model_providers = (
+                session.query(LLMModelProvider)
+                .filter(LLMModelProvider.provider_id == provider.id)
+                .all()
+            )
+
+        if not model_providers:
+            return {}
+
+        # 计算综合统计
+        total_requests = sum(mp.total_requests for mp in model_providers)
+        total_successful = sum(mp.successful_requests for mp in model_providers)
+        total_cost = sum(mp.total_cost for mp in model_providers)
+        total_tokens = sum(mp.total_tokens_used for mp in model_providers)
+
+        # 计算平均响应时间
+        response_times = [mp.response_time_avg for mp in model_providers if mp.response_time_avg > 0]
+        avg_response_time = sum(response_times) / len(response_times) if response_times else 0
+
+        # 计算平均成功率
+        success_rates = [mp.success_rate for mp in model_providers if mp.success_rate > 0]
+        avg_success_rate = sum(success_rates) / len(success_rates) if success_rates else 0
+
+        return {
+            "provider_name": provider.name,
+            "total_requests": total_requests,
+            "total_successful_requests": total_successful,
+            "total_failed_requests": total_requests - total_successful,
+            "overall_success_rate": total_successful / total_requests if total_requests > 0 else 0,
+            "average_response_time": avg_response_time,
+            "average_success_rate": avg_success_rate,
+            "total_cost": total_cost,
+            "total_tokens_used": total_tokens,
+            "cost_per_1k_tokens": (total_cost / total_tokens * 1000) if total_tokens > 0 else 0,
+            "models_count": len(model_providers),
+            "healthy_models": len([mp for mp in model_providers if mp.health_status == "healthy"]),
+            "degraded_models": len([mp for mp in model_providers if mp.health_status == "degraded"]),
+            "unhealthy_models": len([mp for mp in model_providers if mp.health_status == "unhealthy"]),
+        }
+
+    def get_top_providers(self, limit: int = 5) -> List[Dict[str, Any]]:
+        """获取排名前几的提供商"""
+        providers_with_health = self.get_all_providers_with_health()
+        return providers_with_health[:limit]
+
+    def get_provider_recommendations(self, model_name: str = None) -> List[Dict[str, Any]]:
+        """获取提供商推荐"""
+        if model_name:
+            # 为特定模型推荐提供商
+            model = self.get_model_by_name(model_name, is_enabled=True)
+            if not model:
+                return []
+
+            model_providers = self.get_model_providers(model.id, is_enabled=True)
+            recommendations = []
+
+            for mp in sorted(model_providers, key=lambda x: x.overall_score, reverse=True):
+                provider = self.get_provider_by_id(mp.provider_id)
+                if provider:
+                    recommendations.append({
+                        "provider": provider,
+                        "score": mp.overall_score,
+                        "health_status": mp.health_status,
+                        "response_time": mp.response_time_avg,
+                        "success_rate": mp.success_rate,
+                        "cost_per_1k_tokens": mp.cost_per_1k_tokens,
+                        "reason": self._get_recommendation_reason(mp)
+                    })
+
+            return recommendations
+        else:
+            # 全局提供商推荐
+            return self.get_top_providers(10)
+
+    def _get_recommendation_reason(self, model_provider: LLMModelProvider) -> str:
+        """获取推荐原因"""
+        reasons = []
+        
+        if model_provider.health_status == "healthy":
+            reasons.append("健康状态良好")
+        
+        if model_provider.response_time_avg < 2.0:
+            reasons.append("响应速度快")
+        
+        if model_provider.success_rate > 0.95:
+            reasons.append("成功率高")
+        
+        if model_provider.cost_per_1k_tokens < 0.01:
+            reasons.append("成本较低")
+        
+        if model_provider.is_preferred:
+            reasons.append("首选提供商")
+        
+        return "、".join(reasons) if reasons else "综合评分较高"
+
+    # ==================== 健康状态和评估相关方法 ====================
+
+    def update_model_provider_health_status(
+        self, model_id: int, provider_id: int, health_status: str, 
+        response_time: float = None, success: bool = None
+    ) -> bool:
+        """更新模型-提供商的健康状态"""
+        with self.get_session() as session:
+            model_provider = (
+                session.query(LLMModelProvider)
+                .filter(
+                    LLMModelProvider.llm_id == model_id,
+                    LLMModelProvider.provider_id == provider_id,
+                )
+                .first()
+            )
+            
+            if model_provider:
+                model_provider.health_status = health_status
+                model_provider.last_health_check = datetime.now()
+                
+                # 更新性能指标
+                if response_time is not None:
+                    self._update_response_time_stats(model_provider, response_time)
+                
+                if success is not None:
+                    self._update_success_stats(model_provider, success)
+                
+                # 重新计算评分
+                self._recalculate_scores(model_provider)
+                
+                session.commit()
+                return True
+            return False
+
+    def update_model_provider_metrics(
+        self, model_id: int, provider_id: int, 
+        response_time: float, success: bool, tokens_used: int = 0, cost: float = 0.0
+    ) -> bool:
+        """更新模型-提供商的性能指标"""
+        with self.get_session() as session:
+            model_provider = (
+                session.query(LLMModelProvider)
+                .filter(
+                    LLMModelProvider.llm_id == model_id,
+                    LLMModelProvider.provider_id == provider_id,
+                )
+                .first()
+            )
+            
+            if model_provider:
+                # 更新响应时间统计
+                self._update_response_time_stats(model_provider, response_time)
+                
+                # 更新成功率统计
+                self._update_success_stats(model_provider, success)
+                
+                # 更新成本统计
+                if cost > 0:
+                    model_provider.total_cost += cost
+                    model_provider.total_tokens_used += tokens_used
+                    if tokens_used > 0:
+                        model_provider.cost_per_1k_tokens = (model_provider.total_cost / model_provider.total_tokens_used) * 1000
+                
+                # 重新计算评分
+                self._recalculate_scores(model_provider)
+                
+                session.commit()
+                return True
+            return False
+
+    def get_healthy_model_providers(self, model_id: int) -> List[LLMModelProvider]:
+        """获取健康的模型-提供商关联"""
+        with self.get_session() as session:
+            return (
+                session.query(LLMModelProvider)
+                .filter(
+                    LLMModelProvider.llm_id == model_id,
+                    LLMModelProvider.is_enabled == True,
+                    LLMModelProvider.health_status == HealthStatusEnum.HEALTHY.value,
+                )
+                .order_by(LLMModelProvider.overall_score.desc())
+                .all()
+            )
+
+    def get_best_model_provider(self, model_id: int) -> Optional[LLMModelProvider]:
+        """获取最佳的模型-提供商关联（基于综合评分）"""
+        with self.get_session() as session:
+            return (
+                session.query(LLMModelProvider)
+                .filter(
+                    LLMModelProvider.llm_id == model_id,
+                    LLMModelProvider.is_enabled == True,
+                    LLMModelProvider.health_status.in_([
+                        HealthStatusEnum.HEALTHY.value,
+                        HealthStatusEnum.DEGRADED.value
+                    ]),
+                )
+                .order_by(LLMModelProvider.overall_score.desc())
+                .first()
+            )
+
+    def increment_failure_count(self, model_id: int, provider_id: int) -> bool:
+        """增加失败计数"""
+        with self.get_session() as session:
+            model_provider = (
+                session.query(LLMModelProvider)
+                .filter(
+                    LLMModelProvider.llm_id == model_id,
+                    LLMModelProvider.provider_id == provider_id,
+                )
+                .first()
+            )
+            
+            if model_provider:
+                model_provider.failure_count += 1
+                model_provider.last_failure_time = datetime.now()
+                
+                # 如果失败次数超过阈值且启用了自动禁用
+                if (model_provider.failure_count >= model_provider.max_failures and 
+                    model_provider.auto_disable_on_failure):
+                    model_provider.is_enabled = False
+                    model_provider.health_status = HealthStatusEnum.UNHEALTHY.value
+                
+                session.commit()
+                return True
+            return False
+
+    def reset_failure_count(self, model_id: int, provider_id: int) -> bool:
+        """重置失败计数"""
+        with self.get_session() as session:
+            model_provider = (
+                session.query(LLMModelProvider)
+                .filter(
+                    LLMModelProvider.llm_id == model_id,
+                    LLMModelProvider.provider_id == provider_id,
+                )
+                .first()
+            )
+            
+            if model_provider:
+                model_provider.failure_count = 0
+                session.commit()
+                return True
+            return False
+
+    def get_model_provider_stats(self, model_id: int, provider_id: int) -> Dict[str, Any]:
+        """获取模型-提供商的统计信息"""
+        with self.get_session() as session:
+            model_provider = (
+                session.query(LLMModelProvider)
+                .filter(
+                    LLMModelProvider.llm_id == model_id,
+                    LLMModelProvider.provider_id == provider_id,
+                )
+                .first()
+            )
+            
+            if model_provider:
+                return {
+                    "health_status": model_provider.health_status,
+                    "response_time_avg": model_provider.response_time_avg,
+                    "success_rate": model_provider.success_rate,
+                    "total_requests": model_provider.total_requests,
+                    "successful_requests": model_provider.successful_requests,
+                    "failed_requests": model_provider.failed_requests,
+                    "cost_per_1k_tokens": model_provider.cost_per_1k_tokens,
+                    "total_cost": model_provider.total_cost,
+                    "total_tokens_used": model_provider.total_tokens_used,
+                    "health_score": model_provider.health_score,
+                    "performance_score": model_provider.performance_score,
+                    "cost_score": model_provider.cost_score,
+                    "overall_score": model_provider.overall_score,
+                    "failure_count": model_provider.failure_count,
+                    "last_health_check": model_provider.last_health_check,
+
+                    "last_failure_time": model_provider.last_failure_time,
+                    "custom_config": model_provider.custom_config,
+                    "model_metadata": model_provider.model_metadata,
+                }
+            return {}
+
+    # ==================== 私有辅助方法 ====================
+
+    def _update_response_time_stats(self, model_provider: LLMModelProvider, response_time: float):
+        """更新响应时间统计"""
+        if model_provider.response_time_avg == 0:
+            model_provider.response_time_avg = response_time
+            model_provider.response_time_min = response_time
+            model_provider.response_time_max = response_time
+        else:
+            # 使用指数移动平均
+            alpha = 0.1  # 平滑因子
+            model_provider.response_time_avg = (
+                alpha * response_time + (1 - alpha) * model_provider.response_time_avg
+            )
+            model_provider.response_time_min = min(model_provider.response_time_min, response_time)
+            model_provider.response_time_max = max(model_provider.response_time_max, response_time)
+
+    def _update_success_stats(self, model_provider: LLMModelProvider, success: bool):
+        """更新成功率统计"""
+        model_provider.total_requests += 1
+        if success:
+            model_provider.successful_requests += 1
+        else:
+            model_provider.failed_requests += 1
+        
+        # 计算成功率
+        if model_provider.total_requests > 0:
+            model_provider.success_rate = model_provider.successful_requests / model_provider.total_requests
+
+    def _recalculate_scores(self, model_provider: LLMModelProvider):
+        """重新计算评分"""
+        # 健康评分
+        if model_provider.health_status == HealthStatusEnum.HEALTHY.value:
+            model_provider.health_score = 1.0
+        elif model_provider.health_status == HealthStatusEnum.DEGRADED.value:
+            model_provider.health_score = 0.5
+        else:
+            model_provider.health_score = 0.1
+
+        # 性能评分（基于响应时间和成功率）
+        response_time_score = max(0, 1 - model_provider.response_time_avg / 10)  # 10秒内线性递减
+        performance_score = (response_time_score * 0.5 + model_provider.success_rate * 0.5)
+        model_provider.performance_score = min(1.0, max(0.0, performance_score))
+
+        # 成本评分（越便宜越好）
+        cost_score = max(0, 1 - model_provider.cost_per_1k_tokens / 0.1)  # 0.1$/1K tokens内线性递减
+        model_provider.cost_score = min(1.0, max(0.0, cost_score))
+
+        # 综合评分（加权平均）
+        model_provider.overall_score = (
+            model_provider.health_score * 0.4 +
+            model_provider.performance_score * 0.4 +
+            model_provider.cost_score * 0.2
+        )
+
+    def update_model_provider_strategy(
+        self, 
+        model_name: str, 
+        provider_name: str, 
+        strategy: str,
+        strategy_config: Dict[str, Any] = None,
+        priority: int = None
+    ) -> bool:
+        """更新模型-供应商的负载均衡策略"""
+        try:
+            with self.get_session() as session:
+                # 获取模型和供应商
+                model = self.get_model_by_name(model_name)
+                provider = self.get_provider_by_name(provider_name)
+                
+                if not model or not provider:
+                    return False
+
+                # 获取模型-供应商关联
+                model_provider = (
+                    session.query(LLMModelProvider)
+                    .filter(
+                        LLMModelProvider.llm_id == model.id,
+                        LLMModelProvider.provider_id == provider.id
+                    )
+                    .first()
+                )
+
+                if not model_provider:
+                    return False
+
+                # 更新策略配置
+                model_provider.load_balancing_strategy = strategy
+                if strategy_config is not None:
+                    model_provider.strategy_config = strategy_config
+                if priority is not None:
+                    model_provider.priority = priority
+
+                session.commit()
+                return True
+
+        except Exception as e:
+            print(f"更新负载均衡策略失败: {e}")
+            return False
+
+    def get_model_provider_strategy(
+        self, model_name: str, provider_name: str
+    ) -> Optional[Dict[str, Any]]:
+        """获取模型-供应商的负载均衡策略"""
+        try:
+            model = self.get_model_by_name(model_name)
+            provider = self.get_provider_by_name(provider_name)
+            
+            if not model or not provider:
+                return None
+
+            with self.get_session() as session:
+                model_provider = (
+                    session.query(LLMModelProvider)
+                    .filter(
+                        LLMModelProvider.llm_id == model.id,
+                        LLMModelProvider.provider_id == provider.id
+                    )
+                    .first()
+                )
+
+                if not model_provider:
+                    return None
+
+                return {
+                    "strategy": model_provider.load_balancing_strategy,
+                    "strategy_config": model_provider.strategy_config,
+                    "priority": model_provider.priority,
+                    "max_retries": model_provider.max_retries,
+                    "retry_delay": model_provider.retry_delay,
+                    "circuit_breaker_enabled": model_provider.circuit_breaker_enabled,
+                    "circuit_breaker_threshold": model_provider.circuit_breaker_threshold,
+                    "circuit_breaker_timeout": model_provider.circuit_breaker_timeout,
+                }
+
+        except Exception as e:
+            print(f"获取负载均衡策略失败: {e}")
+            return None
+
+    def get_model_strategies(self, model_name: str) -> List[Dict[str, Any]]:
+        """获取模型的所有供应商策略"""
+        try:
+            model = self.get_model_by_name(model_name, is_enabled=True)
+            if not model:
+                return []
+
+            model_providers = self.get_model_providers(model.id, is_enabled=True)
+            strategies = []
+
+            for mp in model_providers:
+                provider = self.get_provider_by_id(mp.provider_id)
+                if provider:
+                    strategies.append({
+                        "provider_name": provider.name,
+                        "strategy": mp.load_balancing_strategy,
+                        "strategy_config": mp.strategy_config,
+                        "priority": mp.priority,
+                        "weight": mp.weight,
+                        "is_preferred": mp.is_preferred,
+                        "health_status": mp.health_status,
+                        "overall_score": mp.overall_score,
+                    })
+
+            return strategies
+
+        except Exception as e:
+            print(f"获取模型策略失败: {e}")
+            return []
+
+    def update_model_provider_circuit_breaker(
+        self, 
+        model_name: str, 
+        provider_name: str,
+        enabled: bool = None,
+        threshold: int = None,
+        timeout: int = None
+    ) -> bool:
+        """更新模型-供应商的熔断器配置"""
+        try:
+            with self.get_session() as session:
+                model = self.get_model_by_name(model_name)
+                provider = self.get_provider_by_name(provider_name)
+                
+                if not model or not provider:
+                    return False
+
+                model_provider = (
+                    session.query(LLMModelProvider)
+                    .filter(
+                        LLMModelProvider.llm_id == model.id,
+                        LLMModelProvider.provider_id == provider.id
+                    )
+                    .first()
+                )
+
+                if not model_provider:
+                    return False
+
+                if enabled is not None:
+                    model_provider.circuit_breaker_enabled = enabled
+                if threshold is not None:
+                    model_provider.circuit_breaker_threshold = threshold
+                if timeout is not None:
+                    model_provider.circuit_breaker_timeout = timeout
+
+                session.commit()
+                return True
+
+        except Exception as e:
+            print(f"更新熔断器配置失败: {e}")
+            return False
+
+    def get_available_strategies(self) -> List[str]:
+        """获取所有可用的负载均衡策略"""
+        from .load_balancing_strategies import LoadBalancingStrategy
+        return [strategy.value for strategy in LoadBalancingStrategy]
+
+    def get_strategy_statistics(self, model_name: str = None) -> Dict[str, Any]:
+        """获取策略使用统计"""
+        try:
+            with self.get_session() as session:
+                query = session.query(LLMModelProvider)
+                
+                if model_name:
+                    model = self.get_model_by_name(model_name)
+                    if model:
+                        query = query.filter(LLMModelProvider.llm_id == model.id)
+
+                model_providers = query.all()
+                
+                strategy_counts = {}
+                for mp in model_providers:
+                    strategy = mp.load_balancing_strategy
+                    strategy_counts[strategy] = strategy_counts.get(strategy, 0) + 1
+
+                return {
+                    "total_model_providers": len(model_providers),
+                    "strategy_distribution": strategy_counts,
+                    "available_strategies": self.get_available_strategies(),
+                }
+
+        except Exception as e:
+            print(f"获取策略统计失败: {e}")
+            return {}
 
 
 # 全局数据库服务实例

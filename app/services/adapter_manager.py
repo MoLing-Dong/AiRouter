@@ -118,7 +118,9 @@ class ModelAdapterManager:
             if not provider_config.enabled:
                 continue
 
-            adapter = self.factory.create_adapter(provider_config, model_name)
+            # 从数据库配置中获取模型名称
+            adapter_model_name = model_name
+            adapter = self.factory.create_adapter(provider_config, adapter_model_name)
             if adapter:
                 self.model_adapters[model_name].append(adapter)
                 self.provider_adapters[f"{model_name}:{provider_config.name}"] = adapter

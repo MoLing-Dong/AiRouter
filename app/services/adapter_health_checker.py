@@ -1,5 +1,7 @@
-from typing import Dict, List
+from typing import Dict, List, Optional
 from app.core.adapters.base import BaseAdapter, HealthStatus
+from app.services.database_service import db_service
+from app.models.llm_model_provider import HealthStatusEnum
 
 
 class HealthChecker:
@@ -17,9 +19,16 @@ class HealthChecker:
                 status = await adapter.health_check()
                 print(f"健康状态: {status.value}")
                 health_status[f"{model_name}:{adapter.provider}"] = status.value
+                
+                # 更新数据库中的健康状态
+                self._update_db_health_status(model_name, adapter.provider, status.value)
+                
             except Exception as e:
                 print(f"健康检查失败: {adapter.provider} - {e}")
                 health_status[f"{model_name}:{adapter.provider}"] = "unhealthy"
+                
+                # 更新数据库中的健康状态
+                self._update_db_health_status(model_name, adapter.provider, "unhealthy")
 
         return health_status
 
@@ -78,3 +87,164 @@ class HealthChecker:
                 best_adapter = adapter
 
         return best_adapter
+
+    def get_best_adapter_from_db(self, model_name: str) -> Optional[BaseAdapter]:
+        """从数据库获取最佳适配器"""
+        try:
+            # 获取模型
+            model = db_service.get_model_by_name(model_name)
+            if not model:
+                return None
+
+            # 获取最佳的模型-提供商关联
+            best_model_provider = db_service.get_best_model_provider(model.id)
+            if not best_model_provider:
+                return None
+
+            # 获取提供商信息
+            provider = db_service.get_provider_by_id(best_model_provider.provider_id)
+            if not provider:
+                return None
+
+            # 获取API密钥
+            api_key_obj = db_service.get_best_api_key(provider.id)
+            if not api_key_obj:
+                return None
+
+            # 构建适配器配置
+            config = {
+                "name": model.name,
+                "provider": provider.name,
+                "base_url": provider.official_endpoint or provider.third_party_endpoint,
+                "api_key": api_key_obj.api_key,
+                "weight": best_model_provider.weight,
+                "cost_per_1k_tokens": best_model_provider.cost_per_1k_tokens,
+                "timeout": 30,
+                "retry_count": 3,
+                "enabled": best_model_provider.is_enabled,
+                "is_preferred": best_model_provider.is_preferred,
+            }
+
+            # 根据提供商类型创建适配器
+            from app.core.adapters import create_adapter
+            adapter = create_adapter(provider.name, config)
+            
+            # 设置健康状态
+            if best_model_provider.health_status == HealthStatusEnum.HEALTHY.value:
+                adapter.health_status = HealthStatus.HEALTHY
+            elif best_model_provider.health_status == HealthStatusEnum.DEGRADED.value:
+                adapter.health_status = HealthStatus.DEGRADED
+            else:
+                adapter.health_status = HealthStatus.UNHEALTHY
+
+            return adapter
+
+        except Exception as e:
+            print(f"从数据库获取最佳适配器失败: {e}")
+            return None
+
+    def update_adapter_metrics_to_db(
+        self, model_name: str, provider_name: str, 
+        response_time: float, success: bool, tokens_used: int = 0, cost: float = 0.0
+    ) -> bool:
+        """更新适配器指标到数据库"""
+        try:
+            # 获取模型
+            model = db_service.get_model_by_name(model_name)
+            if not model:
+                return False
+
+            # 获取提供商
+            provider = db_service.get_provider_by_name(provider_name)
+            if not provider:
+                return False
+
+            # 更新指标
+            return db_service.update_model_provider_metrics(
+                model.id, provider.id, response_time, success, tokens_used, cost
+            )
+
+        except Exception as e:
+            print(f"更新适配器指标到数据库失败: {e}")
+            return False
+
+    def get_model_provider_stats_from_db(self, model_name: str, provider_name: str) -> Dict[str, any]:
+        """从数据库获取模型-提供商统计信息"""
+        try:
+            # 获取模型
+            model = db_service.get_model_by_name(model_name)
+            if not model:
+                return {}
+
+            # 获取提供商
+            provider = db_service.get_provider_by_name(provider_name)
+            if not provider:
+                return {}
+
+            # 获取统计信息
+            return db_service.get_model_provider_stats(model.id, provider.id)
+
+        except Exception as e:
+            print(f"从数据库获取统计信息失败: {e}")
+            return {}
+
+    def _update_db_health_status(self, model_name: str, provider_name: str, health_status: str):
+        """更新数据库中的健康状态"""
+        try:
+            # 获取模型
+            model = db_service.get_model_by_name(model_name)
+            if not model:
+                return
+
+            # 获取提供商
+            provider = db_service.get_provider_by_name(provider_name)
+            if not provider:
+                return
+
+            # 更新健康状态
+            db_service.update_model_provider_health_status(
+                model.id, provider.id, health_status
+            )
+
+        except Exception as e:
+            print(f"更新数据库健康状态失败: {e}")
+
+    def increment_failure_count_in_db(self, model_name: str, provider_name: str) -> bool:
+        """在数据库中增加失败计数"""
+        try:
+            # 获取模型
+            model = db_service.get_model_by_name(model_name)
+            if not model:
+                return False
+
+            # 获取提供商
+            provider = db_service.get_provider_by_name(provider_name)
+            if not provider:
+                return False
+
+            # 增加失败计数
+            return db_service.increment_failure_count(model.id, provider.id)
+
+        except Exception as e:
+            print(f"增加失败计数失败: {e}")
+            return False
+
+    def reset_failure_count_in_db(self, model_name: str, provider_name: str) -> bool:
+        """在数据库中重置失败计数"""
+        try:
+            # 获取模型
+            model = db_service.get_model_by_name(model_name)
+            if not model:
+                return False
+
+            # 获取提供商
+            provider = db_service.get_provider_by_name(provider_name)
+            if not provider:
+                return False
+
+            # 重置失败计数
+            return db_service.reset_failure_count(model.id, provider.id)
+
+        except Exception as e:
+            print(f"重置失败计数失败: {e}")
+            return False
