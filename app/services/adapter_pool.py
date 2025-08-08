@@ -5,7 +5,11 @@ from dataclasses import dataclass
 from enum import Enum
 from ..core.adapters.base import BaseAdapter, HealthStatus
 from ..core.adapters import create_adapter
+from ..utils.logging_config import get_factory_logger
 from .database_service import db_service
+
+# 获取日志器
+logger = get_factory_logger()
 
 
 class PoolStatus(str, Enum):
@@ -50,7 +54,7 @@ class AdapterPool:
             self._cleanup_task = asyncio.create_task(self._cleanup_loop())
         if self._health_check_task is None:
             self._health_check_task = asyncio.create_task(self._health_check_loop())
-        print("🔄 适配器池已启动")
+        logger.info("🔄 适配器池已启动")
 
     async def stop(self):
         """停止适配器池"""
@@ -72,7 +76,7 @@ class AdapterPool:
 
         # 关闭所有适配器
         await self._close_all_adapters()
-        print("🛑 适配器池已停止")
+        logger.info("🛑 适配器池已停止")
 
     async def get_adapter_context(self, model_name: str, provider_name: str):
         """获取适配器上下文管理器"""
@@ -123,7 +127,7 @@ class AdapterPool:
                     pooled_adapter.last_used_time = time.time()
                     pooled_adapter.use_count += 1
                     
-                    print(f"🔄 从池中获取适配器: {model_name}:{provider_name} (使用次数: {pooled_adapter.use_count})")
+                    logger.info(f"🔄 从池中获取适配器: {model_name}:{provider_name} (使用次数: {pooled_adapter.use_count})")
                     return pooled_adapter.adapter
 
             # 如果没有可用的适配器，尝试创建新的
@@ -141,11 +145,11 @@ class AdapterPool:
                         health_check_time=time.time()
                     )
                     pool.append(pooled_adapter)
-                    print(f"🆕 创建新适配器并加入池: {model_name}:{provider_name}")
+                    logger.info(f"🆕 创建新适配器并加入池: {model_name}:{provider_name}")
                     return new_adapter
 
             # 如果池已满，等待可用的适配器
-            print(f"⏳ 池已满，等待可用适配器: {model_name}:{provider_name}")
+            logger.warning(f"⏳ 池已满，等待可用适配器: {model_name}:{provider_name}")
             return await self._wait_for_available_adapter(pool_key)
 
     async def release_adapter(self, adapter: BaseAdapter, model_name: str, provider_name: str):
@@ -164,12 +168,12 @@ class AdapterPool:
                     if pooled_adapter.status == PoolStatus.IN_USE:
                         pooled_adapter.status = PoolStatus.AVAILABLE
                         pooled_adapter.last_used_time = time.time()
-                        print(f"🔄 释放适配器回池: {model_name}:{provider_name} (使用次数: {pooled_adapter.use_count})")
+                        logger.info(f"🔄 释放适配器回池: {model_name}:{provider_name} (使用次数: {pooled_adapter.use_count})")
                     break
 
     async def _initialize_pool(self, pool_key: str, model_name: str, provider_name: str):
         """初始化适配器池"""
-        print(f"🔧 初始化适配器池: {pool_key}")
+        logger.info(f"🔧 初始化适配器池: {pool_key}")
         
         # 创建初始的适配器
         for _ in range(self.min_pool_size):
@@ -193,25 +197,25 @@ class AdapterPool:
             # 获取模型
             model = db_service.get_model_by_name(model_name)
             if not model:
-                print(f"❌ 模型不存在: {model_name}")
+                logger.error(f"❌ 模型不存在: {model_name}")
                 return None
 
             # 获取供应商
             provider = db_service.get_provider_by_name(provider_name)
             if not provider:
-                print(f"❌ 供应商不存在: {provider_name}")
+                logger.error(f"❌ 供应商不存在: {provider_name}")
                 return None
 
             # 获取模型-供应商关联
             model_provider = db_service.get_model_provider_by_ids(model.id, provider.id)
             if not model_provider or not model_provider.is_enabled:
-                print(f"❌ 模型-供应商关联不存在或未启用: {model_name}:{provider_name}")
+                logger.error(f"❌ 模型-供应商关联不存在或未启用: {model_name}:{provider_name}")
                 return None
 
             # 获取API密钥
             api_key_obj = db_service.get_best_api_key(provider.id)
             if not api_key_obj:
-                print(f"❌ 未找到API密钥: {provider_name}")
+                logger.error(f"❌ 未找到API密钥: {provider_name}")
                 return None
 
             # 构建适配器配置
@@ -232,14 +236,14 @@ class AdapterPool:
             # 创建适配器
             adapter = create_adapter(provider.name, config)
             if adapter:
-                print(f"✅ 创建适配器成功: {model_name}:{provider_name}")
+                logger.success(f"✅ 创建适配器成功: {model_name}:{provider_name}")
                 return adapter
             else:
-                print(f"❌ 创建适配器失败: {model_name}:{provider_name}")
+                logger.error(f"❌ 创建适配器失败: {model_name}:{provider_name}")
                 return None
 
         except Exception as e:
-            print(f"❌ 创建适配器异常: {model_name}:{provider_name} - {e}")
+            logger.exception(f"❌ 创建适配器异常: {model_name}:{provider_name} - {e}")
             return None
 
     async def _wait_for_available_adapter(self, pool_key: str) -> Optional[BaseAdapter]:
@@ -260,7 +264,7 @@ class AdapterPool:
             # 等待一段时间后重试
             await asyncio.sleep(0.1)
         
-        print(f"⏰ 等待适配器超时: {pool_key}")
+        logger.error(f"⏰ 等待适配器超时: {pool_key}")
         return None
 
     async def _cleanup_loop(self):
@@ -272,7 +276,7 @@ class AdapterPool:
             except asyncio.CancelledError:
                 break
             except Exception as e:
-                print(f"❌ 清理循环异常: {e}")
+                logger.exception(f"❌ 清理循环异常: {e}")
 
     async def _health_check_loop(self):
         """健康检查循环"""
@@ -283,7 +287,7 @@ class AdapterPool:
             except asyncio.CancelledError:
                 break
             except Exception as e:
-                print(f"❌ 健康检查循环异常: {e}")
+                logger.exception(f"❌ 健康检查循环异常: {e}")
 
     async def _cleanup_expired_adapters(self):
         """清理过期的适配器"""
@@ -320,7 +324,7 @@ class AdapterPool:
                             pool.append(pooled_adapter)
             
             if removed_count > 0:
-                print(f"🧹 清理了 {removed_count} 个过期适配器")
+                logger.info(f"🧹 清理了 {removed_count} 个过期适配器")
 
     async def _check_all_adapters_health(self):
         """检查所有适配器的健康状态"""
@@ -341,14 +345,14 @@ class AdapterPool:
                             
                             if health_status == HealthStatus.UNHEALTHY:
                                 pooled_adapter.status = PoolStatus.UNHEALTHY
-                                print(f"❌ 适配器健康检查失败: {pool_key}")
+                                logger.error(f"❌ 适配器健康检查失败: {pool_key}")
                             elif health_status == HealthStatus.HEALTHY:
                                 if pooled_adapter.status == PoolStatus.UNHEALTHY:
                                     pooled_adapter.status = PoolStatus.AVAILABLE
-                                    print(f"✅ 适配器恢复健康: {pool_key}")
+                                    logger.success(f"✅ 适配器恢复健康: {pool_key}")
                                     
                         except Exception as e:
-                            print(f"❌ 健康检查异常: {pool_key} - {e}")
+                            logger.exception(f"❌ 健康检查异常: {pool_key} - {e}")
                             # 不要立即标记为不健康，给一些容错机会
                             if pooled_adapter.status == PoolStatus.AVAILABLE:
                                 pooled_adapter.status = PoolStatus.UNHEALTHY
@@ -377,7 +381,7 @@ class AdapterPool:
                     try:
                         await pooled_adapter.adapter.close()
                     except Exception as e:
-                        print(f"❌ 关闭适配器异常: {e}")
+                        logger.info(f"❌ 关闭适配器异常: {e}")
             
             self.pools.clear()
 

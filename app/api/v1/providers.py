@@ -1,6 +1,10 @@
 from fastapi import APIRouter, HTTPException, Query
 from typing import List, Optional
 from app.services.database_service import db_service
+from app.utils.logging_config import get_factory_logger
+
+# 获取日志器
+logger = get_factory_logger()
 
 providers_router = APIRouter(prefix="/v1/providers", tags=["提供商管理"])
 

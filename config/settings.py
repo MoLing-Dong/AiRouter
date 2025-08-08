@@ -75,6 +75,7 @@ class Settings(BaseSettings):
     APP_NAME: str = "AI路由器"
     APP_VERSION: str = "1.0.0"
     DEBUG: bool = False
+    RUN_ENV: str = "dev"
 
     # 服务器配置
     HOST: str = "0.0.0.0"
@@ -101,17 +102,6 @@ class Settings(BaseSettings):
 
     # 安全配置
     SECURITY: SecurityConfig = SecurityConfig()
-
-    # API密钥配置（备用）
-    OPENAI_API_KEY: str = ""
-    ANTHROPIC_API_KEY: str = ""
-    GOOGLE_API_KEY: str = ""
-    AZURE_API_KEY: str = ""
-    THIRD_PARTY_API_KEY: str = ""
-    PRIVATE_API_KEY: str = ""
-
-    # 模型配置 - 从数据库读取，这里不需要硬编码配置
-    MODELS: Dict[str, ModelConfig] = {}
 
     class Config:
         env_file = ".env"

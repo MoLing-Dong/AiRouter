@@ -2,7 +2,10 @@ from typing import Dict, List, Optional
 from app.core.adapters.base import BaseAdapter, HealthStatus
 from app.services.database_service import db_service
 from app.models.llm_model_provider import HealthStatusEnum
+from app.utils.logging_config import get_factory_logger
 
+# 获取日志器
+logger = get_factory_logger()
 
 class HealthChecker:
     """健康检查服务 - 专门处理适配器的健康检查逻辑"""
@@ -15,16 +18,16 @@ class HealthChecker:
 
         for adapter in adapters:
             try:
-                print(f"检查适配器: {type(adapter).__name__} - {adapter.provider}")
+                logger.info(f"检查适配器: {type(adapter).__name__} - {adapter.provider}")
                 status = await adapter.health_check()
-                print(f"健康状态: {status.value}")
+                logger.info(f"健康状态: {status.value}")
                 health_status[f"{model_name}:{adapter.provider}"] = status.value
                 
                 # 更新数据库中的健康状态
                 self._update_db_health_status(model_name, adapter.provider, status.value)
                 
             except Exception as e:
-                print(f"健康检查失败: {adapter.provider} - {e}")
+                logger.info(f"健康检查失败: {adapter.provider} - {e}")
                 health_status[f"{model_name}:{adapter.provider}"] = "unhealthy"
                 
                 # 更新数据库中的健康状态
@@ -140,7 +143,7 @@ class HealthChecker:
             return adapter
 
         except Exception as e:
-            print(f"从数据库获取最佳适配器失败: {e}")
+            logger.info(f"从数据库获取最佳适配器失败: {e}")
             return None
 
     def update_adapter_metrics_to_db(
@@ -165,7 +168,7 @@ class HealthChecker:
             )
 
         except Exception as e:
-            print(f"更新适配器指标到数据库失败: {e}")
+            logger.info(f"更新适配器指标到数据库失败: {e}")
             return False
 
     def get_model_provider_stats_from_db(self, model_name: str, provider_name: str) -> Dict[str, any]:
@@ -185,7 +188,7 @@ class HealthChecker:
             return db_service.get_model_provider_stats(model.id, provider.id)
 
         except Exception as e:
-            print(f"从数据库获取统计信息失败: {e}")
+            logger.info(f"从数据库获取统计信息失败: {e}")
             return {}
 
     def _update_db_health_status(self, model_name: str, provider_name: str, health_status: str):
@@ -207,7 +210,7 @@ class HealthChecker:
             )
 
         except Exception as e:
-            print(f"更新数据库健康状态失败: {e}")
+            logger.info(f"更新数据库健康状态失败: {e}")
 
     def increment_failure_count_in_db(self, model_name: str, provider_name: str) -> bool:
         """在数据库中增加失败计数"""
@@ -226,7 +229,7 @@ class HealthChecker:
             return db_service.increment_failure_count(model.id, provider.id)
 
         except Exception as e:
-            print(f"增加失败计数失败: {e}")
+            logger.info(f"增加失败计数失败: {e}")
             return False
 
     def reset_failure_count_in_db(self, model_name: str, provider_name: str) -> bool:
@@ -246,5 +249,5 @@ class HealthChecker:
             return db_service.reset_failure_count(model.id, provider.id)
 
         except Exception as e:
-            print(f"重置失败计数失败: {e}")
+            logger.info(f"重置失败计数失败: {e}")
             return False

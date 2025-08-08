@@ -2,6 +2,10 @@ from typing import Optional
 from app.services.adapter_manager import ModelAdapterManager
 from app.core.adapters.base import BaseAdapter, ChatRequest, ChatResponse
 from config.settings import ModelConfig
+from app.utils.logging_config import get_factory_logger
+
+# 获取日志器
+logger = get_factory_logger()
 
 # 全局适配器管理器实例 - 提供统一的服务接口
 adapter_manager = ModelAdapterManager()

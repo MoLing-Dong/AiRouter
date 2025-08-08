@@ -1,6 +1,10 @@
 from fastapi import APIRouter, HTTPException
 from typing import Dict, Any
 from app.services.adapter_pool import adapter_pool
+from app.utils.logging_config import get_factory_logger
+
+# 获取日志器
+logger = get_factory_logger()
 
 pool_router = APIRouter(prefix="/v1/pool", tags=["适配器池管理"])
 

@@ -17,7 +17,10 @@ from ..models import (
 )
 from ..models.llm_model_provider import HealthStatusEnum
 from config.settings import settings
+from app.utils.logging_config import get_factory_logger
 
+# 获取日志器
+logger = get_factory_logger()
 
 class DatabaseService:
     """数据库服务"""
@@ -274,7 +277,7 @@ class DatabaseService:
             # 获取最佳API密钥
             api_key_obj = self.get_best_api_key(provider.id)
             if not api_key_obj:
-                print(f"警告: 提供商 {provider.name} 没有可用的API密钥")
+                logger.info(f"警告: 提供商 {provider.name} 没有可用的API密钥")
                 continue
 
             # 获取提供商参数
@@ -927,7 +930,7 @@ class DatabaseService:
                 return True
 
         except Exception as e:
-            print(f"更新负载均衡策略失败: {e}")
+            logger.info(f"更新负载均衡策略失败: {e}")
             return False
 
     def get_model_provider_strategy(
@@ -966,7 +969,7 @@ class DatabaseService:
                 }
 
         except Exception as e:
-            print(f"获取负载均衡策略失败: {e}")
+            logger.info(f"获取负载均衡策略失败: {e}")
             return None
 
     def get_model_strategies(self, model_name: str) -> List[Dict[str, Any]]:
@@ -996,7 +999,7 @@ class DatabaseService:
             return strategies
 
         except Exception as e:
-            print(f"获取模型策略失败: {e}")
+            logger.info(f"获取模型策略失败: {e}")
             return []
 
     def update_model_provider_circuit_breaker(
@@ -1039,7 +1042,7 @@ class DatabaseService:
                 return True
 
         except Exception as e:
-            print(f"更新熔断器配置失败: {e}")
+            logger.info(f"更新熔断器配置失败: {e}")
             return False
 
     def get_available_strategies(self) -> List[str]:
@@ -1072,7 +1075,7 @@ class DatabaseService:
                 }
 
         except Exception as e:
-            print(f"获取策略统计失败: {e}")
+            logger.info(f"获取策略统计失败: {e}")
             return {}
 
 

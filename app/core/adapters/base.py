@@ -6,6 +6,10 @@ import time
 from enum import Enum
 import httpx
 import json
+from app.utils.logging_config import get_factory_logger
+
+# 获取日志器
+logger = get_factory_logger()
 
 
 class MessageRole(str, Enum):

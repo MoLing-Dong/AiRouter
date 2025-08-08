@@ -12,7 +12,10 @@ from dataclasses import dataclass
 from ..core.adapters import ChatRequest, ChatResponse
 from ..core.adapters.base import BaseAdapter, HealthStatus
 from .database_service import db_service
+from app.utils.logging_config import get_factory_logger
 
+# 获取日志器
+logger = get_factory_logger()
 
 class LoadBalancingStrategy(str, Enum):
     """负载均衡策略枚举"""
@@ -138,7 +141,7 @@ class LoadBalancingStrategyManager:
                 response = await self._execute_request_with_provider(request, provider)
                 return response
             except Exception as e:
-                print(f"供应商 {provider.name} 失败: {e}")
+                logger.info(f"供应商 {provider.name} 失败: {e}")
                 continue
         
         raise Exception("所有供应商都不可用")
@@ -171,7 +174,7 @@ class LoadBalancingStrategyManager:
                     try:
                         return await self._execute_request_with_provider(request, provider)
                     except Exception as e:
-                        print(f"首选供应商 {preferred_provider} 失败: {e}")
+                        logger.info(f"首选供应商 {preferred_provider} 失败: {e}")
                         break
 
         # 按优先级和评分排序
@@ -183,7 +186,7 @@ class LoadBalancingStrategyManager:
                 response = await self._execute_request_with_provider(request, provider)
                 return response
             except Exception as e:
-                print(f"供应商 {provider.name} 失败: {e}")
+                logger.info(f"供应商 {provider.name} 失败: {e}")
                 continue
 
         raise Exception("所有供应商都不可用")
@@ -218,7 +221,7 @@ class LoadBalancingStrategyManager:
             try:
                 return await self._execute_request_with_provider(request, provider)
             except Exception as e:
-                print(f"供应商 {provider.name} 失败: {e}")
+                logger.info(f"供应商 {provider.name} 失败: {e}")
                 continue
 
         raise Exception("所有供应商都不可用")
@@ -236,7 +239,7 @@ class LoadBalancingStrategyManager:
                 response = await self._execute_request_with_provider(request, provider)
                 return response
             except Exception as e:
-                print(f"供应商 {provider.name} 失败: {e}")
+                logger.info(f"供应商 {provider.name} 失败: {e}")
                 continue
 
         raise Exception("所有供应商都不可用")
@@ -254,7 +257,7 @@ class LoadBalancingStrategyManager:
                 response = await self._execute_request_with_provider(request, provider)
                 return response
             except Exception as e:
-                print(f"供应商 {provider.name} 失败: {e}")
+                logger.info(f"供应商 {provider.name} 失败: {e}")
                 continue
 
         raise Exception("所有供应商都不可用")
@@ -284,7 +287,7 @@ class LoadBalancingStrategyManager:
                 response = await self._execute_request_with_provider(request, provider)
                 return response
             except Exception as e:
-                print(f"供应商 {provider.name} 失败: {e}")
+                logger.info(f"供应商 {provider.name} 失败: {e}")
                 continue
 
         raise Exception("所有供应商都不可用")
@@ -313,7 +316,7 @@ class LoadBalancingStrategyManager:
                 response = await self._execute_request_with_provider(request, provider)
                 return response
             except Exception as e:
-                print(f"供应商 {provider.name} 失败: {e}")
+                logger.info(f"供应商 {provider.name} 失败: {e}")
                 continue
 
         raise Exception("所有供应商都不可用")
@@ -371,14 +374,14 @@ class LoadBalancingStrategyManager:
             # 从适配器池获取适配器
             adapter = await adapter_pool.get_adapter(model_name, provider_name)
             if adapter:
-                print(f"🔄 从适配器池获取适配器: {model_name}:{provider_name}")
+                logger.info(f"🔄 从适配器池获取适配器: {model_name}:{provider_name}")
                 return adapter
             else:
-                print(f"❌ 无法从适配器池获取适配器: {model_name}:{provider_name}")
+                logger.info(f"❌ 无法从适配器池获取适配器: {model_name}:{provider_name}")
                 return None
 
         except Exception as e:
-            print(f"获取供应商适配器失败: {e}")
+            logger.info(f"获取供应商适配器失败: {e}")
             return None
 
     async def _update_provider_metrics(self, provider_name: str, response_time: float, success: bool):
@@ -388,7 +391,7 @@ class LoadBalancingStrategyManager:
             # 简化处理，实际应该更新数据库中的指标
             pass
         except Exception as e:
-            print(f"更新供应商指标失败: {e}")
+            logger.info(f"更新供应商指标失败: {e}")
 
     def get_strategy_info(self) -> Dict[str, Any]:
         """获取策略信息"""

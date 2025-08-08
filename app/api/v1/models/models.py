@@ -1,9 +1,12 @@
 import time
 from fastapi import APIRouter, HTTPException
 from app.services import adapter_manager
+from app.utils.logging_config import get_factory_logger
 
 models_router = APIRouter(prefix="/v1/models", tags=["模型管理"])
 
+# 获取日志器
+logger = get_factory_logger()
 
 @models_router.get("/")
 async def list_models():
@@ -32,15 +35,15 @@ async def list_models():
                         }
                     )
             except Exception as e:
-                print(f"处理模型 {model_name} 时出错: {e}")
+                logger.info(f"处理模型 {model_name} 时出错: {e}")
                 continue
 
         return {"object": "list", "data": models}
     except Exception as e:
-        print(f"获取模型列表失败: {e}")
+        logger.info(f"获取模型列表失败: {e}")
         import traceback
 
-        traceback.print_exc()
+        traceback.logger.info_exc()
         raise HTTPException(status_code=500, detail=f"获取模型列表失败: {str(e)}")
 
 

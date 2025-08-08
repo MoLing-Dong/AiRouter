@@ -2,7 +2,10 @@ import time
 from typing import Dict, List, Any
 from .base import BaseAdapter, ChatRequest, ChatResponse, Message, HealthStatus
 import openai
+from app.utils.logging_config import get_factory_logger
 
+# 获取日志器
+logger = get_factory_logger()
 
 class VolcengineAdapter(BaseAdapter):
     """Volcengine模型适配器 - 使用OpenAI库"""
@@ -98,15 +101,15 @@ class VolcengineAdapter(BaseAdapter):
                     messages=[{"role": "user", "content": "test"}],
                     max_tokens=1,
                 )
-                print(f"VolcengineAdapter健康检查成功 - 测试聊天完成")
+                logger.info(f"VolcengineAdapter健康检查成功 - 测试聊天完成")
                 self.health_status = HealthStatus.HEALTHY
                 self.metrics.last_health_check = time.time()
                 return HealthStatus.HEALTHY
             except Exception as e:
-                print(f"测试聊天请求失败: {str(e)}")
+                logger.info(f"测试聊天请求失败: {str(e)}")
 
             # 如果都失败了，标记为降级
-            print(f"VolcengineAdapter健康检查失败，标记为降级")
+            logger.info(f"VolcengineAdapter健康检查失败，标记为降级")
             self.health_status = HealthStatus.DEGRADED
             return HealthStatus.DEGRADED
 
