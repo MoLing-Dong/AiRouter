@@ -1,39 +1,42 @@
 import uvicorn
-import time
 from contextlib import asynccontextmanager
-from fastapi.responses import JSONResponse
 from config.settings import settings
 from app.core.app import app
 from app.services import adapter_manager
 from app.core.routes import register_routes
+from app.utils.logging_config import init_logging, get_app_logger
+
+# 初始化日志系统
+init_logging()
 
 # 注册路由
 register_routes(app)
 
-
+# 获取日志器
+logger = get_app_logger()
 @asynccontextmanager
 async def lifespan(app):
     """应用生命周期管理"""
     # 启动时初始化
-    print(f"🚀 启动 {settings.APP_NAME} v{settings.APP_VERSION}")
+    logger.info(f"🚀 启动 {settings.APP_NAME} v{settings.APP_VERSION}")
 
     # 启动适配器池
-    print("🔄 启动适配器池...")
+    logger.info("🔄 启动适配器池...")
     from app.services.adapter_pool import adapter_pool
     await adapter_pool.start()
 
     # 从数据库加载模型配置
-    print("📊 从数据库加载模型配置...")
+    logger.info("📊 从数据库加载模型配置...")
     adapter_manager.load_models_from_database()
 
     # 显示负载均衡策略信息
-    print("📊 负载均衡策略系统已启用")
-    print(f"📊 支持策略: auto, specified_provider, fallback, weighted_round_robin, least_connections, response_time, cost_optimized, hybrid")
+    logger.info("📊 负载均衡策略系统已启用")
+    logger.info(f"📊 支持策略: auto, specified_provider, fallback, weighted_round_robin, least_connections, response_time, cost_optimized, hybrid")
 
     yield
 
     # 应用关闭时的清理
-    print("🛑 关闭应用...")
+    logger.info("🛑 关闭应用...")
     await adapter_pool.stop()
     await adapter_manager.close_all()
 

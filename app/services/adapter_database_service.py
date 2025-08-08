@@ -1,6 +1,9 @@
 from typing import Dict, Any, Optional
 from app.services.database_service import db_service
+from app.utils.logging_config import get_factory_logger
 
+# 获取日志器
+logger = get_factory_logger()
 
 class ModelDatabaseService:
     """模型数据库服务 - 专门处理与数据库相关的操作"""
@@ -10,7 +13,7 @@ class ModelDatabaseService:
         try:
             return db_service.get_all_model_configs_from_db()
         except Exception as e:
-            print(f"从数据库获取模型配置失败: {e}")
+            logger.info(f"从数据库获取模型配置失败: {e}")
             return {}
 
     def get_api_key_for_provider(self, provider_name: str) -> str:
@@ -29,19 +32,19 @@ class ModelDatabaseService:
             # 根据提供商名称获取提供商
             provider = db_service.get_provider_by_name(provider_name)
             if not provider:
-                print(f"警告: 数据库中未找到提供商: {provider_name}")
+                logger.info(f"警告: 数据库中未找到提供商: {provider_name}")
                 return ""
 
             # 获取最佳API密钥
             api_key_obj = db_service.get_best_api_key(provider.id)
             if not api_key_obj:
-                print(f"警告: 提供商 {provider_name} 没有可用的API密钥")
+                logger.info(f"警告: 提供商 {provider_name} 没有可用的API密钥")
                 return ""
 
             return api_key_obj.api_key
 
         except Exception as e:
-            print(f"从数据库获取API密钥失败: {provider_name} - {e}")
+            logger.info(f"从数据库获取API密钥失败: {provider_name} - {e}")
             return ""
 
     def _get_api_key_from_settings(self, provider_name: str) -> str:
@@ -69,7 +72,7 @@ class ModelDatabaseService:
             return api_key
 
         except Exception as e:
-            print(f"从settings获取API密钥失败: {provider_name} - {e}")
+            logger.info(f"从settings获取API密钥失败: {provider_name} - {e}")
             return ""
 
     def get_provider_by_name(self, provider_name: str):

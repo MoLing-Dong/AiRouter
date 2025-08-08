@@ -10,6 +10,11 @@ from app.services.adapter_database_service import ModelDatabaseService
 from app.services.adapter_health_checker import HealthChecker
 from config.settings import ModelConfig, ModelProvider
 
+# 获取日志器
+from app.utils.logging_config import get_factory_logger
+
+# 获取日志器
+logger = get_factory_logger()
 
 class ModelAdapterManager:
     """模型适配器管理器 - 以模型为主的设计"""
@@ -37,7 +42,7 @@ class ModelAdapterManager:
         try:
             # 从数据库获取所有模型配置
             db_configs = self.db_service.get_all_model_configs_from_db()
-            print(f"从数据库加载的模型配置: {list(db_configs.keys())}")
+            logger.info(f"从数据库加载的模型配置: {list(db_configs.keys())}")
 
             # 清除现有配置
             self.model_configs.clear()
@@ -46,16 +51,16 @@ class ModelAdapterManager:
 
             # 注册从数据库获取的模型
             for model_name, config in db_configs.items():
-                print(f"注册模型: {model_name}")
+                logger.info(f"注册模型: {model_name}")
                 self._register_model_from_dict(model_name, config)
 
-            print(f"最终可用模型: {list(self.model_configs.keys())}")
+            logger.info(f"最终可用模型: {list(self.model_configs.keys())}")
 
         except Exception as e:
-            print(f"从数据库加载模型配置失败: {e}")
+            logger.info(f"从数据库加载模型配置失败: {e}")
             import traceback
 
-            traceback.print_exc()
+            traceback.logger.info_exc()
 
     def _register_model_from_dict(self, model_name: str, config_dict: Dict[str, Any]):
         """从字典注册模型配置"""
@@ -68,7 +73,7 @@ class ModelAdapterManager:
                     provider_dict["name"]
                 )
                 if not api_key:
-                    print(f"警告: 未找到提供商 {provider_dict['name']} 的API密钥")
+                    logger.info(f"警告: 未找到提供商 {provider_dict['name']} 的API密钥")
                     continue
 
                 provider = ModelProvider(
@@ -86,7 +91,7 @@ class ModelAdapterManager:
                 providers.append(provider)
 
             if not providers:
-                print(f"警告: 模型 {model_name} 没有可用的提供商")
+                logger.info(f"警告: 模型 {model_name} 没有可用的提供商")
                 return
 
             model_config = ModelConfig(
@@ -103,10 +108,10 @@ class ModelAdapterManager:
             )
 
             self.register_model(model_name, model_config)
-            print(f"✅ 从数据库注册模型: {model_name}")
+            logger.info(f"✅ 从数据库注册模型: {model_name}")
 
         except Exception as e:
-            print(f"注册模型失败 {model_name}: {e}")
+            logger.info(f"注册模型失败 {model_name}: {e}")
 
     def register_model(self, model_name: str, model_config: ModelConfig):
         """注册模型配置"""

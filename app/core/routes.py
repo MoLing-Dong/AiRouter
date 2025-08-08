@@ -9,7 +9,10 @@ from app.api.v1 import (
 )
 from app.api.v1.load_balancing import router as load_balancing_router
 from app.api.v1.pool import pool_router
+from app.utils.logging_config import get_factory_logger
 
+# 获取日志器
+logger = get_factory_logger()
 
 def register_routes(app):
     """注册所有路由"""

@@ -45,7 +45,7 @@ async def health_check():
                 }
 
             except Exception as e:
-                print(f"检查模型 {model_name} 健康状态时出错: {e}")
+                logger.info(f"检查模型 {model_name} 健康状态时出错: {e}")
                 all_health_status[model_name] = {
                     "status": "unhealthy",
                     "error": str(e),
@@ -172,7 +172,7 @@ async def get_providers_health():
 
                     providers_health[provider_name]["models"].append(model_name)
             except Exception as e:
-                print(f"获取模型 {model_name} 的提供商信息时出错: {e}")
+                logger.info(f"获取模型 {model_name} 的提供商信息时出错: {e}")
                 continue
 
         return {

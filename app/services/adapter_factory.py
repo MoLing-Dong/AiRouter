@@ -4,7 +4,10 @@ from app.core.adapters.openai import OpenAIAdapter
 from app.core.adapters.anthropic import AnthropicAdapter
 from app.core.adapters.volcengine import VolcengineAdapter
 from config.settings import ModelProvider
+from app.utils.logging_config import get_factory_logger
 
+# 获取日志器
+logger = get_factory_logger()
 
 class AdapterFactory:
     """适配器工厂 - 负责创建不同类型的适配器"""
@@ -27,7 +30,7 @@ class AdapterFactory:
                 "weight": provider_config.weight,
             }
             
-            print(f"🔧 创建适配器: {provider_config.name} -> 模型: {adapter_config['model']}")
+            logger.info(f"🔧 创建适配器: {provider_config.name} -> 模型: {adapter_config['model']}")
 
             # 根据提供商类型创建适配器（大小写不敏感）
             provider_name_lower = provider_config.name.lower()
@@ -43,18 +46,18 @@ class AdapterFactory:
                 return VolcengineAdapter(adapter_config, provider_config.api_key)
             elif provider_name_lower == "google":
                 # TODO: 实现Google适配器
-                print(f"警告: Google适配器尚未实现: {provider_config.name}")
+                logger.info(f"警告: Google适配器尚未实现: {provider_config.name}")
                 return None
             elif provider_name_lower == "private-server":
                 # 私有服务器适配器
                 return OpenAIAdapter(adapter_config, provider_config.api_key)
             else:
                 # 默认使用OpenAI适配器（兼容第三方OpenAI兼容的API）
-                print(f"使用OpenAI适配器作为默认适配器: {provider_config.name}")
+                logger.info(f"使用OpenAI适配器作为默认适配器: {provider_config.name}")
                 return OpenAIAdapter(adapter_config, provider_config.api_key)
 
         except Exception as e:
-            print(f"创建适配器失败: {provider_config.name} - {e}")
+            logger.info(f"创建适配器失败: {provider_config.name} - {e}")
             return None
 
     def _create_openai_adapter(self, config: dict, api_key: str) -> OpenAIAdapter:

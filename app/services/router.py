@@ -8,7 +8,10 @@ from ..core.adapters import ChatRequest, ChatResponse
 from ..core.adapters.base import HealthStatus, BaseAdapter
 from fastapi import HTTPException
 from .load_balancing_strategies import strategy_manager, LoadBalancingStrategy
+from app.utils.logging_config import get_factory_logger
 
+# 获取日志器
+logger = get_factory_logger()
 
 class SmartRouter:
     """智能路由器 - 为特定模型选择最佳供应商"""
@@ -127,7 +130,7 @@ class SmartRouter:
             best_provider = db_service.get_best_provider_for_model(model_name)
             return best_provider.name if best_provider else None
         except Exception as e:
-            print(f"获取最佳供应商失败: {e}")
+            logger.info(f"获取最佳供应商失败: {e}")
             return None
 
     def get_available_providers_for_model(self, model_name: str) -> List[Dict[str, Any]]:
@@ -152,7 +155,7 @@ class SmartRouter:
                 for rec in recommendations["recommendations"]
             ]
         except Exception as e:
-            print(f"获取可用供应商失败: {e}")
+            logger.info(f"获取可用供应商失败: {e}")
             return []
 
     def get_routing_stats(self) -> Dict[str, Any]:

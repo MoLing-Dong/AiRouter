@@ -9,6 +9,11 @@ import asyncio
 
 from app.core.adapters import ChatRequest, ChatResponse, Message, MessageRole
 from app.services.router import router
+from app.utils.logging_config import get_chat_logger
+
+# 获取日志器
+logger = get_chat_logger()
+
 
 chat_router = APIRouter(prefix="/v1", tags=["聊天"])
 
@@ -123,7 +128,7 @@ async def chat_completions(request: ChatCompletionRequest):
         import traceback
 
         error_detail = f"聊天完成失败: {str(e)}\n{traceback.format_exc()}"
-        print(f"API错误详情: {error_detail}")
+        logger.error(f"API错误详情: {error_detail}")
         raise HTTPException(status_code=500, detail=f"聊天完成失败: {str(e)}")
 
 
