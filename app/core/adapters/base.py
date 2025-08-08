@@ -116,6 +116,10 @@ class BaseAdapter(ABC):
         """格式化消息为特定提供商的格式"""
         pass
 
+    async def stream_chat_completion(self, request: ChatRequest):
+        """流式聊天完成 - 子类必须重写此方法以支持真正的流式响应"""
+        raise NotImplementedError("This adapter does not support streaming")
+
     def update_metrics(self, response_time: float, success: bool, tokens_used: int = 0):
         """更新模型指标"""
         self.metrics.response_time = response_time

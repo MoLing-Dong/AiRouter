@@ -117,6 +117,56 @@ class AnthropicAdapter(BaseAdapter):
             self.health_status = HealthStatus.UNHEALTHY
             raise Exception(f"Anthropic适配器错误: {str(e)}")
 
+    async def stream_chat_completion(self, request: ChatRequest):
+        """执行Anthropic流式聊天完成请求"""
+        start_time = time.time()
+
+        try:
+            # 构建请求数据
+            payload = {
+                "model": self.model_name,
+                "messages": self.format_messages(request.messages),
+                "max_tokens": request.max_tokens
+                or self.model_config.get("max_tokens", 4096),
+                "temperature": request.temperature,
+                "top_p": request.top_p,
+                "stream": True,  # 强制启用流式
+            }
+
+            # 发送流式请求
+            async with self.client.stream(
+                "POST", f"{self.base_url}/v1/messages", json=payload
+            ) as response:
+                response.raise_for_status()
+
+                # 直接返回原生的流式响应
+                async for line in response.aiter_lines():
+                    yield line
+
+            # 更新指标
+            response_time = time.time() - start_time
+            self.update_metrics(response_time, True)
+
+        except httpx.HTTPStatusError as e:
+            response_time = time.time() - start_time
+            self.update_metrics(response_time, False)
+
+            # 根据错误状态码更新健康状态
+            if e.response.status_code >= 500:
+                self.health_status = HealthStatus.UNHEALTHY
+            elif e.response.status_code >= 400:
+                self.health_status = HealthStatus.DEGRADED
+
+            raise Exception(
+                f"Anthropic流式API错误: {e.response.status_code} - {e.response.text}"
+            )
+
+        except Exception as e:
+            response_time = time.time() - start_time
+            self.update_metrics(response_time, False)
+            self.health_status = HealthStatus.UNHEALTHY
+            raise Exception(f"Anthropic流式适配器错误: {str(e)}")
+
     async def health_check(self) -> HealthStatus:
         """执行Anthropic健康检查"""
         try:

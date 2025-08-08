@@ -16,6 +16,7 @@ from app.utils.logging_config import get_factory_logger
 # 获取日志器
 logger = get_factory_logger()
 
+
 class ModelAdapterManager:
     """模型适配器管理器 - 以模型为主的设计"""
 
@@ -55,6 +56,7 @@ class ModelAdapterManager:
                 self._register_model_from_dict(model_name, config)
 
             logger.info(f"最终可用模型: {list(self.model_configs.keys())}")
+            logger.info(f"模型适配器: {list(self.model_adapters.keys())}")
 
         except Exception as e:
             logger.info(f"从数据库加载模型配置失败: {e}")
@@ -137,15 +139,19 @@ class ModelAdapterManager:
     def get_best_adapter(self, model_name: str) -> Optional[BaseAdapter]:
         """获取模型的最佳适配器（基于权重和健康状态）"""
         adapters = self.get_model_adapters(model_name)
+        logger.info(f"模型 {model_name} 的适配器数量: {len(adapters)}")
         if not adapters:
+            logger.warning(f"模型 {model_name} 没有可用的适配器")
             return None
 
         # 按权重和健康状态排序
         scored_adapters = []
         for adapter in adapters:
+            # 避免除零错误，如果response_time为0，使用默认值
+            response_time = adapter.metrics.response_time or 1.0
             score = (
                 adapter.metrics.cost_per_1k_tokens * 0.3
-                + (1 - adapter.metrics.response_time / 10) * 0.4
+                + (1 - response_time / 10) * 0.4
                 + adapter.metrics.success_rate * 0.3
             )
 

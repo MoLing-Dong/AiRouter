@@ -7,6 +7,7 @@ from app.utils.logging_config import get_factory_logger
 # 获取日志器
 logger = get_factory_logger()
 
+
 class VolcengineAdapter(BaseAdapter):
     """Volcengine模型适配器 - 使用OpenAI库"""
 
@@ -88,6 +89,59 @@ class VolcengineAdapter(BaseAdapter):
             self.update_metrics(response_time, False)
             self.health_status = HealthStatus.UNHEALTHY
             raise Exception(f"Volcengine适配器错误: {str(e)}")
+
+    async def stream_chat_completion(self, request: ChatRequest):
+        """执行Volcengine流式聊天完成请求 - 使用OpenAI库"""
+        start_time = time.time()
+
+        try:
+            # 构建请求参数
+            params = {
+                "model": self.model_name,
+                "messages": self.format_messages(request.messages),
+                "max_tokens": request.max_tokens
+                or self.model_config.get("max_tokens", 4096),
+                "temperature": request.temperature,
+                "top_p": request.top_p,
+                "frequency_penalty": request.frequency_penalty,
+                "presence_penalty": request.presence_penalty,
+                "stream": True,  # 强制启用流式
+            }
+
+            # 过滤None值
+            filtered_params = {k: v for k, v in params.items() if v is not None}
+
+            # 使用OpenAI库发送流式请求
+            stream = await self.client.chat.completions.create(**filtered_params)
+
+            # 直接返回原生的流式响应
+            async for chunk in stream:
+                logger.info(f"流式响应块: {chunk.model_dump_json()}")
+                # 将JSON转换为SSE格式
+                yield f"data: {chunk.model_dump_json()}\n\n"
+
+            # 更新指标
+            response_time = time.time() - start_time
+            self.update_metrics(response_time, True)
+
+        except openai.APIError as e:
+            response_time = time.time() - start_time
+            self.update_metrics(response_time, False)
+
+            # 根据错误状态码更新健康状态
+            if hasattr(e, "status_code"):
+                if e.status_code >= 500:
+                    self.health_status = HealthStatus.UNHEALTHY
+                elif e.status_code >= 400:
+                    self.health_status = HealthStatus.DEGRADED
+
+            raise Exception(f"Volcengine流式API错误: {str(e)}")
+
+        except Exception as e:
+            response_time = time.time() - start_time
+            self.update_metrics(response_time, False)
+            self.health_status = HealthStatus.UNHEALTHY
+            raise Exception(f"Volcengine流式适配器错误: {str(e)}")
 
     async def health_check(self) -> HealthStatus:
         """执行Volcengine健康检查 - 使用OpenAI库"""

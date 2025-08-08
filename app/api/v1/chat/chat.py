@@ -3,8 +3,6 @@ from fastapi.responses import StreamingResponse
 from typing import Optional, List, Dict, Any
 from pydantic import BaseModel
 import json
-import time
-import uuid
 import asyncio
 
 from app.core.adapters import ChatRequest, ChatResponse, Message, MessageRole
@@ -100,6 +98,7 @@ async def chat_completions(request: ChatCompletionRequest):
         )
 
         if request.stream:
+            logger.info(f"流式响应: {chat_request}")
             # 流式响应
             return StreamingResponse(
                 stream_chat_completion(chat_request),
@@ -135,45 +134,35 @@ async def chat_completions(request: ChatCompletionRequest):
 async def stream_chat_completion(request: ChatRequest):
     """流式聊天完成"""
     try:
-        # 获取适配器
-        adapter = router.get_best_adapter(request.model)
+        # 获取适配器管理器
+        from app.services import adapter_manager
+
+        # 获取最佳适配器
+        adapter = adapter_manager.get_best_adapter(request.model)
+        logger.info(f"获取适配器: {adapter}")
         if not adapter:
+            logger.error(f"没有找到模型 {request.model} 的适配器")
             yield f"data: {json.dumps({'error': 'No available adapter for model'})}\n\n"
             return
 
-        # 创建流式响应
-        response_id = str(uuid.uuid4())
-        created_time = int(time.time())
+        # 调用适配器进行流式响应
+        try:
+            # 检查适配器是否支持流式响应
+            if hasattr(adapter, "stream_chat_completion"):
+                logger.info(f"开始流式响应，适配器类型: {type(adapter).__name__}")
+                async for chunk in adapter.stream_chat_completion(request):
+                    # 直接返回原生流式响应
+                    logger.debug(f"流式响应块: {chunk[:100]}...")  # 只记录前100个字符
+                    yield chunk
+            else:
+                # 如果适配器不支持流式，返回错误
+                yield f"data: {json.dumps({'error': 'This model does not support streaming'})}\n\n"
+                return
 
-        # 发送开始标记
-        yield f"data: {json.dumps({'id': response_id, 'object': 'chat.completion.chunk', 'created': created_time, 'model': request.model, 'choices': [{'index': 0, 'delta': {'role': 'assistant'}, 'finish_reason': None}]})}\n\n"
-
-        # 这里需要实现流式响应逻辑
-        # 由于当前适配器不支持流式，我们先返回一个简单的响应
-        content = "这是一个流式响应的示例。"
-        for i, char in enumerate(content):
-            chunk = {
-                "id": response_id,
-                "object": "chat.completion.chunk",
-                "created": created_time,
-                "model": request.model,
-                "choices": [
-                    {"index": 0, "delta": {"content": char}, "finish_reason": None}
-                ],
-            }
-            yield f"data: {json.dumps(chunk)}\n\n"
-            await asyncio.sleep(0.01)  # 模拟流式延迟
-
-        # 发送结束标记
-        final_chunk = {
-            "id": response_id,
-            "object": "chat.completion.chunk",
-            "created": created_time,
-            "model": request.model,
-            "choices": [{"index": 0, "delta": {}, "finish_reason": "stop"}],
-        }
-        yield f"data: {json.dumps(final_chunk)}\n\n"
-        yield "data: [DONE]\n\n"
+        except Exception as e:
+            logger.error(f"流式响应失败: {e}")
+            yield f"data: {json.dumps({'error': f'Stream response failed: {str(e)}'})}\n\n"
+            return
 
     except Exception as e:
         yield f"data: {json.dumps({'error': str(e)})}\n\n"
