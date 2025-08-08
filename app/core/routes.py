@@ -8,6 +8,7 @@ from app.api.v1 import (
     providers_router
 )
 from app.api.v1.load_balancing import router as load_balancing_router
+from app.api.v1.pool import pool_router
 
 
 def register_routes(app):
@@ -25,3 +26,6 @@ def register_routes(app):
     
     # 注册负载均衡策略管理路由
     app.include_router(load_balancing_router, tags=["负载均衡策略"])
+    
+    # 注册适配器池管理路由
+    app.include_router(pool_router, tags=["适配器池管理"])

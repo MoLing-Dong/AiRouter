@@ -101,23 +101,15 @@ class LoadBalancingStrategyManager:
             if not provider:
                 continue
 
-            # 获取适配器
-            adapter = await self._get_provider_adapter(model_name, provider.name)
-            if not adapter:
+            # 从数据库获取健康状态
+            health_status = mp.health_status
+            if health_status == "unhealthy":
                 continue
 
-            # 检查健康状态
-            try:
-                health_status = await adapter.health_check()
-                if health_status.value == "unhealthy":
-                    continue
-            except:
-                continue
-
-            # 构建供应商信息
+            # 构建供应商信息（不在这里获取适配器，而是在执行时动态获取）
             provider_info = ProviderInfo(
                 name=provider.name,
-                adapter=adapter,
+                adapter=None,  # 适配器将在执行时动态获取
                 weight=mp.weight,
                 priority=mp.priority,
                 health_status=mp.health_status,
@@ -338,17 +330,27 @@ class LoadBalancingStrategyManager:
                 self.provider_connections.get(provider.name, 0) + 1
             )
             
-            # 执行请求
-            response = await provider.adapter.chat_completion(request)
+            # 从适配器池获取适配器
+            from .adapter_pool import adapter_pool
+            adapter = await adapter_pool.get_adapter(request.model, provider.name)
+            if not adapter:
+                raise Exception(f"无法获取适配器: {request.model}:{provider.name}")
             
-            # 更新最后使用时间
-            self.provider_last_used[provider.name] = time.time()
-            
-            # 更新指标
-            response_time = time.time() - start_time
-            await self._update_provider_metrics(provider.name, response_time, True)
-            
-            return response
+            try:
+                # 执行请求
+                response = await adapter.chat_completion(request)
+                
+                # 更新最后使用时间
+                self.provider_last_used[provider.name] = time.time()
+                
+                # 更新指标
+                response_time = time.time() - start_time
+                await self._update_provider_metrics(provider.name, response_time, True)
+                
+                return response
+            finally:
+                # 释放适配器回池
+                await adapter_pool.release_adapter(adapter, request.model, provider.name)
             
         except Exception as e:
             # 更新失败指标
@@ -364,47 +366,16 @@ class LoadBalancingStrategyManager:
     async def _get_provider_adapter(self, model_name: str, provider_name: str) -> Optional[BaseAdapter]:
         """获取供应商适配器"""
         try:
-            from .database_service import db_service
-            # 获取模型
-            model = db_service.get_model_by_name(model_name)
-            if not model:
-                return None
-
-            # 获取供应商
-            provider = db_service.get_provider_by_name(provider_name)
-            if not provider:
-                return None
-
-            # 获取模型-供应商关联
-            model_provider = db_service.get_model_provider_by_ids(model.id, provider.id)
-            if not model_provider or not model_provider.is_enabled:
-                return None
-
-            # 获取API密钥
-            api_key_obj = db_service.get_best_api_key(provider.id)
-            if not api_key_obj:
-                return None
-
-            # 构建适配器配置
-            config = {
-                "name": model.name,
-                "provider": provider.name,
-                "base_url": provider.official_endpoint or provider.third_party_endpoint,
-                "api_key": api_key_obj.api_key,
-                "model": model.name,  # 明确指定模型名称
-                "weight": model_provider.weight,
-                "cost_per_1k_tokens": model_provider.cost_per_1k_tokens,
-                "timeout": 30,
-                "retry_count": 3,
-                "enabled": model_provider.is_enabled,
-                "is_preferred": model_provider.is_preferred,
-            }
-
-            # 根据供应商类型创建适配器
-            from ..core.adapters import create_adapter
-            adapter = create_adapter(provider.name, config)
+            from .adapter_pool import adapter_pool
             
-            return adapter
+            # 从适配器池获取适配器
+            adapter = await adapter_pool.get_adapter(model_name, provider_name)
+            if adapter:
+                print(f"🔄 从适配器池获取适配器: {model_name}:{provider_name}")
+                return adapter
+            else:
+                print(f"❌ 无法从适配器池获取适配器: {model_name}:{provider_name}")
+                return None
 
         except Exception as e:
             print(f"获取供应商适配器失败: {e}")

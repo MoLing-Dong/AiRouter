@@ -17,6 +17,11 @@ async def lifespan(app):
     # 启动时初始化
     print(f"🚀 启动 {settings.APP_NAME} v{settings.APP_VERSION}")
 
+    # 启动适配器池
+    print("🔄 启动适配器池...")
+    from app.services.adapter_pool import adapter_pool
+    await adapter_pool.start()
+
     # 从数据库加载模型配置
     print("📊 从数据库加载模型配置...")
     adapter_manager.load_models_from_database()
@@ -29,6 +34,7 @@ async def lifespan(app):
 
     # 应用关闭时的清理
     print("🛑 关闭应用...")
+    await adapter_pool.stop()
     await adapter_manager.close_all()
 
 
