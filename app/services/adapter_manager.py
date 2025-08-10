@@ -56,13 +56,15 @@ class ModelAdapterManager:
                 self._register_model_from_dict(model_name, config)
 
             logger.info(f"最终可用模型: {list(self.model_configs.keys())}")
-            logger.info(f"模型适配器: {list(self.model_adapters.keys())}")
+            # 打印每个模型对应的适配器提供商名称
+            adapter_info = {}
+            for model_name, adapters in self.model_adapters.items():
+                adapter_info[model_name] = [adapter.provider for adapter in adapters]
+            logger.info(f"模型适配器: {adapter_info}")
 
         except Exception as e:
             logger.info(f"从数据库加载模型配置失败: {e}")
-            import traceback
-
-            traceback.logger.info_exc()
+            logger.info_exc()
 
     def _register_model_from_dict(self, model_name: str, config_dict: Dict[str, Any]):
         """从字典注册模型配置"""

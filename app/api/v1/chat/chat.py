@@ -152,7 +152,6 @@ async def stream_chat_completion(request: ChatRequest):
                 logger.info(f"开始流式响应，适配器类型: {type(adapter).__name__}")
                 async for chunk in adapter.stream_chat_completion(request):
                     # 直接返回原生流式响应
-                    logger.debug(f"流式响应块: {chunk[:100]}...")  # 只记录前100个字符
                     yield chunk
             else:
                 # 如果适配器不支持流式，返回错误

@@ -116,7 +116,6 @@ class VolcengineAdapter(BaseAdapter):
 
             # 直接返回原生的流式响应
             async for chunk in stream:
-                logger.info(f"流式响应块: {chunk.model_dump_json()}")
                 # 将JSON转换为SSE格式
                 yield f"data: {chunk.model_dump_json()}\n\n"
 

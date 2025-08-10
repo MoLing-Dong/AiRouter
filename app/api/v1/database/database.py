@@ -17,8 +17,8 @@ async def get_db_models():
                     "type": model.llm_type,
                     "description": model.description,
                     "is_enabled": model.is_enabled,
-                    "created_at": model.created_at.isoformat(),
-                    "updated_at": model.updated_at.isoformat(),
+                    "created_at": model.created_at,
+                    "updated_at": model.updated_at,
                 }
                 for model in models
             ]

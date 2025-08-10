@@ -31,7 +31,6 @@ async def lifespan(app):
 
     # 显示负载均衡策略信息
     logger.info("📊 负载均衡策略系统已启用")
-    logger.info(f"📊 支持策略: auto, specified_provider, fallback, weighted_round_robin, least_connections, response_time, cost_optimized, hybrid")
 
     yield
 
