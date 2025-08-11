@@ -21,7 +21,7 @@ async def get_routing_stats():
         raise HTTPException(status_code=500, detail=f"获取统计信息失败: {str(e)}")
 
 
-@stats_router.post("/stats/reset")
+@stats_router.post("/reset")
 async def reset_stats():
     """重置路由统计"""
     try:

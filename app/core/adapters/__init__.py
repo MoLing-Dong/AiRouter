@@ -15,6 +15,8 @@ from .base import (
 from .openai import OpenAIAdapter
 from .anthropic import AnthropicAdapter
 from .volcengine import VolcengineAdapter
+from .zhipu import ZhipuAdapter
+from .aliqwen import AliQwenAdapter
 
 # 导出适配器工厂函数
 from ...services.adapter_factory import AdapterFactory
@@ -22,10 +24,11 @@ from ...services.adapter_factory import AdapterFactory
 # 创建全局适配器工厂实例
 _adapter_factory = AdapterFactory()
 
+
 def create_adapter(provider_name: str, config: dict):
     """创建适配器的便捷函数"""
     from config.settings import ModelProvider
-    
+
     # 创建 ModelProvider 对象
     provider_config = ModelProvider(
         name=provider_name,
@@ -38,8 +41,9 @@ def create_adapter(provider_name: str, config: dict):
         retry_count=config.get("retry_count", 3),
         weight=config.get("weight", 1),
     )
-    
+
     return _adapter_factory.create_adapter(provider_config, config.get("model"))
+
 
 # 导出所有必要的类
 __all__ = [
@@ -57,6 +61,8 @@ __all__ = [
     "OpenAIAdapter",
     "AnthropicAdapter",
     "VolcengineAdapter",
+    "ZhipuAdapter",
+    "AliQwenAdapter",
     # 适配器工厂函数
     "create_adapter",
 ]

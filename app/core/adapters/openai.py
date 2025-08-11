@@ -4,6 +4,10 @@ from typing import Dict, List, Optional, Any
 from .base import BaseAdapter, ChatRequest, ChatResponse, Message, HealthStatus
 import httpx
 import json
+from app.utils.logging_config import get_factory_logger
+
+# 获取日志器
+logger = get_factory_logger()
 
 
 class OpenAIAdapter(BaseAdapter):
@@ -122,15 +126,43 @@ class OpenAIAdapter(BaseAdapter):
                 if request.tool_choice:
                     payload["tool_choice"] = request.tool_choice
 
-            # 发送流式请求
-            async with self.client.stream(
-                "POST", f"{self.base_url}/chat/completions", json=payload
-            ) as response:
-                response.raise_for_status()
+            # 尝试使用OpenAI库的流式处理（如果可用）
+            try:
+                # 创建OpenAI客户端
+                import openai
 
-                # 直接返回原生的流式响应
-                async for line in response.aiter_lines():
-                    yield line
+                openai_client = openai.AsyncOpenAI(
+                    api_key=self.api_key, base_url=self.base_url
+                )
+
+                # 使用OpenAI库发送流式请求
+                stream = await openai_client.chat.completions.create(**payload)
+
+                # 逐块处理流式响应
+                async for chunk in stream:
+                    # 将JSON转换为SSE格式
+                    yield f"data: {chunk.model_dump_json()}\n\n"
+
+            except Exception as openai_error:
+                logger.info(f"OpenAI库流式处理失败，回退到httpx: {openai_error}")
+
+                # 回退到httpx流式处理
+                async with self.client.stream(
+                    "POST", f"{self.base_url}/chat/completions", json=payload
+                ) as response:
+                    response.raise_for_status()
+
+                    # 逐行处理流式响应
+                    async for line in response.aiter_lines():
+                        if line.strip():  # 忽略空行
+                            logger.info(f"OpenAI流式响应: {line}")
+                            # 确保每行都有正确的格式和换行符
+                            if not line.startswith("data: "):
+                                line = "data: " + line
+                            yield line + "\n"
+
+            # 发送结束标记
+            yield "data: [DONE]\n\n"
 
             # 更新指标
             response_time = time.time() - start_time

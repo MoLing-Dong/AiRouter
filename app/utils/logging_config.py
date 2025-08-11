@@ -8,56 +8,62 @@ from config.settings import settings
 
 class LogConfig:
     """日志配置类"""
-    
+
     def __init__(self):
         self.log_dir = Path("logs")
         self.log_dir.mkdir(exist_ok=True)
-        
+
         # 日志文件路径
-        self.log_file = self.log_dir / f"ai_router_{datetime.now().strftime('%Y%m%d')}.log"
-        self.error_file = self.log_dir / f"ai_router_error_{datetime.now().strftime('%Y%m%d')}.log"
-        
+        self.log_file = (
+            self.log_dir / f"ai_router_{datetime.now().strftime('%Y%m%d')}.log"
+        )
+        self.error_file = (
+            self.log_dir / f"ai_router_error_{datetime.now().strftime('%Y%m%d')}.log"
+        )
+
         # 获取环境变量
         self.run_env = settings.RUN_ENV
-        
+
         # 开发环境日志格式（详细格式）
         self.dev_console_format = (
             "<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> | "
-            "<level>{level: <8}</level> | "
+            "<level>{level: <5}</level> | "
             "<cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> | "
             "<level>{message}</level>"
         )
-        
+
         # 生产环境日志格式（简洁格式）
         self.prod_console_format = (
             "<green>{time:YYYY-MM-DD HH:mm:ss}</green> | "
-            "<level>{level: <8}</level> | "
+            "<level>{level: <5}</level> | "
             "<level>{message}</level>"
         )
-        
+
         self.file_format = (
             "{time:YYYY-MM-DD HH:mm:ss} | "
-            "{level: <8} | "
+            "{level: <5} | "
             "{name}:{function}:{line} | "
             "{message}"
         )
-        
+
         # 日志级别
         self.console_level = "INFO"
         self.file_level = "DEBUG"
         self.error_level = "ERROR"
-    
-    def setup_logging(self, 
-                     console_level: str = "INFO",
-                     file_level: str = "DEBUG",
-                     enable_console: bool = True,
-                     enable_file: bool = True,
-                     max_file_size: str = "10 MB",
-                     rotation: str = "1 day",
-                     retention: str = "30 days"):
+
+    def setup_logging(
+        self,
+        console_level: str = "INFO",
+        file_level: str = "DEBUG",
+        enable_console: bool = True,
+        enable_file: bool = True,
+        max_file_size: str = "10 MB",
+        rotation: str = "1 day",
+        retention: str = "30 days",
+    ):
         """
         设置日志系统
-        
+
         Args:
             console_level: 控制台日志级别
             file_level: 文件日志级别
@@ -67,17 +73,21 @@ class LogConfig:
             rotation: 日志轮转间隔
             retention: 日志保留时间
         """
-        
+
         # 清除默认处理器
         logger.remove()
-        
+
         # 根据环境选择日志格式
-        console_format = self.dev_console_format if self.run_env == "dev" else self.prod_console_format
-        
+        console_format = (
+            self.dev_console_format
+            if self.run_env == "dev"
+            else self.prod_console_format
+        )
+
         # 调试信息（临时）
         print(f"当前环境: {self.run_env}")
         print(f"使用日志格式: {'开发环境' if self.run_env == 'dev' else '生产环境'}")
-        
+
         # 控制台处理器
         if enable_console:
             logger.add(
@@ -86,9 +96,9 @@ class LogConfig:
                 level=console_level,
                 colorize=True,
                 backtrace=True,
-                diagnose=True
+                diagnose=True,
             )
-        
+
         # 文件处理器
         if enable_file:
             logger.add(
@@ -100,9 +110,9 @@ class LogConfig:
                 compression="zip",
                 backtrace=True,
                 diagnose=True,
-                encoding="utf-8"
+                encoding="utf-8",
             )
-            
+
             # 错误日志文件
             logger.add(
                 str(self.error_file),
@@ -113,16 +123,16 @@ class LogConfig:
                 compression="zip",
                 backtrace=True,
                 diagnose=True,
-                encoding="utf-8"
+                encoding="utf-8",
             )
-    
+
     def get_logger(self, name: str = None):
         """
         获取日志器
-        
+
         Args:
             name: 日志器名称，如果为None则返回默认日志器
-        
+
         Returns:
             loguru logger实例
         """
@@ -138,23 +148,23 @@ log_config = LogConfig()
 def init_logging(config: Optional[Dict[str, Any]] = None):
     """
     初始化日志系统
-    
+
     Args:
         config: 日志配置字典
     """
     if config is None:
         config = {}
-    
+
     log_config.setup_logging(**config)
 
 
 def get_logger(name: str = None):
     """
     获取日志器
-    
+
     Args:
         name: 日志器名称
-    
+
     Returns:
         loguru logger实例
     """
@@ -215,7 +225,7 @@ DEFAULT_LOG_CONFIG = {
     "enable_file": True,
     "max_file_size": "10 MB",
     "rotation": "1 day",
-    "retention": "30 days"
+    "retention": "30 days",
 }
 
 

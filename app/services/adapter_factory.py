@@ -3,11 +3,14 @@ from app.core.adapters.base import BaseAdapter
 from app.core.adapters.openai import OpenAIAdapter
 from app.core.adapters.anthropic import AnthropicAdapter
 from app.core.adapters.volcengine import VolcengineAdapter
+from app.core.adapters.zhipu import ZhipuAdapter
+from app.core.adapters.aliqwen import AliQwenAdapter
 from config.settings import ModelProvider
 from app.utils.logging_config import get_factory_logger
 
 # 获取日志器
 logger = get_factory_logger()
+
 
 class AdapterFactory:
     """适配器工厂 - 负责创建不同类型的适配器"""
@@ -21,7 +24,10 @@ class AdapterFactory:
             adapter_config = {
                 "provider": provider_config.name,
                 "base_url": provider_config.base_url,
-                "model": model_name or getattr(provider_config, 'model', provider_config.name),  # 优先使用传入的模型名，然后从提供商配置获取，最后使用提供商名
+                "model": model_name
+                or getattr(
+                    provider_config, "model", provider_config.name
+                ),  # 优先使用传入的模型名，然后从提供商配置获取，最后使用提供商名
                 "max_tokens": provider_config.max_tokens,
                 "temperature": provider_config.temperature,
                 "cost_per_1k_tokens": provider_config.cost_per_1k_tokens,
@@ -29,8 +35,10 @@ class AdapterFactory:
                 "retry_count": provider_config.retry_count,
                 "weight": provider_config.weight,
             }
-            
-            logger.info(f"🔧 创建适配器: {provider_config.name} -> 模型: {adapter_config['model']}")
+
+            logger.info(
+                f"🔧 创建适配器: {provider_config.name} -> 模型: {adapter_config['model']}"
+            )
 
             # 根据提供商类型创建适配器（大小写不敏感）
             provider_name_lower = provider_config.name.lower()
@@ -44,6 +52,10 @@ class AdapterFactory:
                 return AnthropicAdapter(adapter_config, provider_config.api_key)
             elif provider_name_lower == "volcengine":
                 return VolcengineAdapter(adapter_config, provider_config.api_key)
+            elif provider_name_lower == "zhipu":
+                return ZhipuAdapter(adapter_config, provider_config.api_key)
+            elif provider_name_lower == "aliqwen":
+                return AliQwenAdapter(adapter_config, provider_config.api_key)
             elif provider_name_lower == "google":
                 # TODO: 实现Google适配器
                 logger.info(f"警告: Google适配器尚未实现: {provider_config.name}")
@@ -73,3 +85,11 @@ class AdapterFactory:
     ) -> VolcengineAdapter:
         """创建火山引擎适配器"""
         return VolcengineAdapter(config, api_key)
+
+    def _create_zhipu_adapter(self, config: dict, api_key: str) -> ZhipuAdapter:
+        """创建智谱AI适配器"""
+        return ZhipuAdapter(config, api_key)
+
+    def _create_aliqwen_adapter(self, config: dict, api_key: str) -> AliQwenAdapter:
+        """创建千问适配器"""
+        return AliQwenAdapter(config, api_key)

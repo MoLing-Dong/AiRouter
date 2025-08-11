@@ -102,11 +102,11 @@ async def chat_completions(request: ChatCompletionRequest):
             # 流式响应
             return StreamingResponse(
                 stream_chat_completion(chat_request),
-                media_type="text/plain",
+                media_type="text/event-stream",
                 headers={
                     "Cache-Control": "no-cache",
                     "Connection": "keep-alive",
-                    "Content-Type": "text/event-stream",
+                    "X-Accel-Buffering": "no",  # 禁用nginx缓冲
                 },
             )
         else:

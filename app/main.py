@@ -55,7 +55,6 @@ async def root():
             settings.APP_DESCRIPTION if hasattr(settings, "APP_DESCRIPTION") else None
         ),
         "docs": "/docs",
-        "health": "/health",
         "models": "/v1/models",
         "stats": "/v1/stats",
         "load_balancing": "/v1/load-balancing",
