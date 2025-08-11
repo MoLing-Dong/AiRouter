@@ -12,6 +12,7 @@ from ..models import (
     LLMModelCreate,
     LLMProviderCreate,
     LLMModelProviderCreate,
+    LLMModelProviderUpdate,
     LLMModelParamCreate,
     LLMProviderApiKeyCreate,
 )
@@ -21,6 +22,7 @@ from app.utils.logging_config import get_factory_logger
 
 # 获取日志器
 logger = get_factory_logger()
+
 
 class DatabaseService:
     """数据库服务"""
@@ -246,6 +248,55 @@ class DatabaseService:
         with self.get_session() as session:
             model_provider = LLMModelProvider(**model_provider_data.dict())
             session.add(model_provider)
+            session.commit()
+            session.refresh(model_provider)
+            return model_provider
+
+    def update_model_provider(
+        self, model_provider_id: int, model_provider_data: LLMModelProviderUpdate
+    ) -> LLMModelProvider:
+        """更新模型-提供商关联"""
+        with self.get_session() as session:
+            # 查找要更新的模型-提供商关联
+            model_provider = (
+                session.query(LLMModelProvider)
+                .filter(LLMModelProvider.id == model_provider_id)
+                .first()
+            )
+
+            if not model_provider:
+                raise ValueError(f"模型-提供商关联不存在: ID {model_provider_id}")
+
+            # 获取更新数据
+            update_data = model_provider_data.dict(exclude_unset=True)
+
+            # 如果更新包含 llm_id 或 provider_id，需要检查唯一性约束
+            if "llm_id" in update_data or "provider_id" in update_data:
+                new_llm_id = update_data.get("llm_id", model_provider.llm_id)
+                new_provider_id = update_data.get(
+                    "provider_id", model_provider.provider_id
+                )
+
+                # 检查新的组合是否与其他记录冲突（排除当前记录）
+                existing_conflict = (
+                    session.query(LLMModelProvider)
+                    .filter(
+                        LLMModelProvider.llm_id == new_llm_id,
+                        LLMModelProvider.provider_id == new_provider_id,
+                        LLMModelProvider.id != model_provider_id,  # 排除当前记录
+                    )
+                    .first()
+                )
+
+                if existing_conflict:
+                    raise ValueError(
+                        f"模型-提供商关联已存在: 模型ID {new_llm_id}, 提供商ID {new_provider_id}"
+                    )
+
+            # 更新所有字段
+            for field, value in update_data.items():
+                setattr(model_provider, field, value)
+
             session.commit()
             session.refresh(model_provider)
             return model_provider
@@ -480,7 +531,7 @@ class DatabaseService:
         # 计算综合健康状态
         total_score = sum(mp.overall_score for mp in model_providers)
         avg_score = total_score / len(model_providers)
-        
+
         # 确定整体健康状态
         if avg_score >= 0.8:
             overall_health = "healthy"
@@ -494,9 +545,15 @@ class DatabaseService:
             "overall_health": overall_health,
             "average_score": avg_score,
             "total_models": len(model_providers),
-            "healthy_models": len([mp for mp in model_providers if mp.health_status == "healthy"]),
-            "degraded_models": len([mp for mp in model_providers if mp.health_status == "degraded"]),
-            "unhealthy_models": len([mp for mp in model_providers if mp.health_status == "unhealthy"]),
+            "healthy_models": len(
+                [mp for mp in model_providers if mp.health_status == "healthy"]
+            ),
+            "degraded_models": len(
+                [mp for mp in model_providers if mp.health_status == "degraded"]
+            ),
+            "unhealthy_models": len(
+                [mp for mp in model_providers if mp.health_status == "unhealthy"]
+            ),
             "model_details": [
                 {
                     "model_id": mp.llm_id,
@@ -507,7 +564,7 @@ class DatabaseService:
                     "cost_per_1k_tokens": mp.cost_per_1k_tokens,
                 }
                 for mp in model_providers
-            ]
+            ],
         }
 
     def get_all_providers_with_health(self) -> List[Dict[str, Any]]:
@@ -518,16 +575,15 @@ class DatabaseService:
         for provider in providers:
             health_info = self.get_provider_health_status(provider.name)
             if health_info:
-                result.append({
-                    "provider": provider,
-                    "health_info": health_info
-                })
+                result.append({"provider": provider, "health_info": health_info})
 
         # 按平均评分排序
         result.sort(key=lambda x: x["health_info"]["average_score"], reverse=True)
         return result
 
-    def update_provider_health_status(self, provider_name: str, health_status: str) -> bool:
+    def update_provider_health_status(
+        self, provider_name: str, health_status: str
+    ) -> bool:
         """更新提供商的健康状态（影响所有相关模型）"""
         provider = self.get_provider_by_name(provider_name)
         if not provider:
@@ -572,28 +628,46 @@ class DatabaseService:
         total_tokens = sum(mp.total_tokens_used for mp in model_providers)
 
         # 计算平均响应时间
-        response_times = [mp.response_time_avg for mp in model_providers if mp.response_time_avg > 0]
-        avg_response_time = sum(response_times) / len(response_times) if response_times else 0
+        response_times = [
+            mp.response_time_avg for mp in model_providers if mp.response_time_avg > 0
+        ]
+        avg_response_time = (
+            sum(response_times) / len(response_times) if response_times else 0
+        )
 
         # 计算平均成功率
-        success_rates = [mp.success_rate for mp in model_providers if mp.success_rate > 0]
-        avg_success_rate = sum(success_rates) / len(success_rates) if success_rates else 0
+        success_rates = [
+            mp.success_rate for mp in model_providers if mp.success_rate > 0
+        ]
+        avg_success_rate = (
+            sum(success_rates) / len(success_rates) if success_rates else 0
+        )
 
         return {
             "provider_name": provider.name,
             "total_requests": total_requests,
             "total_successful_requests": total_successful,
             "total_failed_requests": total_requests - total_successful,
-            "overall_success_rate": total_successful / total_requests if total_requests > 0 else 0,
+            "overall_success_rate": (
+                total_successful / total_requests if total_requests > 0 else 0
+            ),
             "average_response_time": avg_response_time,
             "average_success_rate": avg_success_rate,
             "total_cost": total_cost,
             "total_tokens_used": total_tokens,
-            "cost_per_1k_tokens": (total_cost / total_tokens * 1000) if total_tokens > 0 else 0,
+            "cost_per_1k_tokens": (
+                (total_cost / total_tokens * 1000) if total_tokens > 0 else 0
+            ),
             "models_count": len(model_providers),
-            "healthy_models": len([mp for mp in model_providers if mp.health_status == "healthy"]),
-            "degraded_models": len([mp for mp in model_providers if mp.health_status == "degraded"]),
-            "unhealthy_models": len([mp for mp in model_providers if mp.health_status == "unhealthy"]),
+            "healthy_models": len(
+                [mp for mp in model_providers if mp.health_status == "healthy"]
+            ),
+            "degraded_models": len(
+                [mp for mp in model_providers if mp.health_status == "degraded"]
+            ),
+            "unhealthy_models": len(
+                [mp for mp in model_providers if mp.health_status == "unhealthy"]
+            ),
         }
 
     def get_top_providers(self, limit: int = 5) -> List[Dict[str, Any]]:
@@ -601,7 +675,9 @@ class DatabaseService:
         providers_with_health = self.get_all_providers_with_health()
         return providers_with_health[:limit]
 
-    def get_provider_recommendations(self, model_name: str = None) -> List[Dict[str, Any]]:
+    def get_provider_recommendations(
+        self, model_name: str = None
+    ) -> List[Dict[str, Any]]:
         """获取提供商推荐"""
         if model_name:
             # 为特定模型推荐提供商
@@ -612,18 +688,22 @@ class DatabaseService:
             model_providers = self.get_model_providers(model.id, is_enabled=True)
             recommendations = []
 
-            for mp in sorted(model_providers, key=lambda x: x.overall_score, reverse=True):
+            for mp in sorted(
+                model_providers, key=lambda x: x.overall_score, reverse=True
+            ):
                 provider = self.get_provider_by_id(mp.provider_id)
                 if provider:
-                    recommendations.append({
-                        "provider": provider,
-                        "score": mp.overall_score,
-                        "health_status": mp.health_status,
-                        "response_time": mp.response_time_avg,
-                        "success_rate": mp.success_rate,
-                        "cost_per_1k_tokens": mp.cost_per_1k_tokens,
-                        "reason": self._get_recommendation_reason(mp)
-                    })
+                    recommendations.append(
+                        {
+                            "provider": provider,
+                            "score": mp.overall_score,
+                            "health_status": mp.health_status,
+                            "response_time": mp.response_time_avg,
+                            "success_rate": mp.success_rate,
+                            "cost_per_1k_tokens": mp.cost_per_1k_tokens,
+                            "reason": self._get_recommendation_reason(mp),
+                        }
+                    )
 
             return recommendations
         else:
@@ -633,29 +713,33 @@ class DatabaseService:
     def _get_recommendation_reason(self, model_provider: LLMModelProvider) -> str:
         """获取推荐原因"""
         reasons = []
-        
+
         if model_provider.health_status == "healthy":
             reasons.append("健康状态良好")
-        
+
         if model_provider.response_time_avg < 2.0:
             reasons.append("响应速度快")
-        
+
         if model_provider.success_rate > 0.95:
             reasons.append("成功率高")
-        
+
         if model_provider.cost_per_1k_tokens < 0.01:
             reasons.append("成本较低")
-        
+
         if model_provider.is_preferred:
             reasons.append("首选提供商")
-        
+
         return "、".join(reasons) if reasons else "综合评分较高"
 
     # ==================== 健康状态和评估相关方法 ====================
 
     def update_model_provider_health_status(
-        self, model_id: int, provider_id: int, health_status: str, 
-        response_time: float = None, success: bool = None
+        self,
+        model_id: int,
+        provider_id: int,
+        health_status: str,
+        response_time: float = None,
+        success: bool = None,
     ) -> bool:
         """更新模型-提供商的健康状态"""
         with self.get_session() as session:
@@ -667,28 +751,33 @@ class DatabaseService:
                 )
                 .first()
             )
-            
+
             if model_provider:
                 model_provider.health_status = health_status
                 model_provider.last_health_check = datetime.now()
-                
+
                 # 更新性能指标
                 if response_time is not None:
                     self._update_response_time_stats(model_provider, response_time)
-                
+
                 if success is not None:
                     self._update_success_stats(model_provider, success)
-                
+
                 # 重新计算评分
                 self._recalculate_scores(model_provider)
-                
+
                 session.commit()
                 return True
             return False
 
     def update_model_provider_metrics(
-        self, model_id: int, provider_id: int, 
-        response_time: float, success: bool, tokens_used: int = 0, cost: float = 0.0
+        self,
+        model_id: int,
+        provider_id: int,
+        response_time: float,
+        success: bool,
+        tokens_used: int = 0,
+        cost: float = 0.0,
     ) -> bool:
         """更新模型-提供商的性能指标"""
         with self.get_session() as session:
@@ -700,24 +789,26 @@ class DatabaseService:
                 )
                 .first()
             )
-            
+
             if model_provider:
                 # 更新响应时间统计
                 self._update_response_time_stats(model_provider, response_time)
-                
+
                 # 更新成功率统计
                 self._update_success_stats(model_provider, success)
-                
+
                 # 更新成本统计
                 if cost > 0:
                     model_provider.total_cost += cost
                     model_provider.total_tokens_used += tokens_used
                     if tokens_used > 0:
-                        model_provider.cost_per_1k_tokens = (model_provider.total_cost / model_provider.total_tokens_used) * 1000
-                
+                        model_provider.cost_per_1k_tokens = (
+                            model_provider.total_cost / model_provider.total_tokens_used
+                        ) * 1000
+
                 # 重新计算评分
                 self._recalculate_scores(model_provider)
-                
+
                 session.commit()
                 return True
             return False
@@ -744,10 +835,12 @@ class DatabaseService:
                 .filter(
                     LLMModelProvider.llm_id == model_id,
                     LLMModelProvider.is_enabled == True,
-                    LLMModelProvider.health_status.in_([
-                        HealthStatusEnum.HEALTHY.value,
-                        HealthStatusEnum.DEGRADED.value
-                    ]),
+                    LLMModelProvider.health_status.in_(
+                        [
+                            HealthStatusEnum.HEALTHY.value,
+                            HealthStatusEnum.DEGRADED.value,
+                        ]
+                    ),
                 )
                 .order_by(LLMModelProvider.overall_score.desc())
                 .first()
@@ -764,17 +857,19 @@ class DatabaseService:
                 )
                 .first()
             )
-            
+
             if model_provider:
                 model_provider.failure_count += 1
                 model_provider.last_failure_time = datetime.now()
-                
+
                 # 如果失败次数超过阈值且启用了自动禁用
-                if (model_provider.failure_count >= model_provider.max_failures and 
-                    model_provider.auto_disable_on_failure):
+                if (
+                    model_provider.failure_count >= model_provider.max_failures
+                    and model_provider.auto_disable_on_failure
+                ):
                     model_provider.is_enabled = False
                     model_provider.health_status = HealthStatusEnum.UNHEALTHY.value
-                
+
                 session.commit()
                 return True
             return False
@@ -790,14 +885,16 @@ class DatabaseService:
                 )
                 .first()
             )
-            
+
             if model_provider:
                 model_provider.failure_count = 0
                 session.commit()
                 return True
             return False
 
-    def get_model_provider_stats(self, model_id: int, provider_id: int) -> Dict[str, Any]:
+    def get_model_provider_stats(
+        self, model_id: int, provider_id: int
+    ) -> Dict[str, Any]:
         """获取模型-提供商的统计信息"""
         with self.get_session() as session:
             model_provider = (
@@ -808,7 +905,7 @@ class DatabaseService:
                 )
                 .first()
             )
-            
+
             if model_provider:
                 return {
                     "health_status": model_provider.health_status,
@@ -826,7 +923,6 @@ class DatabaseService:
                     "overall_score": model_provider.overall_score,
                     "failure_count": model_provider.failure_count,
                     "last_health_check": model_provider.last_health_check,
-
                     "last_failure_time": model_provider.last_failure_time,
                     "custom_config": model_provider.custom_config,
                     "model_metadata": model_provider.model_metadata,
@@ -835,7 +931,9 @@ class DatabaseService:
 
     # ==================== 私有辅助方法 ====================
 
-    def _update_response_time_stats(self, model_provider: LLMModelProvider, response_time: float):
+    def _update_response_time_stats(
+        self, model_provider: LLMModelProvider, response_time: float
+    ):
         """更新响应时间统计"""
         if model_provider.response_time_avg == 0:
             model_provider.response_time_avg = response_time
@@ -847,8 +945,12 @@ class DatabaseService:
             model_provider.response_time_avg = (
                 alpha * response_time + (1 - alpha) * model_provider.response_time_avg
             )
-            model_provider.response_time_min = min(model_provider.response_time_min, response_time)
-            model_provider.response_time_max = max(model_provider.response_time_max, response_time)
+            model_provider.response_time_min = min(
+                model_provider.response_time_min, response_time
+            )
+            model_provider.response_time_max = max(
+                model_provider.response_time_max, response_time
+            )
 
     def _update_success_stats(self, model_provider: LLMModelProvider, success: bool):
         """更新成功率统计"""
@@ -857,10 +959,12 @@ class DatabaseService:
             model_provider.successful_requests += 1
         else:
             model_provider.failed_requests += 1
-        
+
         # 计算成功率
         if model_provider.total_requests > 0:
-            model_provider.success_rate = model_provider.successful_requests / model_provider.total_requests
+            model_provider.success_rate = (
+                model_provider.successful_requests / model_provider.total_requests
+            )
 
     def _recalculate_scores(self, model_provider: LLMModelProvider):
         """重新计算评分"""
@@ -873,28 +977,34 @@ class DatabaseService:
             model_provider.health_score = 0.1
 
         # 性能评分（基于响应时间和成功率）
-        response_time_score = max(0, 1 - model_provider.response_time_avg / 10)  # 10秒内线性递减
-        performance_score = (response_time_score * 0.5 + model_provider.success_rate * 0.5)
+        response_time_score = max(
+            0, 1 - model_provider.response_time_avg / 10
+        )  # 10秒内线性递减
+        performance_score = (
+            response_time_score * 0.5 + model_provider.success_rate * 0.5
+        )
         model_provider.performance_score = min(1.0, max(0.0, performance_score))
 
         # 成本评分（越便宜越好）
-        cost_score = max(0, 1 - model_provider.cost_per_1k_tokens / 0.1)  # 0.1$/1K tokens内线性递减
+        cost_score = max(
+            0, 1 - model_provider.cost_per_1k_tokens / 0.1
+        )  # 0.1$/1K tokens内线性递减
         model_provider.cost_score = min(1.0, max(0.0, cost_score))
 
         # 综合评分（加权平均）
         model_provider.overall_score = (
-            model_provider.health_score * 0.4 +
-            model_provider.performance_score * 0.4 +
-            model_provider.cost_score * 0.2
+            model_provider.health_score * 0.4
+            + model_provider.performance_score * 0.4
+            + model_provider.cost_score * 0.2
         )
 
     def update_model_provider_strategy(
-        self, 
-        model_name: str, 
-        provider_name: str, 
+        self,
+        model_name: str,
+        provider_name: str,
         strategy: str,
         strategy_config: Dict[str, Any] = None,
-        priority: int = None
+        priority: int = None,
     ) -> bool:
         """更新模型-供应商的负载均衡策略"""
         try:
@@ -902,7 +1012,7 @@ class DatabaseService:
                 # 获取模型和供应商
                 model = self.get_model_by_name(model_name)
                 provider = self.get_provider_by_name(provider_name)
-                
+
                 if not model or not provider:
                     return False
 
@@ -911,7 +1021,7 @@ class DatabaseService:
                     session.query(LLMModelProvider)
                     .filter(
                         LLMModelProvider.llm_id == model.id,
-                        LLMModelProvider.provider_id == provider.id
+                        LLMModelProvider.provider_id == provider.id,
                     )
                     .first()
                 )
@@ -940,7 +1050,7 @@ class DatabaseService:
         try:
             model = self.get_model_by_name(model_name)
             provider = self.get_provider_by_name(provider_name)
-            
+
             if not model or not provider:
                 return None
 
@@ -949,7 +1059,7 @@ class DatabaseService:
                     session.query(LLMModelProvider)
                     .filter(
                         LLMModelProvider.llm_id == model.id,
-                        LLMModelProvider.provider_id == provider.id
+                        LLMModelProvider.provider_id == provider.id,
                     )
                     .first()
                 )
@@ -985,16 +1095,18 @@ class DatabaseService:
             for mp in model_providers:
                 provider = self.get_provider_by_id(mp.provider_id)
                 if provider:
-                    strategies.append({
-                        "provider_name": provider.name,
-                        "strategy": mp.load_balancing_strategy,
-                        "strategy_config": mp.strategy_config,
-                        "priority": mp.priority,
-                        "weight": mp.weight,
-                        "is_preferred": mp.is_preferred,
-                        "health_status": mp.health_status,
-                        "overall_score": mp.overall_score,
-                    })
+                    strategies.append(
+                        {
+                            "provider_name": provider.name,
+                            "strategy": mp.load_balancing_strategy,
+                            "strategy_config": mp.strategy_config,
+                            "priority": mp.priority,
+                            "weight": mp.weight,
+                            "is_preferred": mp.is_preferred,
+                            "health_status": mp.health_status,
+                            "overall_score": mp.overall_score,
+                        }
+                    )
 
             return strategies
 
@@ -1003,19 +1115,19 @@ class DatabaseService:
             return []
 
     def update_model_provider_circuit_breaker(
-        self, 
-        model_name: str, 
+        self,
+        model_name: str,
         provider_name: str,
         enabled: bool = None,
         threshold: int = None,
-        timeout: int = None
+        timeout: int = None,
     ) -> bool:
         """更新模型-供应商的熔断器配置"""
         try:
             with self.get_session() as session:
                 model = self.get_model_by_name(model_name)
                 provider = self.get_provider_by_name(provider_name)
-                
+
                 if not model or not provider:
                     return False
 
@@ -1023,7 +1135,7 @@ class DatabaseService:
                     session.query(LLMModelProvider)
                     .filter(
                         LLMModelProvider.llm_id == model.id,
-                        LLMModelProvider.provider_id == provider.id
+                        LLMModelProvider.provider_id == provider.id,
                     )
                     .first()
                 )
@@ -1048,6 +1160,7 @@ class DatabaseService:
     def get_available_strategies(self) -> List[str]:
         """获取所有可用的负载均衡策略"""
         from .load_balancing_strategies import LoadBalancingStrategy
+
         return [strategy.value for strategy in LoadBalancingStrategy]
 
     def get_strategy_statistics(self, model_name: str = None) -> Dict[str, Any]:
@@ -1055,14 +1168,14 @@ class DatabaseService:
         try:
             with self.get_session() as session:
                 query = session.query(LLMModelProvider)
-                
+
                 if model_name:
                     model = self.get_model_by_name(model_name)
                     if model:
                         query = query.filter(LLMModelProvider.llm_id == model.id)
 
                 model_providers = query.all()
-                
+
                 strategy_counts = {}
                 for mp in model_providers:
                     strategy = mp.load_balancing_strategy

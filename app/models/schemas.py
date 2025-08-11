@@ -65,6 +65,14 @@ class LLMModelProviderCreate(BaseModel):
     is_enabled: bool = True
 
 
+class LLMModelProviderUpdate(BaseModel):
+    llm_id: Optional[int] = None
+    provider_id: Optional[int] = None
+    weight: Optional[int] = None
+    is_preferred: Optional[bool] = None
+    is_enabled: Optional[bool] = None
+
+
 class LLMModelParamCreate(BaseModel):
     llm_id: int
     provider_id: Optional[int] = None

@@ -20,6 +20,7 @@ from .schemas import (
     LLMProviderApiKeyCreate,
     LLMProviderApiKeyUpdate,
     LLMModelProviderCreate,
+    LLMModelProviderUpdate,
     LLMModelParamCreate,
 )
 
@@ -41,5 +42,6 @@ __all__ = [
     "LLMProviderApiKeyCreate",
     "LLMProviderApiKeyUpdate",
     "LLMModelProviderCreate",
+    "LLMModelProviderUpdate",
     "LLMModelParamCreate",
 ]
