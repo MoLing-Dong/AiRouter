@@ -76,7 +76,8 @@ class Settings(BaseSettings):
     APP_VERSION: str = "1.0.0"
     DEBUG: bool = False
     RUN_ENV: str = "dev"
-
+    LOG_LEVEL: str = "INFO"
+    
     # 服务器配置
     HOST: str = "0.0.0.0"
     PORT: int = 8000

@@ -60,7 +60,7 @@ class ModelAdapterManager:
             adapter_info = {}
             for model_name, adapters in self.model_adapters.items():
                 adapter_info[model_name] = [adapter.provider for adapter in adapters]
-            logger.info(f"模型适配器: {adapter_info}")
+            logger.info(f"模型提供商: {adapter_info}")
 
         except Exception as e:
             logger.info(f"从数据库加载模型配置失败: {e}")
