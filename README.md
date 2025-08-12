@@ -38,6 +38,13 @@
 - Docker Compose 2.0+
 - 至少2GB可用内存
 
+### 技术栈
+
+- **Python 3.10**: 稳定可靠的Python版本
+- **uv**: 极速Python包管理器，比pip快10-100倍
+- **多阶段构建**: 优化的Docker镜像构建
+- **非root用户**: 安全的容器运行环境
+
 ### 快速开始
 
 #### 1. 克隆项目
@@ -104,14 +111,31 @@ curl http://localhost:8000/v1/models
 
 ### 环境要求
 
-- Python 3.11+
+- Python 3.10+
 - PostgreSQL 15+
+- uv (Python 包管理器)
+
+### 安装 uv
+
+```bash
+# 使用 pip 安装 uv
+pip install uv
+
+# 或者使用官方安装脚本
+curl -LsSf https://astral.sh/uv/install.sh | sh
+```
 
 ### 安装依赖
 
 ```bash
-# 安装依赖
-pip install -r requirements.txt
+# 使用 uv 安装依赖
+uv sync
+
+# 或者激活虚拟环境后安装
+uv venv
+source .venv/bin/activate  # Linux/macOS
+# .venv\Scripts\activate   # Windows
+uv pip install -e .
 ```
 
 ### 环境变量配置

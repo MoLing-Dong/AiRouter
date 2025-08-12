@@ -1,11 +1,9 @@
 # 多阶段构建 - 构建阶段
-FROM python:3.11-slim as builder
+FROM python:3.10-slim as builder
 
 # 设置环境变量
 ENV PYTHONUNBUFFERED=1 \
-    PYTHONDONTWRITEBYTECODE=1 \
-    PIP_NO_CACHE_DIR=1 \
-    PIP_DISABLE_PIP_VERSION_CHECK=1
+    PYTHONDONTWRITEBYTECODE=1
 
 # 设置工作目录
 WORKDIR /app
@@ -14,17 +12,21 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y \
     gcc \
     libpq-dev \
+    curl \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean
 
+# 安装 uv
+RUN pip install uv
+
 # 复制依赖文件
-COPY requirements.txt .
+COPY pyproject.toml uv.lock .
 
 # 安装Python依赖
-RUN pip install --no-cache-dir -r requirements.txt
+RUN uv pip install --system -r <(uv pip compile pyproject.toml)
 
 # 生产阶段
-FROM python:3.11-slim as production
+FROM python:3.10-slim as production
 
 # 设置环境变量
 ENV PYTHONUNBUFFERED=1 \
@@ -47,9 +49,10 @@ RUN apt-get update && apt-get install -y \
 RUN useradd --create-home --shell /bin/bash app \
     && chown -R app:app /app
 
-# 从构建阶段复制Python包
-COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
+# 从构建阶段复制Python包和uv
+COPY --from=builder /usr/local/lib/python3.10/site-packages /usr/local/lib/python3.10/site-packages
 COPY --from=builder /usr/local/bin /usr/local/bin
+COPY --from=builder /usr/local/bin/uv /usr/local/bin/uv
 
 # 复制应用代码
 COPY --chown=app:app . .
