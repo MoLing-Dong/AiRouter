@@ -1,4 +1,4 @@
-# 敏感配置文件
+# Sensitive configuration files
 *.env
 *.env.local
 *.env.production
@@ -7,7 +7,7 @@ docker-compose-online.yml
 docker-compose.prod.yml
 docker-compose.production.yml
 
-# API密钥和配置
+# API keys and configuration
 **/api_keys.py
 **/api_keys.json
 **/config/keys.py
@@ -15,23 +15,23 @@ docker-compose.production.yml
 **/secrets.json
 **/secrets.yaml
 
-# 数据库配置
+# Database configuration
 **/database.yml
 **/database.json
 **/db_config.py
 
-# 日志文件
+# Log files
 *.log
 logs/
 *.log.*
 
-# 临时文件
+# Temporary files
 *.tmp
 *.temp
 .DS_Store
 Thumbs.db
 
-# Python相关
+# Python related
 __pycache__/
 *.py[cod]
 *$py.class
@@ -53,14 +53,14 @@ wheels/
 .installed.cfg
 *.egg
 
-# IDE文件
+# IDE files
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
 
-# 虚拟环境
+# Virtual environment
 .venv/
 venv/
 env/
@@ -68,10 +68,10 @@ ENV/
 env.bak/
 venv.bak/
 
-# 测试结果
+# Test results
 
 
-# 系统文件
+# System files
 .DS_Store
 .DS_Store?
 ._*

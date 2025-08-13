@@ -1,7 +1,7 @@
 version: '3.8'
 
 services:
-  # PostgreSQL数据库
+  # PostgreSQL database
   postgres:
     image: postgres:15-alpine
     container_name: ai-router-db
@@ -20,7 +20,7 @@ services:
       timeout: 5s
       retries: 5
 
-  # AI Router应用
+  # AI Router application
   ai-router:
     build:
       context: .
@@ -29,12 +29,12 @@ services:
     ports:
       - "8000:8000"
     environment:
-      # 核心配置
+      # Core configuration
       - HOST=0.0.0.0
       - PORT=8000
       - DEBUG=false
       
-      # 数据库配置
+      # Database configuration
       - DATABASE_URL=postgresql://ai_router:ai_router_password@postgres:5432/ai_router
       
     volumes:

@@ -1,14 +1,14 @@
-# 多阶段构建 - 构建阶段
+# Multi-stage build - Builder stage
 FROM python:3.10-slim as builder
 
-# 设置环境变量
+# Set environment variables
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1
 
-# 设置工作目录
+# Set working directory
 WORKDIR /app
 
-# 安装构建依赖
+# Install build dependencies
 RUN apt-get update && apt-get install -y \
     gcc \
     libpq-dev \
@@ -16,59 +16,59 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean
 
-# 安装 uv
+# Install uv
 RUN pip install uv
 
-# 复制依赖文件
+# Copy dependency files
 COPY pyproject.toml uv.lock .
 
-# 安装Python依赖
+# Install Python dependencies
 RUN uv pip install --system -r <(uv pip compile pyproject.toml)
 
-# 生产阶段
+# Production stage
 FROM python:3.10-slim as production
 
-# 设置环境变量
+# Set environment variables
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     HOST=0.0.0.0 \
     PORT=8000 \
     DEBUG=false
 
-# 设置工作目录
+# Set working directory
 WORKDIR /app
 
-# 安装运行时依赖
+# Install runtime dependencies
 RUN apt-get update && apt-get install -y \
     curl \
     libpq5 \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean
 
-# 创建非root用户
+# Create non-root user
 RUN useradd --create-home --shell /bin/bash app \
     && chown -R app:app /app
 
-# 从构建阶段复制Python包和uv
+# Copy Python packages and uv from builder stage
 COPY --from=builder /usr/local/lib/python3.10/site-packages /usr/local/lib/python3.10/site-packages
 COPY --from=builder /usr/local/bin /usr/local/bin
 COPY --from=builder /usr/local/bin/uv /usr/local/bin/uv
 
-# 复制应用代码
+# Copy application code
 COPY --chown=app:app . .
 
-# 切换到非root用户
+# Switch to non-root user
 USER app
 
-# 创建必要的目录
+# Create necessary directories
 RUN mkdir -p /app/logs /app/data
 
-# 暴露端口
+# Expose port
 EXPOSE 8000
 
-# 健康检查（包含数据库连接检查）
+# Health check (including database connection check)
 HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1
 
-# 启动命令
+# Start command
 CMD ["python", "run.py"] 
