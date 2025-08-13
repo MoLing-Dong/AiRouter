@@ -6,21 +6,21 @@ import httpx
 import json
 from app.utils.logging_config import get_factory_logger
 
-# 获取日志器
+# Get logger
 logger = get_factory_logger()
 
 
 class OpenAIAdapter(BaseAdapter):
-    """OpenAI模型适配器"""
+    """OpenAI model adapter"""
 
     def __init__(self, model_config: Dict[str, Any], api_key: str):
         super().__init__(model_config, api_key)
-        # OpenAI特定的配置
+        # OpenAI specific configuration
         self.api_version = "2024-02-15"
         self.client.headers.update({"OpenAI-Beta": "assistants=v1"})
 
     def format_messages(self, messages: List[Message]) -> List[Dict]:
-        """格式化消息为OpenAI格式"""
+        """Format messages to OpenAI format"""
         formatted_messages = []
         for msg in messages:
             formatted_msg = {"role": msg.role.value, "content": msg.content}
@@ -32,11 +32,11 @@ class OpenAIAdapter(BaseAdapter):
         return formatted_messages
 
     async def chat_completion(self, request: ChatRequest) -> ChatResponse:
-        """执行OpenAI聊天完成请求"""
+        """Execute OpenAI chat completion request"""
         start_time = time.time()
 
         try:
-            # 构建请求数据
+            # Build request data
             payload = {
                 "model": self.model_name,
                 "messages": self.format_messages(request.messages),
@@ -49,13 +49,13 @@ class OpenAIAdapter(BaseAdapter):
                 "stream": request.stream,
             }
 
-            # 添加工具配置
+            # Add tool configuration
             if request.tools:
                 payload["tools"] = [tool.dict() for tool in request.tools]
                 if request.tool_choice:
                     payload["tool_choice"] = request.tool_choice
 
-            # 发送请求
+            # Send request
             response = await self.client.post(
                 f"{self.base_url}/chat/completions", json=payload
             )
@@ -63,14 +63,14 @@ class OpenAIAdapter(BaseAdapter):
             response.raise_for_status()
             response_data = response.json()
 
-            # 计算响应时间
+            # Calculate response time
             response_time = time.time() - start_time
 
-            # 更新指标
+            # Update metrics
             tokens_used = response_data.get("usage", {}).get("total_tokens", 0)
             self.update_metrics(response_time, True, tokens_used)
 
-            # 构建标准响应
+            # Build standard response
             chat_response = ChatResponse(
                 id=response_data.get("id", str(uuid.uuid4())),
                 created=int(time.time()),
@@ -86,28 +86,28 @@ class OpenAIAdapter(BaseAdapter):
             response_time = time.time() - start_time
             self.update_metrics(response_time, False)
 
-            # 根据错误状态码更新健康状态
+            # Update health status based on error status code
             if e.response.status_code >= 500:
                 self.health_status = HealthStatus.UNHEALTHY
             elif e.response.status_code >= 400:
                 self.health_status = HealthStatus.DEGRADED
 
             raise Exception(
-                f"OpenAI API错误: {e.response.status_code} - {e.response.text}"
+                f"OpenAI API error: {e.response.status_code} - {e.response.text}"
             )
 
         except Exception as e:
             response_time = time.time() - start_time
             self.update_metrics(response_time, False)
             self.health_status = HealthStatus.UNHEALTHY
-            raise Exception(f"OpenAI适配器错误: {str(e)}")
+            raise Exception(f"OpenAI adapter error: {str(e)}")
 
     async def stream_chat_completion(self, request: ChatRequest):
-        """执行OpenAI流式聊天完成请求"""
+        """Execute OpenAI stream chat completion request"""
         start_time = time.time()
 
         try:
-            # 构建请求数据
+            # Build request data
             payload = {
                 "model": self.model_name,
                 "messages": self.format_messages(request.messages),
@@ -117,54 +117,54 @@ class OpenAIAdapter(BaseAdapter):
                 "top_p": request.top_p,
                 "frequency_penalty": request.frequency_penalty,
                 "presence_penalty": request.presence_penalty,
-                "stream": True,  # 强制启用流式
+                "stream": True,  # Force enable streaming
             }
 
-            # 添加工具配置
+            # Add tool configuration
             if request.tools:
                 payload["tools"] = [tool.dict() for tool in request.tools]
                 if request.tool_choice:
                     payload["tool_choice"] = request.tool_choice
 
-            # 尝试使用OpenAI库的流式处理（如果可用）
+            # Try using OpenAI library streaming (if available)
             try:
-                # 创建OpenAI客户端
+                # Create OpenAI client
                 import openai
 
                 openai_client = openai.AsyncOpenAI(
                     api_key=self.api_key, base_url=self.base_url
                 )
 
-                # 使用OpenAI库发送流式请求
+                # Use OpenAI library to send streaming request
                 stream = await openai_client.chat.completions.create(**payload)
 
-                # 逐块处理流式响应
+                # Process streaming response chunk by chunk
                 async for chunk in stream:
-                    # 将JSON转换为SSE格式
+                    # Convert JSON to SSE format
                     yield f"data: {chunk.model_dump_json()}\n\n"
 
             except Exception as openai_error:
-                logger.info(f"OpenAI库流式处理失败，回退到httpx: {openai_error}")
+                logger.info(f"OpenAI library streaming failed, fallback to httpx: {openai_error}")
 
-                # 回退到httpx流式处理
+                # Fallback to httpx streaming
                 async with self.client.stream(
                     "POST", f"{self.base_url}/chat/completions", json=payload
                 ) as response:
                     response.raise_for_status()
 
-                    # 逐行处理流式响应
+                    # Process streaming response line by line
                     async for line in response.aiter_lines():
-                        if line.strip():  # 忽略空行
-                            logger.info(f"OpenAI流式响应: {line}")
-                            # 确保每行都有正确的格式和换行符
+                        if line.strip():  # Ignore empty line
+                            logger.info(f"OpenAI streaming response: {line}")
+                            # Ensure each line has correct format and newline
                             if not line.startswith("data: "):
                                 line = "data: " + line
                             yield line + "\n"
 
-            # 发送结束标记
+            # Send end marker
             yield "data: [DONE]\n\n"
 
-            # 更新指标
+            # Update metrics
             response_time = time.time() - start_time
             self.update_metrics(response_time, True)
 
@@ -172,74 +172,74 @@ class OpenAIAdapter(BaseAdapter):
             response_time = time.time() - start_time
             self.update_metrics(response_time, False)
 
-            # 根据错误状态码更新健康状态
+            # Update health status based on error status code
             if e.response.status_code >= 500:
                 self.health_status = HealthStatus.UNHEALTHY
             elif e.response.status_code >= 400:
                 self.health_status = HealthStatus.DEGRADED
 
             raise Exception(
-                f"OpenAI流式API错误: {e.response.status_code} - {e.response.text}"
+                f"OpenAI stream API error: {e.response.status_code} - {e.response.text}"
             )
 
         except Exception as e:
             response_time = time.time() - start_time
             self.update_metrics(response_time, False)
             self.health_status = HealthStatus.UNHEALTHY
-            raise Exception(f"OpenAI流式适配器错误: {str(e)}")
+            raise Exception(f"OpenAI stream adapter error: {str(e)}")
 
     async def health_check(self) -> HealthStatus:
-        """执行OpenAI健康检查"""
+        """Execute OpenAI health check"""
         try:
-            # 使用更简单的健康检查方法 - 只检查API连接
-            # 注意：某些第三方OpenAI兼容API可能不支持/models端点
-            # 所以我们使用一个更通用的方法
+            # Use simpler health check method - only check API connection
+            # Note: Some third-party OpenAI compatible APIs may not support /models endpoint
+            # So we use a more generic method
 
-            # 尝试获取模型列表
+            # Try to get model list
             try:
                 response = await self.client.get(f"{self.base_url}/models")
                 if response.status_code == 200:
-                    print("OpenAIAdapter健康检查成功 - 获取模型列表")
+                    logger.info("OpenAIAdapter health check successful - get model list")
                     self.health_status = HealthStatus.HEALTHY
                     self.metrics.last_health_check = time.time()
                     return HealthStatus.HEALTHY
             except:
                 pass
 
-            # 如果/models端点不可用，尝试简单的HEAD请求
+            # If /models endpoint is not available, try simple HEAD request
             try:
                 response = await self.client.head(f"{self.base_url}/chat/completions")
-                if response.status_code in [200, 405]:  # 405表示方法不允许，但端点存在
-                    print("OpenAI健康检查成功 - 简单的HEAD请求")
+                if response.status_code in [200, 405]:  # 405 means method not allowed, but endpoint exists
+                    logger.info("OpenAI health check successful - simple HEAD request")
                     self.health_status = HealthStatus.HEALTHY
                     self.metrics.last_health_check = time.time()
                     return HealthStatus.HEALTHY
             except:
                 pass
 
-            # 如果都失败了，标记为降级
+            # If all fail, mark as degraded
             self.health_status = HealthStatus.DEGRADED
             return HealthStatus.DEGRADED
 
         except httpx.ConnectError:
-            # 连接错误
+            # Connection error
             self.health_status = HealthStatus.UNHEALTHY
             return HealthStatus.UNHEALTHY
         except httpx.HTTPStatusError as e:
-            # HTTP错误
+            # HTTP error
             if e.response.status_code == 401:
-                # 认证错误
+                # Authentication error
                 self.health_status = HealthStatus.UNHEALTHY
             else:
                 self.health_status = HealthStatus.DEGRADED
             return self.health_status
         except Exception as e:
-            # 其他错误
+            # Other error
             self.health_status = HealthStatus.UNHEALTHY
             return HealthStatus.UNHEALTHY
 
     async def create_embedding(self, text: str) -> Dict[str, Any]:
-        """创建文本嵌入"""
+        """Create text embedding"""
         try:
             payload = {"model": "text-embedding-ada-002", "input": text}
 
@@ -251,14 +251,14 @@ class OpenAIAdapter(BaseAdapter):
             return response.json()
 
         except Exception as e:
-            raise Exception(f"OpenAI嵌入创建错误: {str(e)}")
+            raise Exception(f"OpenAI embedding creation error: {str(e)}")
 
     async def list_models(self) -> List[Dict[str, Any]]:
-        """获取可用模型列表"""
+        """Get available model list"""
         try:
             response = await self.client.get(f"{self.base_url}/models")
             response.raise_for_status()
             return response.json().get("data", [])
 
         except Exception as e:
-            raise Exception(f"OpenAI模型列表获取错误: {str(e)}")
+            raise Exception(f"OpenAI model list get error: {str(e)}")

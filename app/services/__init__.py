@@ -1,7 +1,7 @@
-# 导出数据库服务
+# Export database service
 from .database_service import db_service
 
-# 导出适配器相关服务
+# Export adapter related services
 from .adapter_manager import ModelAdapterManager
 from .adapter_factory import AdapterFactory
 from .adapter_database_service import ModelDatabaseService
@@ -19,13 +19,13 @@ from .adapter_compatibility import (
     set_use_database,
 )
 
-# 导出路由服务
+# Export router service
 from .router import SmartRouter
 
 __all__ = [
-    # 数据库服务
+    # Database service
     "db_service",
-    # 适配器服务
+    # Adapter service
     "ModelAdapterManager",
     "AdapterFactory",
     "ModelDatabaseService",
@@ -40,6 +40,6 @@ __all__ = [
     "health_check_all",
     "refresh_from_database",
     "set_use_database",
-    # 路由服务
+    # Router service
     "SmartRouter",
 ]

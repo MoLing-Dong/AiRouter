@@ -7,13 +7,13 @@ from config.settings import settings
 
 
 class LogConfig:
-    """日志配置类"""
+    """Logging configuration class"""
 
     def __init__(self):
         self.log_dir = Path("logs")
         self.log_dir.mkdir(exist_ok=True)
 
-        # 日志文件路径
+        # Log file path
         self.log_file = (
             self.log_dir / f"ai_router_{datetime.now().strftime('%Y%m%d')}.log"
         )
@@ -21,10 +21,10 @@ class LogConfig:
             self.log_dir / f"ai_router_error_{datetime.now().strftime('%Y%m%d')}.log"
         )
 
-        # 获取环境变量
+        # Get environment variable
         self.run_env = settings.RUN_ENV
 
-        # 开发环境日志格式（详细格式）
+        # Development environment log format (detailed format)
         self.dev_console_format = (
             "<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> | "
             "<level>{level: <5}</level> | "
@@ -32,7 +32,7 @@ class LogConfig:
             "<level>{message}</level>"
         )
 
-        # 生产环境日志格式（简洁格式）
+        # Production environment log format (simple format)
         self.prod_console_format = (
             "<green>{time:YYYY-MM-DD HH:mm:ss}</green> | "
             "<level>{level: <5}</level> | "
@@ -46,7 +46,7 @@ class LogConfig:
             "{message}"
         )
 
-        # 日志级别
+        # Log levels
         self.console_level = "INFO"
         self.file_level = "DEBUG"
         self.error_level = "ERROR"
@@ -74,21 +74,21 @@ class LogConfig:
             retention: 日志保留时间
         """
 
-        # 清除默认处理器
+        # Clear default handlers
         logger.remove()
 
-        # 根据环境选择日志格式
+        # Select log format based on environment
         console_format = (
             self.dev_console_format
             if self.run_env == "dev"
             else self.prod_console_format
         )
 
-        # 调试信息（临时）
-        print(f"当前环境: {self.run_env}")
-        print(f"使用日志格式: {'开发环境' if self.run_env == 'dev' else '生产环境'}")
+        # Debug information (temporary)
+        print(f"Current environment: {self.run_env}")
+        print(f"Using log format: {'Development environment' if self.run_env == 'dev' else 'Production environment'}")
 
-        # 控制台处理器
+        # Console handler
         if enable_console:
             logger.add(
                 sys.stdout,
@@ -99,7 +99,7 @@ class LogConfig:
                 diagnose=True,
             )
 
-        # 文件处理器
+        # File handler
         if enable_file:
             logger.add(
                 str(self.log_file),
@@ -113,7 +113,7 @@ class LogConfig:
                 encoding="utf-8",
             )
 
-            # 错误日志文件
+            # Error log file
             logger.add(
                 str(self.error_file),
                 format=self.file_format,
@@ -128,29 +128,29 @@ class LogConfig:
 
     def get_logger(self, name: str = None):
         """
-        获取日志器
+        Get logger
 
         Args:
-            name: 日志器名称，如果为None则返回默认日志器
+            name: Logger name, if None returns default logger
 
         Returns:
-            loguru logger实例
+            loguru logger instance
         """
         if name:
             return logger.bind(name=name)
         return logger
 
 
-# 全局日志配置实例
+# Global logging configuration instance
 log_config = LogConfig()
 
 
 def init_logging(config: Optional[Dict[str, Any]] = None):
     """
-    初始化日志系统
+    Initialize logging system
 
     Args:
-        config: 日志配置字典
+        config: Logging configuration dictionary
     """
     if config is None:
         config = {}
@@ -160,64 +160,64 @@ def init_logging(config: Optional[Dict[str, Any]] = None):
 
 def get_logger(name: str = None):
     """
-    获取日志器
+    Get logger
 
     Args:
-        name: 日志器名称
+        name: Logger name
 
     Returns:
-        loguru logger实例
+        loguru logger instance
     """
     return log_config.get_logger(name)
 
 
-# 预定义的日志器
+# Predefined loggers
 def get_app_logger():
-    """获取应用主日志器"""
+    """Get application main logger"""
     return get_logger("ai_router")
 
 
 def get_adapter_logger():
-    """获取适配器日志器"""
+    """Get adapter logger"""
     return get_logger("ai_router.adapters")
 
 
 def get_pool_logger():
-    """获取适配器池日志器"""
+    """Get adapter pool logger"""
     return get_logger("ai_router.pool")
 
 
 def get_router_logger():
-    """获取路由器日志器"""
+    """Get router logger"""
     return get_logger("ai_router.router")
 
 
 def get_api_logger():
-    """获取API日志器"""
+    """Get API logger"""
     return get_logger("ai_router.api")
 
 
 def get_db_logger():
-    """获取数据库日志器"""
+    """Get database logger"""
     return get_logger("ai_router.database")
 
 
 def get_chat_logger():
-    """获取聊天日志器"""
+    """Get chat logger"""
     return get_logger("ai_router.chat")
 
 
 def get_health_logger():
-    """获取健康检查日志器"""
+    """Get health check logger"""
     return get_logger("ai_router.health")
 
 
 def get_factory_logger():
-    """获取适配器工厂日志器"""
+    """Get adapter factory logger"""
     return get_logger("app.services.adapter_factory")
 
 
-# 默认配置
+# Default configuration
 DEFAULT_LOG_CONFIG = {
     "console_level": "INFO",
     "file_level": "DEBUG",
@@ -229,38 +229,38 @@ DEFAULT_LOG_CONFIG = {
 }
 
 
-# 便捷函数
+# Convenience functions
 def log_info(message: str, logger_name: str = None):
-    """记录信息日志"""
+    """Log information"""
     log = get_logger(logger_name)
     log.info(message)
 
 
 def log_warning(message: str, logger_name: str = None):
-    """记录警告日志"""
+    """Log warning"""
     log = get_logger(logger_name)
     log.warning(message)
 
 
 def log_error(message: str, logger_name: str = None):
-    """记录错误日志"""
+    """Log error"""
     log = get_logger(logger_name)
     log.error(message)
 
 
 def log_debug(message: str, logger_name: str = None):
-    """记录调试日志"""
+    """Log debug"""
     log = get_logger(logger_name)
     log.debug(message)
 
 
 def log_success(message: str, logger_name: str = None):
-    """记录成功日志"""
+    """Log success"""
     log = get_logger(logger_name)
     log.success(message)
 
 
 def log_exception(message: str, logger_name: str = None):
-    """记录异常日志"""
+    """Log exception"""
     log = get_logger(logger_name)
     log.exception(message)

@@ -1,17 +1,17 @@
-# 导入基础模型
+# Import base model
 from .base import Base
 
-# 导入枚举
+# Import enums
 from .enums import LLMTypeEnum, ProviderTypeEnum, ParamTypeEnum
 
-# 导入所有表模型
+# Import all table models
 from .llm_model import LLMModel
 from .llm_provider import LLMProvider
 from .llm_provider_apikey import LLMProviderApiKey
 from .llm_model_provider import LLMModelProvider
 from .llm_model_param import LLMModelParam
 
-# 导入Pydantic模型
+# Import Pydantic models
 from .schemas import (
     LLMModelCreate,
     LLMModelUpdate,
@@ -24,7 +24,7 @@ from .schemas import (
     LLMModelParamCreate,
 )
 
-# 导出所有模型
+# Export all models
 __all__ = [
     "Base",
     "LLMTypeEnum",

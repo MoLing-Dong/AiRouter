@@ -7,19 +7,19 @@ import json
 
 
 class AnthropicAdapter(BaseAdapter):
-    """Anthropic Claude模型适配器"""
+    """Anthropic Claude model adapter"""
 
     def __init__(self, model_config: Dict[str, Any], api_key: str):
         super().__init__(model_config, api_key)
-        # Anthropic特定的配置
+        # Anthropic specific configuration
         self.client.headers.update(
             {"anthropic-version": "2023-06-01", "x-api-key": api_key}
         )
-        # 移除Bearer前缀，Anthropic使用x-api-key
+        # Remove Bearer prefix, Anthropic uses x-api-key
         self.client.headers.pop("Authorization", None)
 
     def format_messages(self, messages: List[Message]) -> List[Dict]:
-        """格式化消息为Anthropic格式"""
+        """Format messages to Anthropic format"""
         formatted_messages = []
         for msg in messages:
             formatted_msg = {"role": msg.role.value, "content": msg.content}
@@ -29,11 +29,11 @@ class AnthropicAdapter(BaseAdapter):
         return formatted_messages
 
     async def chat_completion(self, request: ChatRequest) -> ChatResponse:
-        """执行Anthropic聊天完成请求"""
+        """Execute Anthropic chat completion request"""
         start_time = time.time()
 
         try:
-            # 构建请求数据
+            # Build request data
             payload = {
                 "model": self.model_name,
                 "messages": self.format_messages(request.messages),
@@ -44,10 +44,10 @@ class AnthropicAdapter(BaseAdapter):
                 "stream": request.stream,
             }
 
-            # Anthropic不支持frequency_penalty和presence_penalty
-            # 也不支持tools，需要特殊处理
+            # Anthropic does not support frequency_penalty and presence_penalty
+            # Also does not support tools, need special handling
 
-            # 发送请求
+            # Send request
             response = await self.client.post(
                 f"{self.base_url}/v1/messages", json=payload
             )
@@ -55,16 +55,16 @@ class AnthropicAdapter(BaseAdapter):
             response.raise_for_status()
             response_data = response.json()
 
-            # 计算响应时间
+            # Calculate response time
             response_time = time.time() - start_time
 
-            # 更新指标
+            # Update metrics
             tokens_used = response_data.get("usage", {}).get(
                 "input_tokens", 0
             ) + response_data.get("usage", {}).get("output_tokens", 0)
             self.update_metrics(response_time, True, tokens_used)
 
-            # 构建标准响应格式
+            # Build standard response format
             choices = []
             for content in response_data.get("content", []):
                 if content.get("type") == "text":
@@ -101,28 +101,28 @@ class AnthropicAdapter(BaseAdapter):
             response_time = time.time() - start_time
             self.update_metrics(response_time, False)
 
-            # 根据错误状态码更新健康状态
+            # Update health status based on error status code
             if e.response.status_code >= 500:
                 self.health_status = HealthStatus.UNHEALTHY
             elif e.response.status_code >= 400:
                 self.health_status = HealthStatus.DEGRADED
 
             raise Exception(
-                f"Anthropic API错误: {e.response.status_code} - {e.response.text}"
+                f"Anthropic API error: {e.response.status_code} - {e.response.text}"
             )
 
         except Exception as e:
             response_time = time.time() - start_time
             self.update_metrics(response_time, False)
             self.health_status = HealthStatus.UNHEALTHY
-            raise Exception(f"Anthropic适配器错误: {str(e)}")
+            raise Exception(f"Anthropic adapter error: {str(e)}")
 
     async def stream_chat_completion(self, request: ChatRequest):
-        """执行Anthropic流式聊天完成请求"""
+        """Execute Anthropic stream chat completion request"""
         start_time = time.time()
 
         try:
-            # 构建请求数据
+            # Build request data
             payload = {
                 "model": self.model_name,
                 "messages": self.format_messages(request.messages),
@@ -130,20 +130,20 @@ class AnthropicAdapter(BaseAdapter):
                 or self.model_config.get("max_tokens", 4096),
                 "temperature": request.temperature,
                 "top_p": request.top_p,
-                "stream": True,  # 强制启用流式
+                "stream": True,  # Force enable streaming
             }
 
-            # 发送流式请求
+            # Send streaming request
             async with self.client.stream(
                 "POST", f"{self.base_url}/v1/messages", json=payload
             ) as response:
                 response.raise_for_status()
 
-                # 直接返回原生的流式响应
+                # Directly return the native streaming response
                 async for line in response.aiter_lines():
                     yield line
 
-            # 更新指标
+            # Update metrics
             response_time = time.time() - start_time
             self.update_metrics(response_time, True)
 
@@ -151,29 +151,29 @@ class AnthropicAdapter(BaseAdapter):
             response_time = time.time() - start_time
             self.update_metrics(response_time, False)
 
-            # 根据错误状态码更新健康状态
+            # Update health status based on error status code
             if e.response.status_code >= 500:
                 self.health_status = HealthStatus.UNHEALTHY
             elif e.response.status_code >= 400:
                 self.health_status = HealthStatus.DEGRADED
 
             raise Exception(
-                f"Anthropic流式API错误: {e.response.status_code} - {e.response.text}"
+                f"Anthropic stream API error: {e.response.status_code} - {e.response.text}"
             )
 
         except Exception as e:
             response_time = time.time() - start_time
             self.update_metrics(response_time, False)
             self.health_status = HealthStatus.UNHEALTHY
-            raise Exception(f"Anthropic流式适配器错误: {str(e)}")
+            raise Exception(f"Anthropic stream adapter error: {str(e)}")
 
     async def health_check(self) -> HealthStatus:
-        """执行Anthropic健康检查"""
+        """Execute Anthropic health check"""
         try:
-            # 使用更简单的健康检查方法 - 只检查API连接
-            # Anthropic支持/models端点，但我们也提供备用方案
+            # Use simpler health check method - only check API connection
+            # Anthropic supports /models endpoint, but we also provide fallback
 
-            # 尝试获取模型列表
+            # Try to get model list
             try:
                 response = await self.client.get(f"{self.base_url}/v1/models")
                 if response.status_code == 200:
@@ -183,47 +183,47 @@ class AnthropicAdapter(BaseAdapter):
             except:
                 pass
 
-            # 如果/models端点不可用，尝试简单的HEAD请求
+            # If /models endpoint is not available, try simple HEAD request
             try:
                 response = await self.client.head(f"{self.base_url}/v1/messages")
-                if response.status_code in [200, 405]:  # 405表示方法不允许，但端点存在
+                if response.status_code in [200, 405]:  # 405 means method not allowed, but endpoint exists
                     self.health_status = HealthStatus.HEALTHY
                     self.metrics.last_health_check = time.time()
                     return HealthStatus.HEALTHY
             except:
                 pass
 
-            # 如果都失败了，标记为降级
+            # If all fail, mark as degraded
             self.health_status = HealthStatus.DEGRADED
             return HealthStatus.DEGRADED
 
         except httpx.ConnectError:
-            # 连接错误
+            # Connection error
             self.health_status = HealthStatus.UNHEALTHY
             return HealthStatus.UNHEALTHY
         except httpx.HTTPStatusError as e:
-            # HTTP错误
+            # HTTP error
             if e.response.status_code == 401:
-                # 认证错误
+                # Authentication error
                 self.health_status = HealthStatus.UNHEALTHY
             else:
                 self.health_status = HealthStatus.DEGRADED
             return self.health_status
         except Exception as e:
-            # 其他错误
+            # Other error
             self.health_status = HealthStatus.UNHEALTHY
             return HealthStatus.UNHEALTHY
 
     async def create_embedding(self, text: str) -> Dict[str, Any]:
-        """创建文本嵌入（Anthropic暂不支持）"""
-        raise NotImplementedError("Anthropic暂不支持文本嵌入功能")
+        """Create text embedding (Anthropic does not support)"""
+        raise NotImplementedError("Anthropic does not support embedding function")
 
     async def list_models(self) -> List[Dict[str, Any]]:
-        """获取可用模型列表"""
+        """Get available model list"""
         try:
             response = await self.client.get(f"{self.base_url}/v1/models")
             response.raise_for_status()
             return response.json().get("data", [])
 
         except Exception as e:
-            raise Exception(f"Anthropic模型列表获取错误: {str(e)}")
+            raise Exception(f"Anthropic model list get error: {str(e)}")

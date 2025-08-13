@@ -4,7 +4,7 @@ import os
 
 
 class ModelProvider(BaseSettings):
-    """模型提供商配置"""
+    """Model provider configuration"""
 
     name: str
     base_url: str
@@ -19,7 +19,7 @@ class ModelProvider(BaseSettings):
 
 
 class ModelConfig(BaseSettings):
-    """模型配置"""
+    """Model configuration"""
 
     name: str
     providers: List[ModelProvider]
@@ -37,9 +37,9 @@ class ModelConfig(BaseSettings):
 
 
 class LoadBalancingConfig(BaseSettings):
-    """负载均衡配置"""
+    """Load balancing configuration"""
 
-    strategy: str = "auto"  # 更新为新的策略：auto, specified_provider, fallback
+    strategy: str = "auto"  # New strategy: auto, specified_provider, fallback
     health_check_interval: int = 30
     max_retries: int = 3
     timeout: int = 30
@@ -52,7 +52,7 @@ class LoadBalancingConfig(BaseSettings):
 
 
 class MonitoringConfig(BaseSettings):
-    """监控配置"""
+    """Monitoring configuration"""
 
     enabled: bool = True
     metrics_interval: int = 60
@@ -62,7 +62,7 @@ class MonitoringConfig(BaseSettings):
 
 
 class SecurityConfig(BaseSettings):
-    """安全配置"""
+    """Security configuration"""
 
     rate_limit: int = 100
     api_key_required: bool = True
@@ -71,43 +71,43 @@ class SecurityConfig(BaseSettings):
 
 
 class Settings(BaseSettings):
-    # 应用基础配置
-    APP_NAME: str = "AI路由器"
+    # Application base configuration
+    APP_NAME: str = "AI Router"
     APP_VERSION: str = "1.0.0"
     DEBUG: bool = False
     RUN_ENV: str = "dev"
     LOG_LEVEL: str = "INFO"
     
-    # 服务器配置
+    # Server configuration
     HOST: str = "0.0.0.0"
     PORT: int = 8000
 
-    # Redis配置
+    # Redis configuration
     REDIS_URL: str = "redis://localhost:6379"
     REDIS_DB: int = 0
 
-    # 数据库配置
+    # Database configuration
     DATABASE_URL: str = "postgresql://user:password@localhost:5432/database"
 
-    # 数据库连接池配置
+    # Database connection pool configuration
     DB_POOL_SIZE: int = 10
     DB_MAX_OVERFLOW: int = 20
     DB_POOL_TIMEOUT: int = 30
     DB_POOL_RECYCLE: int = 3600
 
-    # 负载均衡配置
+    # Load balancing configuration
     LOAD_BALANCING: LoadBalancingConfig = LoadBalancingConfig()
 
-    # 监控配置
+    # Monitoring configuration
     MONITORING: MonitoringConfig = MonitoringConfig()
 
-    # 安全配置
+    # Security configuration
     SECURITY: SecurityConfig = SecurityConfig()
 
     class Config:
         env_file = ".env"
         case_sensitive = False
-        extra = "ignore"  # 忽略额外的环境变量
+        extra = "ignore"  # Ignore extra environment variables
 
 
 settings = Settings()

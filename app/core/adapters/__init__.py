@@ -1,4 +1,4 @@
-# 导出基础类和接口
+# Export base classes and interfaces
 from .base import (
     BaseAdapter,
     ChatRequest,
@@ -11,25 +11,25 @@ from .base import (
     FunctionCall,
 )
 
-# 导出具体的适配器实现
+# Export specific adapter implementations
 from .openai import OpenAIAdapter
 from .anthropic import AnthropicAdapter
 from .volcengine import VolcengineAdapter
 from .zhipu import ZhipuAdapter
 from .aliqwen import AliQwenAdapter
 
-# 导出适配器工厂函数
+# Export adapter factory functions
 from ...services.adapter_factory import AdapterFactory
 
-# 创建全局适配器工厂实例
+# Create global adapter factory instance
 _adapter_factory = AdapterFactory()
 
 
 def create_adapter(provider_name: str, config: dict):
-    """创建适配器的便捷函数"""
+    """Create adapter function"""
     from config.settings import ModelProvider
 
-    # 创建 ModelProvider 对象
+    # Create ModelProvider object
     provider_config = ModelProvider(
         name=provider_name,
         base_url=config.get("base_url", ""),
@@ -45,9 +45,9 @@ def create_adapter(provider_name: str, config: dict):
     return _adapter_factory.create_adapter(provider_config, config.get("model"))
 
 
-# 导出所有必要的类
+# Export all necessary classes
 __all__ = [
-    # 基础类和接口
+    # Base classes and interfaces
     "BaseAdapter",
     "ChatRequest",
     "ChatResponse",
@@ -57,12 +57,12 @@ __all__ = [
     "ModelMetrics",
     "Tool",
     "FunctionCall",
-    # 具体适配器实现
+    # Specific adapter implementations
     "OpenAIAdapter",
     "AnthropicAdapter",
     "VolcengineAdapter",
     "ZhipuAdapter",
     "AliQwenAdapter",
-    # 适配器工厂函数
+    # Adapter factory functions
     "create_adapter",
 ]

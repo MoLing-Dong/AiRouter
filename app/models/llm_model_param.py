@@ -17,7 +17,7 @@ from .base import Base
 
 
 class LLMModelParam(Base):
-    """LLM模型参数表"""
+    """LLM model parameter table"""
 
     __tablename__ = "llm_model_params"
 
@@ -27,7 +27,7 @@ class LLMModelParam(Base):
     )
     provider_id = Column(BigInteger, ForeignKey("llm_providers.id", ondelete="CASCADE"))
     param_key = Column(String(100), nullable=False)
-    param_value = Column(JSON)  # JSON类型，SQLite和PostgreSQL都支持
+    param_value = Column(JSON)  # JSON type, SQLite and PostgreSQL both support
     param_type = Column(String(50))
     description = Column(Text)
     is_enabled = Column(Boolean, default=True)
@@ -36,7 +36,7 @@ class LLMModelParam(Base):
         DateTime(timezone=True), default=func.now(), onupdate=func.now()
     )
 
-    # 关系
+    # Relationships
     llm_model = relationship("LLMModel", back_populates="params")
     provider = relationship("LLMProvider", back_populates="params")
 

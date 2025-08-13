@@ -17,7 +17,7 @@ from .base import Base
 
 
 class LLMProviderApiKey(Base):
-    """LLM提供商API密钥表"""
+    """LLM provider API key table"""
 
     __tablename__ = "llm_provider_apikeys"
 
@@ -39,7 +39,7 @@ class LLMProviderApiKey(Base):
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
 
-    # 关系
+    # Relationships
     provider = relationship("LLMProvider", back_populates="api_keys")
 
     __table_args__ = (

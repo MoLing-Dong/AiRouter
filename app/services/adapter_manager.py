@@ -10,15 +10,15 @@ from app.services.adapter_database_service import ModelDatabaseService
 from app.services.adapter_health_checker import HealthChecker
 from config.settings import ModelConfig, ModelProvider
 
-# 获取日志器
+# Get logger
 from app.utils.logging_config import get_factory_logger
 
-# 获取日志器
+# Get logger
 logger = get_factory_logger()
 
 
 class ModelAdapterManager:
-    """模型适配器管理器 - 以模型为主的设计"""
+    """Model adapter manager - designed around models"""
 
     def __init__(self):
         self.model_configs: Dict[str, ModelConfig] = {}
@@ -26,58 +26,58 @@ class ModelAdapterManager:
         self.provider_adapters: Dict[str, BaseAdapter] = {}
         self.use_database: bool = True
 
-        # 初始化各个服务
+        # Initialize services
         self.db_service = ModelDatabaseService()
         self.factory = AdapterFactory()
         self.health_checker = HealthChecker()
 
     def set_use_database(self, use_db: bool):
-        """设置是否使用数据库配置"""
+        """Set whether to use database configuration"""
         self.use_database = use_db
 
     def load_models_from_database(self):
-        """从数据库加载所有模型配置"""
+        """Load all model configurations from database"""
         if not self.use_database:
             return
 
         try:
-            # 从数据库获取所有模型配置
+            # Get all model configurations from database
             db_configs = self.db_service.get_all_model_configs_from_db()
-            logger.info(f"从数据库加载的模型配置: {list(db_configs.keys())}")
+            logger.info(f"Model configurations loaded from database: {list(db_configs.keys())}")
 
-            # 清除现有配置
+            # Clear existing configurations
             self.model_configs.clear()
             self.model_adapters.clear()
             self.provider_adapters.clear()
 
-            # 注册从数据库获取的模型
+            # Register models from database
             for model_name, config in db_configs.items():
-                logger.info(f"注册模型: {model_name}")
+                logger.info(f"Registering model: {model_name}")
                 self._register_model_from_dict(model_name, config)
 
-            logger.info(f"最终可用模型: {list(self.model_configs.keys())}")
-            # 打印每个模型对应的适配器提供商名称
+            logger.info(f"Available models: {list(self.model_configs.keys())}")
+            # Print adapter provider names for each model
             adapter_info = {}
             for model_name, adapters in self.model_adapters.items():
                 adapter_info[model_name] = [adapter.provider for adapter in adapters]
-            logger.info(f"模型提供商: {adapter_info}")
+            logger.info(f"Model providers: {adapter_info}")
 
         except Exception as e:
-            logger.info(f"从数据库加载模型配置失败: {e}")
+            logger.info(f"Failed to load model configurations from database: {e}")
             logger.info_exc()
 
     def _register_model_from_dict(self, model_name: str, config_dict: Dict[str, Any]):
-        """从字典注册模型配置"""
+        """Register model configuration from dictionary"""
         try:
-            # 构建ModelConfig对象
+            # Build ModelConfig object
             providers = []
             for provider_dict in config_dict.get("providers", []):
-                # 从数据库获取API密钥
+                # Get API key from database
                 api_key = self.db_service.get_api_key_for_provider(
                     provider_dict["name"]
                 )
                 if not api_key:
-                    logger.info(f"警告: 未找到提供商 {provider_dict['name']} 的API密钥")
+                    logger.info(f"Warning: No API key found for provider {provider_dict['name']}")
                     continue
 
                 provider = ModelProvider(
@@ -95,7 +95,7 @@ class ModelAdapterManager:
                 providers.append(provider)
 
             if not providers:
-                logger.info(f"警告: 模型 {model_name} 没有可用的提供商")
+                logger.info(f"Warning: Model {model_name} has no available providers")
                 return
 
             model_config = ModelConfig(
@@ -112,22 +112,22 @@ class ModelAdapterManager:
             )
 
             self.register_model(model_name, model_config)
-            logger.info(f"✅ 从数据库注册模型: {model_name}")
+            logger.info(f"✅ Registered model from database: {model_name}")
 
         except Exception as e:
-            logger.info(f"注册模型失败 {model_name}: {e}")
+            logger.info(f"Failed to register model {model_name}: {e}")
 
     def register_model(self, model_name: str, model_config: ModelConfig):
-        """注册模型配置"""
+        """Register model configuration"""
         self.model_configs[model_name] = model_config
         self.model_adapters[model_name] = []
 
-        # 为每个提供商创建适配器
+        # Create adapter for each provider
         for provider_config in model_config.providers:
             if not provider_config.enabled:
                 continue
 
-            # 从数据库配置中获取模型名称
+            # Get model name from database configuration
             adapter_model_name = model_name
             adapter = self.factory.create_adapter(provider_config, adapter_model_name)
             if adapter:
@@ -135,21 +135,21 @@ class ModelAdapterManager:
                 self.provider_adapters[f"{model_name}:{provider_config.name}"] = adapter
 
     def get_model_adapters(self, model_name: str) -> List[BaseAdapter]:
-        """获取模型的所有适配器"""
+        """Get all adapters for the model"""
         return self.model_adapters.get(model_name, [])
 
     def get_best_adapter(self, model_name: str) -> Optional[BaseAdapter]:
-        """获取模型的最佳适配器（基于权重和健康状态）"""
+        """Get best adapter for the model (based on weight and health status)"""
         adapters = self.get_model_adapters(model_name)
-        logger.info(f"模型 {model_name} 的适配器数量: {len(adapters)}")
+        logger.info(f"Number of adapters for model {model_name}: {len(adapters)}")
         if not adapters:
-            logger.warning(f"模型 {model_name} 没有可用的适配器")
+            logger.warning(f"Model {model_name} has no available adapters")
             return None
 
-        # 按权重和健康状态排序
+        # Sort by weight and health status
         scored_adapters = []
         for adapter in adapters:
-            # 避免除零错误，如果response_time为0，使用默认值
+            # Avoid division by zero error, if response_time is 0, use default value
             response_time = adapter.metrics.response_time or 1.0
             score = (
                 adapter.metrics.cost_per_1k_tokens * 0.3
@@ -157,11 +157,11 @@ class ModelAdapterManager:
                 + adapter.metrics.success_rate * 0.3
             )
 
-            # 考虑权重
+            # Consider weight
             weight = getattr(adapter, "weight", 1.0)
             score *= weight
 
-            # 考虑健康状态
+            # Consider health status
             if adapter.health_status == HealthStatus.HEALTHY:
                 score *= 1.2
             elif adapter.health_status == HealthStatus.DEGRADED:
@@ -171,32 +171,32 @@ class ModelAdapterManager:
 
             scored_adapters.append((adapter, score))
 
-        # 返回得分最高的适配器
+        # Return adapter with highest score
         scored_adapters.sort(key=lambda x: x[1], reverse=True)
         return scored_adapters[0][0] if scored_adapters else None
 
     def get_available_models(self) -> List[str]:
-        """获取所有可用模型"""
+        """Get all available models"""
         return list(self.model_configs.keys())
 
     def get_model_config(self, model_name: str) -> Optional[ModelConfig]:
-        """获取模型配置"""
+        """Get model configuration"""
         return self.model_configs.get(model_name)
 
     async def health_check_model(self, model_name: str) -> Dict[str, str]:
-        """检查模型的所有适配器健康状态"""
+        """Check health status for all adapters of the model"""
         return await self.health_checker.check_model_health(
             model_name, self.get_model_adapters(model_name)
         )
 
     async def health_check_all(self) -> Dict[str, str]:
-        """检查所有模型的健康状态"""
+        """Check health status for all models"""
         return await self.health_checker.check_all_models(
             self.get_available_models(), self.model_adapters
         )
 
     async def close_all(self):
-        """关闭所有适配器"""
+        """Close all adapters"""
         for adapters in self.model_adapters.values():
             for adapter in adapters:
                 await adapter.close()
@@ -204,5 +204,5 @@ class ModelAdapterManager:
         self.provider_adapters.clear()
 
     def refresh_from_database(self):
-        """从数据库刷新模型配置"""
+        """Refresh model configurations from database"""
         self.load_models_from_database()

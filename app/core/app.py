@@ -4,11 +4,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from config.settings import settings
 from app.utils.logging_config import get_factory_logger
 
-# 获取日志器
+# Get logger
 logger = get_factory_logger()
 
 def create_app() -> FastAPI:
-    """创建FastAPI应用实例"""
+    """Create FastAPI application instance"""
     app = FastAPI(
         title=settings.APP_NAME,
         version=settings.APP_VERSION,
@@ -17,7 +17,7 @@ def create_app() -> FastAPI:
         ),
     )
 
-    # 添加CORS中间件
+    # Add CORS middleware
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.SECURITY.cors_origins,
@@ -29,5 +29,5 @@ def create_app() -> FastAPI:
     return app
 
 
-# 创建应用实例
+# Create application instance
 app = create_app()

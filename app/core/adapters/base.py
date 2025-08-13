@@ -8,7 +8,7 @@ import httpx
 import json
 from app.utils.logging_config import get_factory_logger
 
-# 获取日志器
+# Get logger
 logger = get_factory_logger()
 
 
@@ -76,7 +76,7 @@ class ModelMetrics(BaseModel):
 
 
 class BaseAdapter(ABC):
-    """基础适配器接口，所有模型适配器必须继承此类"""
+    """Base adapter interface, all model adapters must inherit this class"""
 
     def __init__(self, model_config: Dict[str, Any], api_key: str):
         self.model_config = model_config
@@ -85,14 +85,14 @@ class BaseAdapter(ABC):
         self.model_name = model_config.get("model")
         self.provider = model_config.get("provider")
 
-        # 初始化指标
+        # Initialize metrics
         self.metrics = ModelMetrics(
             cost_per_1k_tokens=model_config.get("cost_per_1k_tokens", 0.0),
             last_health_check=time.time(),
         )
         self.health_status = HealthStatus.HEALTHY
 
-        # HTTP客户端
+        # HTTP client
         self.client = httpx.AsyncClient(
             timeout=30.0,
             headers={
@@ -103,38 +103,38 @@ class BaseAdapter(ABC):
 
     @abstractmethod
     async def chat_completion(self, request: ChatRequest) -> ChatResponse:
-        """执行聊天完成请求"""
+        """Execute chat completion request"""
         pass
 
     @abstractmethod
     async def health_check(self) -> HealthStatus:
-        """执行健康检查"""
+        """Execute health check"""
         pass
 
     @abstractmethod
     def format_messages(self, messages: List[Message]) -> List[Dict]:
-        """格式化消息为特定提供商的格式"""
+        """Format messages to specific provider format"""
         pass
 
     async def stream_chat_completion(self, request: ChatRequest):
-        """流式聊天完成 - 子类必须重写此方法以支持真正的流式响应"""
+        """Stream chat completion - subclass must override this method to support true streaming response"""
         raise NotImplementedError("This adapter does not support streaming")
 
     def update_metrics(self, response_time: float, success: bool, tokens_used: int = 0):
-        """更新模型指标"""
+        """Update model metrics"""
         self.metrics.response_time = response_time
         self.metrics.total_requests += 1
         self.metrics.total_tokens += tokens_used
 
         if success:
-            # 更新成功率
+            # Update success rate
             total_requests = self.metrics.total_requests
             current_success_rate = self.metrics.success_rate
             self.metrics.success_rate = (
                 current_success_rate * (total_requests - 1) + 1
             ) / total_requests
         else:
-            # 失败时降低成功率
+            # When failed, reduce success rate
             self.metrics.error_count += 1
             total_requests = self.metrics.total_requests
             current_success_rate = self.metrics.success_rate
@@ -143,25 +143,25 @@ class BaseAdapter(ABC):
             ) / total_requests
 
     def get_cost_estimate(self, tokens: int) -> float:
-        """估算成本"""
+        """Estimate cost"""
         return (tokens / 1000) * self.metrics.cost_per_1k_tokens
 
     def get_performance_score(self) -> float:
-        """计算性能评分（用于负载均衡）"""
-        # 综合考虑响应时间、成功率和成本
+        """Calculate performance score (used for load balancing)"""
+        # Consider response time, success rate and cost
         response_time_score = max(
             0, 1 - (self.metrics.response_time / 10)
-        )  # 10秒为基准
+        )  # 10 seconds as baseline
         cost_score = max(
             0, 1 - (self.metrics.cost_per_1k_tokens / 0.1)
-        )  # 0.1美元为基准
+        )  # 0.1 dollar as baseline
         success_score = self.metrics.success_rate
 
-        # 加权平均
+        # Weighted average
         return response_time_score * 0.4 + cost_score * 0.3 + success_score * 0.3
 
     async def close(self):
-        """关闭HTTP客户端"""
+        """Close HTTP client"""
         if hasattr(self.client, "aclose"):
             await self.client.aclose()
         elif hasattr(self.client, "close"):

@@ -7,7 +7,7 @@ from .enums import LLMTypeEnum
 
 
 class LLMModel(Base):
-    """LLM模型表"""
+    """LLM model table"""
 
     __tablename__ = "llm_models"
 
@@ -21,6 +21,6 @@ class LLMModel(Base):
         DateTime(timezone=True), default=func.now(), onupdate=func.now()
     )
 
-    # 关系
+    # Relationships
     providers = relationship("LLMModelProvider", back_populates="llm_model")
     params = relationship("LLMModelParam", back_populates="llm_model")

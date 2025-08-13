@@ -16,7 +16,7 @@ from .enums import ProviderTypeEnum
 
 
 class LLMProvider(Base):
-    """LLM提供商表"""
+    """LLM provider table"""
 
     __tablename__ = "llm_providers"
 
@@ -32,7 +32,7 @@ class LLMProvider(Base):
         DateTime(timezone=True), default=func.now(), onupdate=func.now()
     )
 
-    # 关系
+    # Relationships
     models = relationship("LLMModelProvider", back_populates="provider")
     params = relationship("LLMModelParam", back_populates="provider")
     api_keys = relationship("LLMProviderApiKey", back_populates="provider")

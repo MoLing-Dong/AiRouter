@@ -8,19 +8,19 @@ from app.core.adapters.aliqwen import AliQwenAdapter
 from config.settings import ModelProvider
 from app.utils.logging_config import get_factory_logger
 
-# 获取日志器
+# Get logger
 logger = get_factory_logger()
 
 
 class AdapterFactory:
-    """适配器工厂 - 负责创建不同类型的适配器"""
+    """Adapter factory - responsible for creating different types of adapters"""
 
     def create_adapter(
         self, provider_config: ModelProvider, model_name: str = None
     ) -> Optional[BaseAdapter]:
-        """根据提供商配置创建适配器"""
+        """Create adapter based on provider configuration"""
         try:
-            # 构建适配器配置
+            # Build adapter configuration
             adapter_config = {
                 "provider": provider_config.name,
                 "base_url": provider_config.base_url,
@@ -37,10 +37,10 @@ class AdapterFactory:
             }
 
             logger.info(
-                f"🔧 创建适配器: {provider_config.name} -> 模型: {adapter_config['model']}"
+                f"🔧 Creating adapter: {provider_config.name} -> model: {adapter_config['model']}"
             )
 
-            # 根据提供商类型创建适配器（大小写不敏感）
+            # Create adapter based on provider type (case-insensitive)
             provider_name_lower = provider_config.name.lower()
 
             if (
@@ -57,39 +57,39 @@ class AdapterFactory:
             elif provider_name_lower == "aliqwen":
                 return AliQwenAdapter(adapter_config, provider_config.api_key)
             elif provider_name_lower == "google":
-                # TODO: 实现Google适配器
-                logger.info(f"警告: Google适配器尚未实现: {provider_config.name}")
+                # TODO: Implement Google adapter
+                logger.info(f"Warning: Google adapter not implemented: {provider_config.name}")
                 return None
             elif provider_name_lower == "private-server":
-                # 私有服务器适配器
+                # Private server adapter
                 return OpenAIAdapter(adapter_config, provider_config.api_key)
             else:
-                # 默认使用OpenAI适配器（兼容第三方OpenAI兼容的API）
-                logger.info(f"使用OpenAI适配器作为默认适配器: {provider_config.name}")
+                # Use OpenAI adapter as default (compatible with third-party OpenAI API)
+                logger.info(f"Using OpenAI adapter as default adapter: {provider_config.name}")
                 return OpenAIAdapter(adapter_config, provider_config.api_key)
 
         except Exception as e:
-            logger.info(f"创建适配器失败: {provider_config.name} - {e}")
+            logger.info(f"Failed to create adapter: {provider_config.name} - {e}")
             return None
 
     def _create_openai_adapter(self, config: dict, api_key: str) -> OpenAIAdapter:
-        """创建OpenAI适配器"""
+        """Create OpenAI adapter"""
         return OpenAIAdapter(config, api_key)
 
     def _create_anthropic_adapter(self, config: dict, api_key: str) -> AnthropicAdapter:
-        """创建Anthropic适配器"""
+        """Create Anthropic adapter"""
         return AnthropicAdapter(config, api_key)
 
     def _create_volcengine_adapter(
         self, config: dict, api_key: str
     ) -> VolcengineAdapter:
-        """创建火山引擎适配器"""
+        """Create Volcengine adapter"""
         return VolcengineAdapter(config, api_key)
 
     def _create_zhipu_adapter(self, config: dict, api_key: str) -> ZhipuAdapter:
-        """创建智谱AI适配器"""
+        """Create Zhipu adapter"""
         return ZhipuAdapter(config, api_key)
 
     def _create_aliqwen_adapter(self, config: dict, api_key: str) -> AliQwenAdapter:
-        """创建千问适配器"""
+        """Create AliQwen adapter"""
         return AliQwenAdapter(config, api_key)

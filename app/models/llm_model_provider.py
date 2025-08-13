@@ -21,26 +21,26 @@ from .base import Base
 
 
 class HealthStatusEnum(str, Enum):
-    """健康状态枚举"""
+    """Health status enum"""
     HEALTHY = "healthy"
     DEGRADED = "degraded"
     UNHEALTHY = "unhealthy"
 
 
 class LoadBalancingStrategyEnum(str, Enum):
-    """负载均衡策略枚举"""
-    AUTO = "auto"  # 自动选择最佳供应商
-    SPECIFIED_PROVIDER = "specified_provider"  # 指定供应商
-    FALLBACK = "fallback"  # 故障转移
-    WEIGHTED_ROUND_ROBIN = "weighted_round_robin"  # 加权轮询
-    LEAST_CONNECTIONS = "least_connections"  # 最少连接数
-    RESPONSE_TIME = "response_time"  # 响应时间优先
-    COST_OPTIMIZED = "cost_optimized"  # 成本优化
-    HYBRID = "hybrid"  # 混合策略
+    """Load balancing strategy enum"""
+    AUTO = "auto"  # Auto select best provider
+    SPECIFIED_PROVIDER = "specified_provider"  # Specify provider
+    FALLBACK = "fallback"  # Fallback
+    WEIGHTED_ROUND_ROBIN = "weighted_round_robin"  # Weighted round robin
+    LEAST_CONNECTIONS = "least_connections"  # Least connections
+    RESPONSE_TIME = "response_time"  # Response time priority
+    COST_OPTIMIZED = "cost_optimized"  # Cost optimized
+    HYBRID = "hybrid"  # Hybrid strategy
 
 
 class LLMModelProvider(Base):
-    """LLM模型-提供商关联表"""
+    """LLM model-provider association table"""
 
     __tablename__ = "llm_model_providers"
 
@@ -57,69 +57,69 @@ class LLMModelProvider(Base):
     is_preferred = Column(Boolean, default=False)
     is_enabled = Column(Boolean, default=True)
     
-    # 负载均衡策略配置
+    # Load balancing strategy configuration
     load_balancing_strategy = Column(
         String(50), 
         default=LoadBalancingStrategyEnum.AUTO.value,
         nullable=False
-    )  # 负载均衡策略
-    strategy_config = Column(JSON, default=dict)  # 策略配置参数
-    priority = Column(Integer, default=0)  # 优先级（数字越小优先级越高）
+    )  # Load balancing strategy
+    strategy_config = Column(JSON, default=dict)  # Strategy configuration parameters
+    priority = Column(Integer, default=0)  # Priority (number smaller is higher priority)
     
-    # 策略特定配置
-    max_retries = Column(Integer, default=3)  # 最大重试次数
-    retry_delay = Column(Float, default=1.0)  # 重试延迟（秒）
-    circuit_breaker_enabled = Column(Boolean, default=True)  # 是否启用熔断器
-    circuit_breaker_threshold = Column(Integer, default=5)  # 熔断器阈值
-    circuit_breaker_timeout = Column(Integer, default=60)  # 熔断器超时时间（秒）
+    # Strategy specific configuration
+    max_retries = Column(Integer, default=3)  # Maximum retry count
+    retry_delay = Column(Float, default=1.0)  # Retry delay (seconds)
+    circuit_breaker_enabled = Column(Boolean, default=True)  # Whether to enable circuit breaker
+    circuit_breaker_threshold = Column(Integer, default=5)  # Circuit breaker threshold
+    circuit_breaker_timeout = Column(Integer, default=60)  # Circuit breaker timeout (seconds)
     
-    # 健康状态相关字段
+    # Health status related fields
     health_status = Column(String(20), default=HealthStatusEnum.HEALTHY.value)
     last_health_check = Column(DateTime(timezone=True))
-    health_check_interval = Column(Integer, default=300)  # 健康检查间隔（秒）
+    health_check_interval = Column(Integer, default=300)  # Health check interval (seconds)
     
-    # 性能指标字段
-    response_time_avg = Column(Float, default=0.0)  # 平均响应时间（秒）
-    response_time_min = Column(Float, default=0.0)  # 最小响应时间
-    response_time_max = Column(Float, default=0.0)  # 最大响应时间
-    success_rate = Column(Float, default=1.0)  # 成功率（0-1）
-    total_requests = Column(BigInteger, default=0)  # 总请求数
-    successful_requests = Column(BigInteger, default=0)  # 成功请求数
-    failed_requests = Column(BigInteger, default=0)  # 失败请求数
+    # Performance metrics fields
+    response_time_avg = Column(Float, default=0.0)  # Average response time (seconds)
+    response_time_min = Column(Float, default=0.0)  # Minimum response time
+    response_time_max = Column(Float, default=0.0)  # Maximum response time
+    success_rate = Column(Float, default=1.0)  # Success rate (0-1)
+    total_requests = Column(BigInteger, default=0)  # Total requests
+    successful_requests = Column(BigInteger, default=0)  # Successful requests
+    failed_requests = Column(BigInteger, default=0)  # Failed requests
     
-    # 成本相关字段
-    cost_per_1k_tokens = Column(Float, default=0.0)  # 每1K tokens的成本
-    total_cost = Column(Float, default=0.0)  # 总成本
-    total_tokens_used = Column(BigInteger, default=0)  # 总使用的tokens
+    # Cost related fields
+    cost_per_1k_tokens = Column(Float, default=0.0)  # Cost per 1K tokens
+    total_cost = Column(Float, default=0.0)  # Total cost
+    total_tokens_used = Column(BigInteger, default=0)  # Total tokens used
     
-    # 评分和优先级
-    health_score = Column(Float, default=1.0)  # 健康评分（0-1）
-    performance_score = Column(Float, default=1.0)  # 性能评分
-    cost_score = Column(Float, default=1.0)  # 成本评分
-    overall_score = Column(Float, default=1.0)  # 综合评分
+    # Score and priority
+    health_score = Column(Float, default=1.0)  # Health score (0-1)
+    performance_score = Column(Float, default=1.0)  # Performance score
+    cost_score = Column(Float, default=1.0)  # Cost score
+    overall_score = Column(Float, default=1.0)  # Overall score
     
-    # 故障转移和降级配置
-    max_failures = Column(Integer, default=3)  # 最大失败次数
-    failure_count = Column(Integer, default=0)  # 当前失败次数
-    last_failure_time = Column(DateTime(timezone=True))  # 最后失败时间
-    auto_disable_on_failure = Column(Boolean, default=True)  # 失败时自动禁用
+    # Failure transfer and degradation configuration
+    max_failures = Column(Integer, default=3)  # Maximum failure count
+    failure_count = Column(Integer, default=0)  # Current failure count
+    last_failure_time = Column(DateTime(timezone=True))  # Last failure time
+    auto_disable_on_failure = Column(Boolean, default=True)  # Auto disable on failure
     
-    # 监控和告警
-    alert_threshold = Column(Float, default=0.8)  # 告警阈值
-    is_alerting = Column(Boolean, default=False)  # 是否处于告警状态
-    last_alert_time = Column(DateTime(timezone=True))  # 最后告警时间
+    # Monitoring and alerting
+    alert_threshold = Column(Float, default=0.8)  # Alert threshold
+    is_alerting = Column(Boolean, default=False)  # Whether in alert state
+    last_alert_time = Column(DateTime(timezone=True))  # Last alert time
     
-    # 扩展配置
-    custom_config = Column(JSON)  # 自定义配置
-    model_metadata = Column(JSON)  # 元数据
+    # Extended configuration
+    custom_config = Column(JSON)  # Custom configuration
+    model_metadata = Column(JSON)  # Model metadata
     
-    # 时间戳
+    # Timestamp
     created_at = Column(DateTime(timezone=True), default=func.now())
     updated_at = Column(
         DateTime(timezone=True), default=func.now(), onupdate=func.now()
     )
 
-    # 关系
+    # Relationships
     llm_model = relationship("LLMModel", back_populates="providers")
     provider = relationship("LLMProvider", back_populates="models")
 

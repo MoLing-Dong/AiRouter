@@ -9,14 +9,14 @@ from app.models import (
     LLMModelParamCreate,
 )
 
-# 获取日志器
+# Get logger
 logger = get_factory_logger()
-db_router = APIRouter(prefix="/v1/db", tags=["数据库管理"])
+db_router = APIRouter(prefix="/v1/db", tags=["Database Management"])
 
 
 @db_router.get("/models")
 async def get_db_models():
-    """获取数据库中的模型列表"""
+    """Get database models list"""
     try:
         models = db_service.get_all_models()
         return {
@@ -34,37 +34,37 @@ async def get_db_models():
             ]
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"获取数据库模型失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Get database models failed: {str(e)}")
 
 
 @db_router.post("/models")
 async def create_db_model(model_data: LLMModelCreate):
-    """创建模型"""
+    """Create model"""
     try:
-        # 检查是否已存在相同名称的模型
+        # Check if model already exists
         existing_model = db_service.get_model_by_name(model_data.name)
 
         if existing_model:
             raise HTTPException(
-                status_code=400, detail=f"模型已存在: {model_data.name}"
+                status_code=400, detail=f"Model already exists: {model_data.name}"
             )
 
         model = db_service.create_model(model_data)
         return {
-            "message": "模型创建成功",
+            "message": "Model created successfully",
             "id": model.id,
             "name": model.name,
         }
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"创建模型失败: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"创建模型失败: {str(e)}")
+        logger.error(f"Create model failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Create model failed: {str(e)}")
 
 
 @db_router.get("/providers")
 async def get_db_providers():
-    """获取数据库中的提供商列表"""
+    """Get database providers list"""
     try:
         providers = db_service.get_all_providers()
         return {
@@ -82,14 +82,14 @@ async def get_db_providers():
             ]
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"获取提供商列表失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Get providers list failed: {str(e)}")
 
 
 @db_router.post("/providers")
 async def create_db_provider(provider_data: LLMProviderCreate):
-    """创建数据库提供商"""
+    """Create database provider"""
     try:
-        # 检查是否已存在相同名称和类型的提供商
+        # Check if provider already exists
         existing_provider = db_service.get_provider_by_name_and_type(
             provider_data.name, provider_data.provider_type
         )
@@ -97,26 +97,26 @@ async def create_db_provider(provider_data: LLMProviderCreate):
         if existing_provider:
             raise HTTPException(
                 status_code=400,
-                detail=f"提供商已存在: {provider_data.name} ({provider_data.provider_type})",
+                detail=f"Provider already exists: {provider_data.name} ({provider_data.provider_type})",
             )
 
         provider = db_service.create_provider(provider_data)
         return {
-            "message": "提供商创建成功",
+            "message": "Provider created successfully",
             "provider_id": provider.id,
             "provider_name": provider.name,
         }
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"创建提供商失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Create provider failed: {str(e)}")
 
 
 @db_router.post("/model-providers")
 async def create_db_model_provider(model_provider_data: LLMModelProviderCreate):
-    """创建模型-提供商关联"""
+    """Create model-provider association"""
     try:
-        # 检查是否已存在相同的模型-提供商关联
+        # Check if model-provider association already exists
         existing_mp = db_service.get_model_provider_by_ids(
             model_provider_data.llm_id, model_provider_data.provider_id
         )
@@ -124,42 +124,42 @@ async def create_db_model_provider(model_provider_data: LLMModelProviderCreate):
         if existing_mp:
             raise HTTPException(
                 status_code=400,
-                detail=f"模型-提供商关联已存在: 模型ID {model_provider_data.llm_id}, 提供商ID {model_provider_data.provider_id}",
+                detail=f"Model-provider association already exists: model ID {model_provider_data.llm_id}, provider ID {model_provider_data.provider_id}",
             )
 
         model_provider = db_service.create_model_provider(model_provider_data)
-        return {"message": "模型-提供商关联创建成功", "id": model_provider.id}
+        return {"message": "Model-provider association created successfully", "id": model_provider.id}
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(
-            status_code=500, detail=f"创建模型-提供商关联失败: {str(e)}"
+            status_code=500, detail=f"Create model-provider association failed: {str(e)}"
         )
 
 
-# 更新模型-提供商关联
+# Update model-provider association
 @db_router.put("/model-providers/{model_provider_id}")
 async def update_db_model_provider(
     model_provider_id: int, model_provider_data: LLMModelProviderUpdate
 ):
-    """更新模型-提供商关联"""
+    """Update model-provider association"""
     try:
         model_provider = db_service.update_model_provider(
             model_provider_id, model_provider_data
         )
-        return {"message": "模型-提供商关联更新成功", "id": model_provider.id}
+        return {"message": "Model-provider association updated successfully", "id": model_provider.id}
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(
-            status_code=500, detail=f"更新模型-提供商关联失败: {str(e)}"
+            status_code=500, detail=f"Update model-provider association failed: {str(e)}"
         )
 
 @db_router.post("/model-params")
 async def create_db_model_param(param_data: LLMModelParamCreate):
-    """创建模型参数"""
+    """Create model parameter"""
     try:
-        # 检查是否已存在相同的模型参数
+        # Check if model parameter already exists
         existing_param = db_service.get_model_param_by_key(
             param_data.llm_id,
             param_data.provider_id,
@@ -169,12 +169,12 @@ async def create_db_model_param(param_data: LLMModelParamCreate):
         if existing_param:
             raise HTTPException(
                 status_code=400,
-                detail=f"模型参数已存在: 模型ID {param_data.llm_id}, 参数键 {param_data.param_key}",
+                detail=f"Model parameter already exists: model ID {param_data.llm_id}, parameter key {param_data.param_key}",
             )
 
         param = db_service.create_model_param(param_data)
-        return {"message": "模型参数创建成功", "param_id": param.param_id}
+        return {"message": "Model parameter created successfully", "param_id": param.param_id}
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"创建模型参数失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Create model parameter failed: {str(e)}")

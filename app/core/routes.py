@@ -11,24 +11,24 @@ from app.api.v1.load_balancing import router as load_balancing_router
 from app.api.v1.pool import pool_router
 from app.utils.logging_config import get_factory_logger
 
-# 获取日志器
+# Get logger
 logger = get_factory_logger()
 
 def register_routes(app):
-    """注册所有路由"""
+    """Register all routes"""
     
-    # 注册v1版本路由 - 这些路由已经包含了/v1前缀
-    app.include_router(chat_router, tags=["聊天"])
-    app.include_router(models_router, tags=["模型管理"])
-    app.include_router(stats_router, tags=["统计"])
-    app.include_router(db_router, tags=["数据库管理"])
-    app.include_router(health_router, tags=["健康检查"])
+    # Register v1 version routes - These routes already contain the /v1 prefix
+    app.include_router(chat_router, tags=["Chat"])
+    app.include_router(models_router, tags=["Model Management"])
+    app.include_router(stats_router, tags=["Statistics"])
+    app.include_router(db_router, tags=["Database Management"])
+    app.include_router(health_router, tags=["Health Check"])
     
-    # 注册提供商管理路由
-    app.include_router(providers_router, tags=["提供商管理"])
+    # Register provider management routes
+    app.include_router(providers_router, tags=["Provider Management"])
     
-    # 注册负载均衡策略管理路由
-    app.include_router(load_balancing_router, tags=["负载均衡策略"])
+    # Register load balancing strategy management routes
+    app.include_router(load_balancing_router, tags=["Load Balancing Strategy"])
     
-    # 注册适配器池管理路由
-    app.include_router(pool_router, tags=["适配器池管理"])
+    # Register adapter pool management routes
+    app.include_router(pool_router, tags=["Adapter Pool Management"])

@@ -20,15 +20,15 @@ from ..models.llm_model_provider import HealthStatusEnum
 from config.settings import settings
 from app.utils.logging_config import get_factory_logger
 
-# 获取日志器
+# Get logger
 logger = get_factory_logger()
 
 
 class DatabaseService:
-    """数据库服务"""
+    """Database service"""
 
     def __init__(self):
-        # PostgreSQL
+        # PostgreSQL database
         self.engine = create_engine(
             settings.DATABASE_URL,
             pool_pre_ping=True,
@@ -39,18 +39,18 @@ class DatabaseService:
             autocommit=False, autoflush=False, bind=self.engine
         )
 
-        # 创建表
+        # Create tables
         Base.metadata.create_all(bind=self.engine)
 
     def get_session(self) -> Session:
-        """获取数据库会话"""
+        """Get database session"""
         return self.SessionLocal()
 
     def get_all_models(self, is_enabled: bool = None) -> List[LLMModel]:
-        """获取所有的模型
+        """Get all models
 
         Args:
-            is_enabled: 是否启用，None表示忽略启用状态
+            is_enabled: Whether to enable, None means ignore enable status
         """
         with self.get_session() as session:
             query = session.query(LLMModel)
@@ -61,11 +61,11 @@ class DatabaseService:
     def get_model_by_name(
         self, model_name: str, is_enabled: bool = None
     ) -> Optional[LLMModel]:
-        """根据模型名称获取模型
+        """Get model by name
 
         Args:
-            model_name: 模型名称
-            is_enabled: 是否启用，None表示忽略启用状态
+            model_name: Model name
+            is_enabled: Whether to enable, None means ignore enable status
         """
         with self.get_session() as session:
             query = session.query(LLMModel).filter(LLMModel.name == model_name)
@@ -76,11 +76,11 @@ class DatabaseService:
     def get_model_providers(
         self, model_id: int, is_enabled: bool = None
     ) -> List[LLMModelProvider]:
-        """获取模型的所有提供商
+        """Get all providers of the model
 
         Args:
-            model_id: 模型ID
-            is_enabled: 是否启用，None表示忽略启用状态
+            model_id: Model ID
+            is_enabled: Whether to enable, None means ignore enable status
         """
         with self.get_session() as session:
             query = session.query(LLMModelProvider).filter(
@@ -93,12 +93,12 @@ class DatabaseService:
     def get_model_provider_by_ids(
         self, model_id: int, provider_id: int, is_enabled: bool = None
     ) -> Optional[LLMModelProvider]:
-        """根据模型ID和提供商ID获取模型-提供商关联
+        """Get model-provider association by model ID and provider ID
 
         Args:
-            model_id: 模型ID
-            provider_id: 提供商ID
-            is_enabled: 是否启用，None表示忽略启用状态
+            model_id: Model ID
+            provider_id: Provider ID
+            is_enabled: Whether to enable, None means ignore enable status
         """
         with self.get_session() as session:
             query = session.query(LLMModelProvider).filter(
@@ -112,12 +112,12 @@ class DatabaseService:
     def get_model_params(
         self, model_id: int, provider_id: Optional[int] = None, is_enabled: bool = None
     ) -> List[LLMModelParam]:
-        """获取模型参数
+        """Get model parameters
 
         Args:
-            model_id: 模型ID
-            provider_id: 提供商ID，None表示获取通用参数
-            is_enabled: 是否启用，None表示忽略启用状态
+            model_id: Model ID
+            provider_id: Provider ID, None means get general parameters
+            is_enabled: Whether to enable, None means ignore enable status
         """
         with self.get_session() as session:
             query = session.query(LLMModelParam).filter(
@@ -139,13 +139,13 @@ class DatabaseService:
         param_key: str,
         is_enabled: bool = None,
     ) -> Optional[LLMModelParam]:
-        """根据模型ID、提供商ID和参数键获取模型参数
+        """Get model parameters by model ID, provider ID and parameter key
 
         Args:
-            model_id: 模型ID
-            provider_id: 提供商ID，None表示获取通用参数
-            param_key: 参数键
-            is_enabled: 是否启用，None表示忽略启用状态
+            model_id: Model ID
+            provider_id: Provider ID, None means get general parameters
+            param_key: Parameter key
+            is_enabled: Whether to enable, None means ignore enable status
         """
         with self.get_session() as session:
             query = session.query(LLMModelParam).filter(
@@ -164,11 +164,11 @@ class DatabaseService:
     def get_provider_by_id(
         self, provider_id: int, is_enabled: bool = None
     ) -> Optional[LLMProvider]:
-        """根据ID获取提供商
+        """Get provider by ID
 
         Args:
-            provider_id: 提供商ID
-            is_enabled: 是否启用，None表示忽略启用状态
+            provider_id: Provider ID
+            is_enabled: Whether to enable, None means ignore enable status
         """
         with self.get_session() as session:
             query = session.query(LLMProvider).filter(LLMProvider.id == provider_id)
@@ -181,11 +181,11 @@ class DatabaseService:
     def get_provider_api_keys(
         self, provider_id: int, is_enabled: bool = None
     ) -> List[LLMProviderApiKey]:
-        """获取提供商的所有API密钥
+        """Get all API keys of the provider
 
         Args:
-            provider_id: 提供商ID
-            is_enabled: 是否启用，None表示忽略启用状态
+            provider_id: Provider ID
+            is_enabled: Whether to enable, None means ignore enable status
         """
         with self.get_session() as session:
             query = session.query(LLMProviderApiKey).filter(
@@ -196,24 +196,24 @@ class DatabaseService:
             return query.order_by(LLMProviderApiKey.weight.desc()).all()
 
     def get_best_api_key(self, provider_id: int) -> Optional[LLMProviderApiKey]:
-        """获取最佳API密钥（基于权重和偏好）"""
+        """Get best API key (based on weight and preference)"""
         api_keys = self.get_provider_api_keys(provider_id, is_enabled=True)
         if not api_keys:
             return None
 
-        # 优先选择首选密钥
+        # Prefer preferred keys
         preferred_keys = [key for key in api_keys if key.is_preferred]
         if preferred_keys:
-            # 按权重排序
+            # Sort by weight
             preferred_keys.sort(key=lambda x: x.weight, reverse=True)
             return preferred_keys[0]
 
-        # 如果没有首选密钥，按权重排序
+        # If no preferred keys, sort by weight
         api_keys.sort(key=lambda x: x.weight, reverse=True)
         return api_keys[0]
 
     def create_model(self, model_data: LLMModelCreate) -> LLMModel:
-        """创建模型"""
+        """Create model"""
         with self.get_session() as session:
             model = LLMModel(**model_data.dict())
             session.add(model)
@@ -222,7 +222,7 @@ class DatabaseService:
             return model
 
     def create_provider(self, provider_data: LLMProviderCreate) -> LLMProvider:
-        """创建提供商"""
+        """Create provider"""
         with self.get_session() as session:
             provider = LLMProvider(**provider_data.dict())
             session.add(provider)
@@ -233,7 +233,7 @@ class DatabaseService:
     def create_provider_api_key(
         self, api_key_data: LLMProviderApiKeyCreate
     ) -> LLMProviderApiKey:
-        """创建提供商API密钥"""
+        """Create provider API key"""
         with self.get_session() as session:
             api_key = LLMProviderApiKey(**api_key_data.dict())
             session.add(api_key)
@@ -244,7 +244,7 @@ class DatabaseService:
     def create_model_provider(
         self, model_provider_data: LLMModelProviderCreate
     ) -> LLMModelProvider:
-        """创建模型-提供商关联"""
+        """Create model-provider association"""
         with self.get_session() as session:
             model_provider = LLMModelProvider(**model_provider_data.dict())
             session.add(model_provider)
@@ -255,9 +255,9 @@ class DatabaseService:
     def update_model_provider(
         self, model_provider_id: int, model_provider_data: LLMModelProviderUpdate
     ) -> LLMModelProvider:
-        """更新模型-提供商关联"""
+        """Update model-provider association"""
         with self.get_session() as session:
-            # 查找要更新的模型-提供商关联
+            # Find model-provider association to update
             model_provider = (
                 session.query(LLMModelProvider)
                 .filter(LLMModelProvider.id == model_provider_id)
@@ -265,35 +265,35 @@ class DatabaseService:
             )
 
             if not model_provider:
-                raise ValueError(f"模型-提供商关联不存在: ID {model_provider_id}")
+                raise ValueError(f"Model-provider association does not exist: ID {model_provider_id}")
 
-            # 获取更新数据
+            # Get update data
             update_data = model_provider_data.dict(exclude_unset=True)
 
-            # 如果更新包含 llm_id 或 provider_id，需要检查唯一性约束
+            # If update contains llm_id or provider_id, need to check uniqueness constraint
             if "llm_id" in update_data or "provider_id" in update_data:
                 new_llm_id = update_data.get("llm_id", model_provider.llm_id)
                 new_provider_id = update_data.get(
                     "provider_id", model_provider.provider_id
                 )
 
-                # 检查新的组合是否与其他记录冲突（排除当前记录）
+                # Check if new combination conflicts with other records (exclude current record)
                 existing_conflict = (
                     session.query(LLMModelProvider)
                     .filter(
                         LLMModelProvider.llm_id == new_llm_id,
                         LLMModelProvider.provider_id == new_provider_id,
-                        LLMModelProvider.id != model_provider_id,  # 排除当前记录
+                        LLMModelProvider.id != model_provider_id,  # Exclude current record
                     )
                     .first()
                 )
 
                 if existing_conflict:
                     raise ValueError(
-                        f"模型-提供商关联已存在: 模型ID {new_llm_id}, 提供商ID {new_provider_id}"
+                        f"Model-provider association already exists: Model ID {new_llm_id}, Provider ID {new_provider_id}"
                     )
 
-            # 更新所有字段
+            # Update all fields
             for field, value in update_data.items():
                 setattr(model_provider, field, value)
 
@@ -302,7 +302,7 @@ class DatabaseService:
             return model_provider
 
     def create_model_param(self, param_data: LLMModelParamCreate) -> LLMModelParam:
-        """创建模型参数"""
+        """Create model parameters"""
         with self.get_session() as session:
             param = LLMModelParam(**param_data.dict())
             session.add(param)
@@ -311,12 +311,12 @@ class DatabaseService:
             return param
 
     def get_model_config_from_db(self, model_name: str) -> Optional[Dict[str, Any]]:
-        """从数据库获取模型配置"""
+        """Get model configuration from database"""
         model = self.get_model_by_name(model_name, is_enabled=True)
         if not model:
             return None
 
-        # 获取模型的所有提供商
+        # Get all providers of the model
         model_providers = self.get_model_providers(model.id, is_enabled=True)
         providers = []
 
@@ -325,25 +325,25 @@ class DatabaseService:
             if not provider:
                 continue
 
-            # 获取最佳API密钥
+            # Get best API key
             api_key_obj = self.get_best_api_key(provider.id)
             if not api_key_obj:
-                logger.info(f"警告: 提供商 {provider.name} 没有可用的API密钥")
+                logger.info(f"Warning: Provider {provider.name} has no available API keys")
                 continue
 
-            # 获取提供商参数
+            # Get provider parameters
             provider_params = self.get_model_params(
                 model.id, provider.id, is_enabled=True
             )
             params = {}
             for param in provider_params:
-                # 处理JSON格式的参数值
+                # Handle JSON-formatted parameter values
                 if isinstance(param.param_value, dict):
                     params[param.param_key] = param.param_value
                 else:
                     params[param.param_key] = param.param_value
 
-            # 获取通用参数
+            # Get general parameters
             general_params = self.get_model_params(model.id, None, is_enabled=True)
             for param in general_params:
                 if param.param_key not in params:
@@ -352,12 +352,12 @@ class DatabaseService:
                     else:
                         params[param.param_key] = param.param_value
 
-            # 构建提供商配置
+            # Build provider configuration
             provider_config = {
                 "name": provider.name,
                 "base_url": provider.official_endpoint or provider.third_party_endpoint,
                 "api_key": api_key_obj.api_key,
-                "model": model.name,  # 使用模型的名称
+                "model": model.name,  # Use model name
                 "weight": mp.weight,
                 "max_tokens": int(params.get("max_tokens", 4096)),
                 "temperature": float(params.get("temperature", 0.7)),
@@ -372,11 +372,11 @@ class DatabaseService:
 
             providers.append(provider_config)
 
-        # 构建模型配置
+        # Build model configuration
         model_config = {
             "name": model.name,
             "providers": providers,
-            "model_type": "chat",  # 默认类型
+            "model_type": "chat",  # Default type
             "max_tokens": 4096,
             "temperature": 0.7,
             "top_p": 1.0,
@@ -389,7 +389,7 @@ class DatabaseService:
         return model_config
 
     def get_all_model_configs_from_db(self) -> Dict[str, Dict[str, Any]]:
-        """从数据库获取所有模型配置"""
+        """Get all model configurations from database"""
         models = self.get_all_models(is_enabled=True)
         configs = {}
 
@@ -401,7 +401,7 @@ class DatabaseService:
         return configs
 
     def update_model_enabled_status(self, model_name: str, enabled: bool) -> bool:
-        """更新模型启用状态"""
+        """Update model enabled status"""
         with self.get_session() as session:
             model = session.query(LLMModel).filter(LLMModel.name == model_name).first()
             if model:
@@ -413,7 +413,7 @@ class DatabaseService:
     def update_provider_weight(
         self, model_name: str, provider_name: str, weight: int
     ) -> bool:
-        """更新提供商权重"""
+        """Update provider weight"""
         with self.get_session() as session:
             model = session.query(LLMModel).filter(LLMModel.name == model_name).first()
             if not model:
@@ -443,10 +443,10 @@ class DatabaseService:
             return False
 
     def get_all_providers(self, is_enabled: bool = None) -> List[LLMProvider]:
-        """获取所有提供商
+        """Get all providers
 
         Args:
-            is_enabled: 是否启用，None表示忽略启用状态
+            is_enabled: Whether to enable, None means ignore enable status
         """
         with self.get_session() as session:
             query = session.query(LLMProvider)
@@ -455,7 +455,7 @@ class DatabaseService:
             return query.all()
 
     def get_provider_by_name(self, provider_name: str) -> Optional[LLMProvider]:
-        """根据名称获取提供商"""
+        """Get provider by name"""
         with self.get_session() as session:
             return (
                 session.query(LLMProvider)
@@ -466,7 +466,7 @@ class DatabaseService:
     def get_provider_by_name_and_type(
         self, provider_name: str, provider_type: str
     ) -> Optional[LLMProvider]:
-        """根据名称和类型获取提供商"""
+        """Get provider by name and type"""
         with self.get_session() as session:
             return (
                 session.query(LLMProvider)
@@ -478,7 +478,7 @@ class DatabaseService:
             )
 
     def update_api_key_usage(self, apikey_id: int, usage_count: int = None) -> bool:
-        """更新API密钥使用次数"""
+        """Update API key usage count"""
         with self.get_session() as session:
             api_key = (
                 session.query(LLMProviderApiKey)
@@ -494,30 +494,30 @@ class DatabaseService:
                 return True
             return False
 
-    # ==================== 以提供商为主的方法 ====================
+    # ==================== Methods based on provider ====================
 
     def get_best_provider_for_model(self, model_name: str) -> Optional[LLMProvider]:
-        """为指定模型获取最佳提供商"""
+        """Get best provider for specified model"""
         model = self.get_model_by_name(model_name, is_enabled=True)
         if not model:
             return None
 
-        # 获取该模型的所有提供商，按综合评分排序
+        # Get all providers of the model, sorted by overall score
         model_providers = self.get_model_providers(model.id, is_enabled=True)
         if not model_providers:
             return None
 
-        # 按综合评分排序，选择最佳的
+        # Sort by overall score, select the best
         best_model_provider = max(model_providers, key=lambda mp: mp.overall_score)
         return self.get_provider_by_id(best_model_provider.provider_id)
 
     def get_provider_health_status(self, provider_name: str) -> Dict[str, Any]:
-        """获取提供商的健康状态"""
+        """Get provider health status"""
         provider = self.get_provider_by_name(provider_name)
         if not provider:
             return {}
 
-        # 获取该提供商在所有模型中的表现
+        # Get the performance of the provider in all models
         with self.get_session() as session:
             model_providers = (
                 session.query(LLMModelProvider)
@@ -528,11 +528,11 @@ class DatabaseService:
         if not model_providers:
             return {}
 
-        # 计算综合健康状态
+        # Calculate overall health status
         total_score = sum(mp.overall_score for mp in model_providers)
         avg_score = total_score / len(model_providers)
 
-        # 确定整体健康状态
+        # Determine overall health status
         if avg_score >= 0.8:
             overall_health = "healthy"
         elif avg_score >= 0.5:
@@ -568,7 +568,7 @@ class DatabaseService:
         }
 
     def get_all_providers_with_health(self) -> List[Dict[str, Any]]:
-        """获取所有提供商及其健康状态"""
+        """Get all providers and their health status"""
         providers = self.get_all_providers(is_enabled=True)
         result = []
 
@@ -577,20 +577,20 @@ class DatabaseService:
             if health_info:
                 result.append({"provider": provider, "health_info": health_info})
 
-        # 按平均评分排序
+        # Sort by average score
         result.sort(key=lambda x: x["health_info"]["average_score"], reverse=True)
         return result
 
     def update_provider_health_status(
         self, provider_name: str, health_status: str
     ) -> bool:
-        """更新提供商的健康状态（影响所有相关模型）"""
+        """Update provider health status (affects all related models)"""
         provider = self.get_provider_by_name(provider_name)
         if not provider:
             return False
 
         with self.get_session() as session:
-            # 更新该提供商在所有模型中的健康状态
+            # Update the health status of the provider in all models
             model_providers = (
                 session.query(LLMModelProvider)
                 .filter(LLMModelProvider.provider_id == provider.id)
@@ -606,7 +606,7 @@ class DatabaseService:
             return True
 
     def get_provider_performance_stats(self, provider_name: str) -> Dict[str, Any]:
-        """获取提供商的性能统计"""
+        """Get provider performance statistics"""
         provider = self.get_provider_by_name(provider_name)
         if not provider:
             return {}
@@ -621,13 +621,13 @@ class DatabaseService:
         if not model_providers:
             return {}
 
-        # 计算综合统计
+        # Calculate overall statistics
         total_requests = sum(mp.total_requests for mp in model_providers)
         total_successful = sum(mp.successful_requests for mp in model_providers)
         total_cost = sum(mp.total_cost for mp in model_providers)
         total_tokens = sum(mp.total_tokens_used for mp in model_providers)
 
-        # 计算平均响应时间
+        # Calculate average response time
         response_times = [
             mp.response_time_avg for mp in model_providers if mp.response_time_avg > 0
         ]
@@ -635,7 +635,7 @@ class DatabaseService:
             sum(response_times) / len(response_times) if response_times else 0
         )
 
-        # 计算平均成功率
+        # Calculate average success rate
         success_rates = [
             mp.success_rate for mp in model_providers if mp.success_rate > 0
         ]
@@ -671,16 +671,16 @@ class DatabaseService:
         }
 
     def get_top_providers(self, limit: int = 5) -> List[Dict[str, Any]]:
-        """获取排名前几的提供商"""
+        """Get top providers"""
         providers_with_health = self.get_all_providers_with_health()
         return providers_with_health[:limit]
 
     def get_provider_recommendations(
         self, model_name: str = None
     ) -> List[Dict[str, Any]]:
-        """获取提供商推荐"""
+        """Get provider recommendations"""
         if model_name:
-            # 为特定模型推荐提供商
+            # Recommend providers for specific models
             model = self.get_model_by_name(model_name, is_enabled=True)
             if not model:
                 return []
@@ -707,31 +707,31 @@ class DatabaseService:
 
             return recommendations
         else:
-            # 全局提供商推荐
+            # Global provider recommendations
             return self.get_top_providers(10)
 
     def _get_recommendation_reason(self, model_provider: LLMModelProvider) -> str:
-        """获取推荐原因"""
+        """Get recommendation reasons"""
         reasons = []
 
         if model_provider.health_status == "healthy":
-            reasons.append("健康状态良好")
+            reasons.append("Healthy status")
 
         if model_provider.response_time_avg < 2.0:
-            reasons.append("响应速度快")
+            reasons.append("Fast response time")
 
         if model_provider.success_rate > 0.95:
-            reasons.append("成功率高")
+            reasons.append("High success rate")
 
         if model_provider.cost_per_1k_tokens < 0.01:
-            reasons.append("成本较低")
+            reasons.append("Low cost")
 
         if model_provider.is_preferred:
-            reasons.append("首选提供商")
+            reasons.append("Preferred provider")
 
-        return "、".join(reasons) if reasons else "综合评分较高"
+        return "、".join(reasons) if reasons else "High overall score"
 
-    # ==================== 健康状态和评估相关方法 ====================
+    # ==================== Health status and evaluation related methods ====================
 
     def update_model_provider_health_status(
         self,
@@ -741,7 +741,7 @@ class DatabaseService:
         response_time: float = None,
         success: bool = None,
     ) -> bool:
-        """更新模型-提供商的健康状态"""
+        """Update model-provider health status"""
         with self.get_session() as session:
             model_provider = (
                 session.query(LLMModelProvider)
@@ -756,14 +756,14 @@ class DatabaseService:
                 model_provider.health_status = health_status
                 model_provider.last_health_check = datetime.now()
 
-                # 更新性能指标
+                # Update performance metrics
                 if response_time is not None:
                     self._update_response_time_stats(model_provider, response_time)
 
                 if success is not None:
                     self._update_success_stats(model_provider, success)
 
-                # 重新计算评分
+                # Recalculate scores
                 self._recalculate_scores(model_provider)
 
                 session.commit()
@@ -779,7 +779,7 @@ class DatabaseService:
         tokens_used: int = 0,
         cost: float = 0.0,
     ) -> bool:
-        """更新模型-提供商的性能指标"""
+        """Update model-provider performance metrics"""
         with self.get_session() as session:
             model_provider = (
                 session.query(LLMModelProvider)
@@ -791,13 +791,13 @@ class DatabaseService:
             )
 
             if model_provider:
-                # 更新响应时间统计
+                # Update response time statistics
                 self._update_response_time_stats(model_provider, response_time)
 
-                # 更新成功率统计
+                # Update success rate statistics
                 self._update_success_stats(model_provider, success)
 
-                # 更新成本统计
+                # Update cost statistics
                 if cost > 0:
                     model_provider.total_cost += cost
                     model_provider.total_tokens_used += tokens_used
@@ -806,7 +806,7 @@ class DatabaseService:
                             model_provider.total_cost / model_provider.total_tokens_used
                         ) * 1000
 
-                # 重新计算评分
+                # Recalculate scores
                 self._recalculate_scores(model_provider)
 
                 session.commit()
@@ -814,7 +814,7 @@ class DatabaseService:
             return False
 
     def get_healthy_model_providers(self, model_id: int) -> List[LLMModelProvider]:
-        """获取健康的模型-提供商关联"""
+        """Get healthy model-provider associations"""
         with self.get_session() as session:
             return (
                 session.query(LLMModelProvider)
@@ -828,7 +828,7 @@ class DatabaseService:
             )
 
     def get_best_model_provider(self, model_id: int) -> Optional[LLMModelProvider]:
-        """获取最佳的模型-提供商关联（基于综合评分）"""
+        """Get best model-provider association (based on overall score)"""
         with self.get_session() as session:
             return (
                 session.query(LLMModelProvider)
@@ -847,7 +847,7 @@ class DatabaseService:
             )
 
     def increment_failure_count(self, model_id: int, provider_id: int) -> bool:
-        """增加失败计数"""
+        """Increment failure count"""
         with self.get_session() as session:
             model_provider = (
                 session.query(LLMModelProvider)
@@ -862,7 +862,7 @@ class DatabaseService:
                 model_provider.failure_count += 1
                 model_provider.last_failure_time = datetime.now()
 
-                # 如果失败次数超过阈值且启用了自动禁用
+                # If failure count exceeds threshold and auto disable is enabled
                 if (
                     model_provider.failure_count >= model_provider.max_failures
                     and model_provider.auto_disable_on_failure
@@ -875,7 +875,7 @@ class DatabaseService:
             return False
 
     def reset_failure_count(self, model_id: int, provider_id: int) -> bool:
-        """重置失败计数"""
+        """Reset failure count"""
         with self.get_session() as session:
             model_provider = (
                 session.query(LLMModelProvider)
@@ -895,7 +895,7 @@ class DatabaseService:
     def get_model_provider_stats(
         self, model_id: int, provider_id: int
     ) -> Dict[str, Any]:
-        """获取模型-提供商的统计信息"""
+        """Get model-provider statistics"""
         with self.get_session() as session:
             model_provider = (
                 session.query(LLMModelProvider)
@@ -929,19 +929,19 @@ class DatabaseService:
                 }
             return {}
 
-    # ==================== 私有辅助方法 ====================
+    # ==================== Private helper methods ====================
 
     def _update_response_time_stats(
         self, model_provider: LLMModelProvider, response_time: float
     ):
-        """更新响应时间统计"""
+        """Update response time statistics"""
         if model_provider.response_time_avg == 0:
             model_provider.response_time_avg = response_time
             model_provider.response_time_min = response_time
             model_provider.response_time_max = response_time
         else:
-            # 使用指数移动平均
-            alpha = 0.1  # 平滑因子
+            # Use exponential moving average
+            alpha = 0.1  # Smoothing factor
             model_provider.response_time_avg = (
                 alpha * response_time + (1 - alpha) * model_provider.response_time_avg
             )
@@ -953,22 +953,22 @@ class DatabaseService:
             )
 
     def _update_success_stats(self, model_provider: LLMModelProvider, success: bool):
-        """更新成功率统计"""
+        """Update success rate statistics"""
         model_provider.total_requests += 1
         if success:
             model_provider.successful_requests += 1
         else:
             model_provider.failed_requests += 1
 
-        # 计算成功率
+        # Calculate success rate
         if model_provider.total_requests > 0:
             model_provider.success_rate = (
                 model_provider.successful_requests / model_provider.total_requests
             )
 
     def _recalculate_scores(self, model_provider: LLMModelProvider):
-        """重新计算评分"""
-        # 健康评分
+        """Recalculate scores"""
+        # Health score
         if model_provider.health_status == HealthStatusEnum.HEALTHY.value:
             model_provider.health_score = 1.0
         elif model_provider.health_status == HealthStatusEnum.DEGRADED.value:
@@ -976,22 +976,22 @@ class DatabaseService:
         else:
             model_provider.health_score = 0.1
 
-        # 性能评分（基于响应时间和成功率）
+        # Performance score (based on response time and success rate)
         response_time_score = max(
             0, 1 - model_provider.response_time_avg / 10
-        )  # 10秒内线性递减
+        )  # 10 seconds linear decrease
         performance_score = (
             response_time_score * 0.5 + model_provider.success_rate * 0.5
         )
         model_provider.performance_score = min(1.0, max(0.0, performance_score))
 
-        # 成本评分（越便宜越好）
+        # Cost score (cheaper is better)
         cost_score = max(
             0, 1 - model_provider.cost_per_1k_tokens / 0.1
-        )  # 0.1$/1K tokens内线性递减
+        )  # 0.1$/1K tokens linear decrease
         model_provider.cost_score = min(1.0, max(0.0, cost_score))
 
-        # 综合评分（加权平均）
+        # Overall score (weighted average)
         model_provider.overall_score = (
             model_provider.health_score * 0.4
             + model_provider.performance_score * 0.4
@@ -1006,17 +1006,17 @@ class DatabaseService:
         strategy_config: Dict[str, Any] = None,
         priority: int = None,
     ) -> bool:
-        """更新模型-供应商的负载均衡策略"""
+        """Update model-provider load balancing strategy"""
         try:
             with self.get_session() as session:
-                # 获取模型和供应商
+                # Get model and provider
                 model = self.get_model_by_name(model_name)
                 provider = self.get_provider_by_name(provider_name)
 
                 if not model or not provider:
                     return False
 
-                # 获取模型-供应商关联
+                # Get model-provider association
                 model_provider = (
                     session.query(LLMModelProvider)
                     .filter(
@@ -1029,7 +1029,7 @@ class DatabaseService:
                 if not model_provider:
                     return False
 
-                # 更新策略配置
+                # Update strategy configuration
                 model_provider.load_balancing_strategy = strategy
                 if strategy_config is not None:
                     model_provider.strategy_config = strategy_config
@@ -1040,13 +1040,13 @@ class DatabaseService:
                 return True
 
         except Exception as e:
-            logger.info(f"更新负载均衡策略失败: {e}")
+            logger.info(f"Update load balancing strategy failed: {e}")
             return False
 
     def get_model_provider_strategy(
         self, model_name: str, provider_name: str
     ) -> Optional[Dict[str, Any]]:
-        """获取模型-供应商的负载均衡策略"""
+        """Get model-provider load balancing strategy"""
         try:
             model = self.get_model_by_name(model_name)
             provider = self.get_provider_by_name(provider_name)
@@ -1079,11 +1079,11 @@ class DatabaseService:
                 }
 
         except Exception as e:
-            logger.info(f"获取负载均衡策略失败: {e}")
+            logger.info(f"Get load balancing strategy failed: {e}")
             return None
 
     def get_model_strategies(self, model_name: str) -> List[Dict[str, Any]]:
-        """获取模型的所有供应商策略"""
+        """Get all provider strategies of the model"""
         try:
             model = self.get_model_by_name(model_name, is_enabled=True)
             if not model:
@@ -1111,7 +1111,7 @@ class DatabaseService:
             return strategies
 
         except Exception as e:
-            logger.info(f"获取模型策略失败: {e}")
+            logger.info(f"Get model strategies failed: {e}")
             return []
 
     def update_model_provider_circuit_breaker(
@@ -1122,7 +1122,7 @@ class DatabaseService:
         threshold: int = None,
         timeout: int = None,
     ) -> bool:
-        """更新模型-供应商的熔断器配置"""
+        """Update model-provider circuit breaker configuration"""
         try:
             with self.get_session() as session:
                 model = self.get_model_by_name(model_name)
@@ -1154,17 +1154,17 @@ class DatabaseService:
                 return True
 
         except Exception as e:
-            logger.info(f"更新熔断器配置失败: {e}")
+            logger.info(f"Update circuit breaker configuration failed: {e}")
             return False
 
     def get_available_strategies(self) -> List[str]:
-        """获取所有可用的负载均衡策略"""
+        """Get all available load balancing strategies"""
         from .load_balancing_strategies import LoadBalancingStrategy
 
         return [strategy.value for strategy in LoadBalancingStrategy]
 
     def get_strategy_statistics(self, model_name: str = None) -> Dict[str, Any]:
-        """获取策略使用统计"""
+        """Get strategy usage statistics"""
         try:
             with self.get_session() as session:
                 query = session.query(LLMModelProvider)
@@ -1188,9 +1188,9 @@ class DatabaseService:
                 }
 
         except Exception as e:
-            logger.info(f"获取策略统计失败: {e}")
+            logger.info(f"Get strategy statistics failed: {e}")
             return {}
 
 
-# 全局数据库服务实例
+# Global database service instance
 db_service = DatabaseService()

@@ -3,59 +3,59 @@ from typing import Dict, Any
 from app.services.adapter_pool import adapter_pool
 from app.utils.logging_config import get_factory_logger
 
-# 获取日志器
+# Get logger
 logger = get_factory_logger()
 
-pool_router = APIRouter(prefix="/v1/pool", tags=["适配器池管理"])
+pool_router = APIRouter(prefix="/v1/pool", tags=["Adapter Pool Management"])
 
 
 @pool_router.get("/stats")
 async def get_pool_stats():
-    """获取适配器池统计信息"""
+    """Get adapter pool statistics information"""
     try:
         stats = adapter_pool.get_pool_stats()
         return {
             "success": True,
             "data": stats,
-            "message": "获取适配器池统计信息成功"
+            "message": "Get adapter pool statistics information successfully"
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"获取适配器池统计信息失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Get adapter pool statistics information failed: {str(e)}")
 
 
 @pool_router.post("/cleanup")
 async def cleanup_pool():
-    """手动清理适配器池"""
+    """Manual cleanup adapter pool"""
     try:
         await adapter_pool._cleanup_expired_adapters()
         return {
             "success": True,
-            "message": "适配器池清理完成"
+            "message": "Adapter pool cleanup completed"
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"清理适配器池失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Cleanup adapter pool failed: {str(e)}")
 
 
 @pool_router.post("/health-check")
 async def health_check_pool():
-    """手动执行健康检查"""
+    """Manual health check"""
     try:
         await adapter_pool._check_all_adapters_health()
         return {
             "success": True,
-            "message": "适配器池健康检查完成"
+            "message": "Adapter pool health check completed"
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"健康检查失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Health check failed: {str(e)}")
 
 
 @pool_router.get("/status")
 async def get_pool_status():
-    """获取适配器池状态"""
+    """Get adapter pool status"""
     try:
         stats = adapter_pool.get_pool_stats()
         
-        # 计算总体状态
+        # Calculate overall status
         total_adapters = sum(pool["total"] for pool in stats["pools"].values())
         available_adapters = sum(pool["available"] for pool in stats["pools"].values())
         in_use_adapters = sum(pool["in_use"] for pool in stats["pools"].values())
@@ -74,7 +74,7 @@ async def get_pool_status():
         return {
             "success": True,
             "data": status,
-            "message": "获取适配器池状态成功"
+            "message": "Get adapter pool status successfully"
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"获取适配器池状态失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Get adapter pool status failed: {str(e)}")

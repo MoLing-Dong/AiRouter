@@ -3,18 +3,18 @@ from fastapi import APIRouter, HTTPException
 from app.services import adapter_manager
 from app.utils.logging_config import get_factory_logger
 
-models_router = APIRouter(prefix="/v1/models", tags=["模型管理"])
+models_router = APIRouter(prefix="/v1/models", tags=["Model Management"])
 
-# 获取日志器
+# Get logger
 logger = get_factory_logger()
 
 
 @models_router.get("/")
 async def list_models():
-    """获取可用模型列表"""
+    """Get available model list"""
     try:
         models = []
-        # 直接从适配器管理器获取可用模型
+        # Get available model list from adapter manager
         available_models = adapter_manager.get_available_models()
 
         for model_name in available_models:
@@ -22,7 +22,7 @@ async def list_models():
                 adapters = adapter_manager.get_model_adapters(model_name)
                 if adapters:
 
-                    # 获取所有可用的提供商
+                    # Get all available providers
                     providers = [adapter.provider for adapter in adapters]
                     models.append(
                         {
@@ -36,31 +36,31 @@ async def list_models():
                         }
                     )
             except Exception as e:
-                logger.info(f"处理模型 {model_name} 时出错: {e}")
+                logger.info(f"Error processing model {model_name}: {e}")
                 continue
 
         return {"object": "list", "data": models}
     except Exception as e:
-        logger.info(f"获取模型列表失败: {e}")
+        logger.info(f"Get model list failed: {e}")
         import traceback
 
         traceback.logger.info_exc()
-        raise HTTPException(status_code=500, detail=f"获取模型列表失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Get model list failed: {str(e)}")
 
 
 @models_router.get("/{model_name}/health")
 async def check_model_health(model_name: str):
-    """检查单个模型的健康状态"""
+    """Check single model's health status"""
     try:
-        # 检查模型是否存在
+        # Check if model exists
         available_models = adapter_manager.get_available_models()
         if model_name not in available_models:
-            raise HTTPException(status_code=404, detail=f"模型不存在: {model_name}")
+            raise HTTPException(status_code=404, detail=f"Model does not exist: {model_name}")
 
-        # 获取模型的健康状态
+        # Get model's health status
         health_status = await adapter_manager.health_check_model(model_name)
 
-        # 计算该模型的整体健康状态
+        # Calculate overall health status for the model
         healthy_count = sum(
             1 for status in health_status.values() if status == "healthy"
         )
@@ -81,27 +81,27 @@ async def check_model_health(model_name: str):
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"检查模型健康状态失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Check model health status failed: {str(e)}")
 
 
 @models_router.get("/{model_name}")
 async def get_model_details(model_name: str):
-    """获取单个模型的详细信息"""
+    """Get single model's detailed information"""
     try:
-        # 检查模型是否存在
+        # Check if model exists
         available_models = adapter_manager.get_available_models()
         if model_name not in available_models:
-            raise HTTPException(status_code=404, detail=f"模型不存在: {model_name}")
+            raise HTTPException(status_code=404, detail=f"Model does not exist: {model_name}")
 
-        # 获取模型配置
+        # Get model configuration
         model_config = adapter_manager.get_model_config(model_name)
         if not model_config:
-            raise HTTPException(status_code=404, detail=f"模型配置不存在: {model_name}")
+            raise HTTPException(status_code=404, detail=f"Model configuration does not exist: {model_name}")
 
-        # 获取模型的所有适配器
+        # Get all adapters for the model
         adapters = adapter_manager.get_model_adapters(model_name)
 
-        # 构建提供商信息
+        # Build provider information
         providers = []
         for adapter in adapters:
             providers.append(
@@ -145,32 +145,32 @@ async def get_model_details(model_name: str):
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"获取模型详细信息失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Get model detailed information failed: {str(e)}")
 
 
 @models_router.get("/all/details")
 async def get_all_models_details():
-    """获取数据库中所有模型的详细信息"""
+    """Get all models' detailed information from database"""
     try:
         all_models_details = []
 
-        # 从数据库获取所有模型，而不是仅获取可用的模型
+        # Get all models from database, not just available models
         from app.services.database_service import db_service
 
-        # 获取所有模型（包括禁用的）
+        # Get all models (including disabled ones)
         all_models = db_service.get_all_models(is_enabled=None)
 
         for model in all_models:
             try:
-                # 获取模型的所有提供商关联（包括禁用的）
+                # Get all provider associations for the model (including disabled ones)
                 model_providers = db_service.get_model_providers(
                     model.id, is_enabled=None
                 )
 
-                # 构建提供商信息
+                # Build provider information
                 providers = []
                 for mp in model_providers:
-                    # 获取提供商信息（包括禁用的）
+                    # Get provider information (including disabled ones)
                     provider = db_service.get_provider_by_id(
                         mp.provider_id, is_enabled=None
                     )
@@ -192,7 +192,7 @@ async def get_all_models_details():
                         "overall_score": mp.overall_score,
                     }
 
-                    # 添加指标信息（如果可用）
+                    # Add metrics information (if available)
                     if hasattr(mp, "response_time_avg"):
                         provider_info["response_time_avg"] = mp.response_time_avg
                     if hasattr(mp, "success_rate"):
@@ -200,7 +200,7 @@ async def get_all_models_details():
 
                     providers.append(provider_info)
 
-                # 计算整体健康状态
+                # Calculate overall health status
                 healthy_count = sum(
                     1 for p in providers if p.get("health_status") == "healthy"
                 )
@@ -214,7 +214,7 @@ async def get_all_models_details():
                 if total_count == 0:
                     overall_status = "no_providers"
 
-                # 构建模型详细信息
+                # Build model detailed information
                 model_detail = {
                     "id": model.id,
                     "model_name": model.name,
@@ -237,7 +237,7 @@ async def get_all_models_details():
                     ),
                 }
 
-                # 获取模型参数（如果有的话）
+                # Get model parameters (if available)
                 try:
                     model_params = db_service.get_model_params(
                         model.id, is_enabled=None
@@ -251,13 +251,13 @@ async def get_all_models_details():
                         if params_dict:
                             model_detail["parameters"] = params_dict
                 except Exception as e:
-                    logger.info(f"获取模型 {model.name} 参数时出错: {e}")
-                    # 参数获取失败不影响模型信息返回
+                    logger.info(f"Error getting parameters for model {model.name}: {e}")
+                    # Parameter retrieval failure does not affect model information return
 
                 all_models_details.append(model_detail)
 
             except Exception as e:
-                logger.info(f"处理模型 {model.name} 详细信息时出错: {e}")
+                logger.info(f"Error getting detailed information for model {model.name}: {e}")
                 continue
 
         return {
@@ -268,10 +268,10 @@ async def get_all_models_details():
         }
 
     except Exception as e:
-        logger.info(f"获取所有模型详细信息失败: {e}")
+        logger.info(f"Get all models' detailed information failed: {e}")
         import traceback
 
         traceback.print_exc()
         raise HTTPException(
-            status_code=500, detail=f"获取所有模型详细信息失败: {str(e)}"
+            status_code=500, detail=f"Get all models' detailed information failed: {str(e)}"
         )

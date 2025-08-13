@@ -1,28 +1,32 @@
 import time
 from fastapi import APIRouter, HTTPException
 from app.services import adapter_manager
+from app.utils.logging_config import get_factory_logger
 
-health_router = APIRouter(prefix="/v1/health", tags=["健康检查"])
+health_router = APIRouter(prefix="/v1/health", tags=["Health Check"])
+
+# Get logger
+logger = get_factory_logger()
 
 
 @health_router.get("/")
 async def health_check():
-    """检查所有可用模型的健康状态"""
+    """Check all available models' health status"""
     try:
-        # 获取所有可用模型
+        # Get all available models
         available_models = adapter_manager.get_available_models()
 
-        # 检查所有模型的健康状态
+        # Check all models' health status
         all_health_status = {}
         total_healthy_models = 0
         total_models = len(available_models)
 
         for model_name in available_models:
             try:
-                # 获取单个模型的健康状态
+                # Get single model's health status
                 model_health = await adapter_manager.health_check_model(model_name)
 
-                # 计算该模型的整体健康状态
+                # Calculate overall health status for the model
                 healthy_providers = sum(
                     1 for status in model_health.values() if status == "healthy"
                 )
@@ -45,7 +49,7 @@ async def health_check():
                 }
 
             except Exception as e:
-                logger.info(f"检查模型 {model_name} 健康状态时出错: {e}")
+                logger.info(f"Error checking model {model_name} health status: {e}")
                 all_health_status[model_name] = {
                     "status": "unhealthy",
                     "error": str(e),
@@ -54,7 +58,7 @@ async def health_check():
                     "total_providers": 0,
                 }
 
-        # 计算整体健康状态
+        # Calculate overall health status
         overall_status = (
             "healthy" if total_healthy_models == total_models else "degraded"
         )
@@ -70,12 +74,12 @@ async def health_check():
             "use_database": adapter_manager.use_database,
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"健康检查失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Health check failed: {str(e)}")
 
 
 @health_router.get("/models")
 async def get_models_health():
-    """获取所有模型的健康状态概览"""
+    """Get all models' health status overview"""
     try:
         available_models = adapter_manager.get_available_models()
         models_health = {}
@@ -110,22 +114,22 @@ async def get_models_health():
             "models": models_health,
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"获取模型健康状态失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Get model health status failed: {str(e)}")
 
 
 @health_router.get("/models/{model_name}")
 async def get_model_health(model_name: str):
-    """获取单个模型的详细健康状态"""
+    """Get single model's detailed health status"""
     try:
-        # 检查模型是否存在
+        # Check if model exists
         available_models = adapter_manager.get_available_models()
         if model_name not in available_models:
-            raise HTTPException(status_code=404, detail=f"模型不存在: {model_name}")
+            raise HTTPException(status_code=404, detail=f"Model does not exist: {model_name}")
 
-        # 获取模型的健康状态
+        # Get model's health status
         health_status = await adapter_manager.health_check_model(model_name)
 
-        # 计算该模型的整体健康状态
+        # Calculate overall health status for the model
         healthy_count = sum(
             1 for status in health_status.values() if status == "healthy"
         )
@@ -146,12 +150,12 @@ async def get_model_health(model_name: str):
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"检查模型健康状态失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Check model health status failed: {str(e)}")
 
 
 @health_router.get("/providers")
 async def get_providers_health():
-    """获取所有提供商的健康状态"""
+    """Get all providers' health status"""
     try:
         available_models = adapter_manager.get_available_models()
         providers_health = {}
@@ -172,7 +176,7 @@ async def get_providers_health():
 
                     providers_health[provider_name]["models"].append(model_name)
             except Exception as e:
-                logger.info(f"获取模型 {model_name} 的提供商信息时出错: {e}")
+                logger.info(f"Error getting provider information for model {model_name}: {e}")
                 continue
 
         return {
@@ -180,4 +184,4 @@ async def get_providers_health():
             "providers": providers_health,
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"获取提供商健康状态失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Get provider health status failed: {str(e)}")

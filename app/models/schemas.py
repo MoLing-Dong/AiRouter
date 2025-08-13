@@ -77,7 +77,7 @@ class LLMModelParamCreate(BaseModel):
     llm_id: int
     provider_id: Optional[int] = None
     param_key: str
-    param_value: Dict[str, Any]  # JSON格式
+    param_value: Dict[str, Any]  # JSON format
     param_type: Optional[str] = None
     description: Optional[str] = None
     is_enabled: bool = True

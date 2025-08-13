@@ -9,15 +9,15 @@ from app.core.adapters import ChatRequest, ChatResponse, Message, MessageRole
 from app.services.router import router
 from app.utils.logging_config import get_chat_logger
 
-# 获取日志器
+# Get logger
 logger = get_chat_logger()
 
 
-chat_router = APIRouter(prefix="/v1", tags=["聊天"])
+chat_router = APIRouter(prefix="/v1", tags=["Chat"])
 
 
 class ChatCompletionRequest(BaseModel):
-    """OpenAI兼容的聊天完成请求"""
+    """OpenAI compatible chat completion request"""
 
     model: str
     messages: List[Dict[str, Any]]
@@ -36,19 +36,19 @@ class ChatCompletionRequest(BaseModel):
 
 
 class ChatCompletionResponse(BaseModel):
-    """OpenAI兼容的聊天完成响应"""
+    """OpenAI compatible chat completion response"""
 
     id: str
     object: str = "chat.completion"
     created: int
     model: str
     choices: List[Dict[str, Any]]
-    usage: Optional[Dict[str, Any]] = None  # 改为Any以兼容不同的usage格式
+    usage: Optional[Dict[str, Any]] = None  # Change to Any to compatible with different usage formats
     system_fingerprint: Optional[str] = None
 
 
 class ChatCompletionChunk(BaseModel):
-    """流式响应的数据块"""
+    """Stream response data chunk"""
 
     id: str
     object: str = "chat.completion.chunk"
@@ -59,9 +59,9 @@ class ChatCompletionChunk(BaseModel):
 
 @chat_router.post("/chat/completions")
 async def chat_completions(request: ChatCompletionRequest):
-    """OpenAI兼容的聊天完成接口"""
+    """OpenAI compatible chat completion interface"""
     try:
-        # 检查模型是否可用
+        # Check if model is available
         from app.services import adapter_manager
 
         available_models = adapter_manager.get_available_models()
@@ -69,10 +69,10 @@ async def chat_completions(request: ChatCompletionRequest):
         if request.model not in available_models:
             raise HTTPException(
                 status_code=400,
-                detail=f"模型 '{request.model}' 不可用。可用模型: {available_models}",
+                detail=f"Model '{request.model}' is not available. Available models: {available_models}",
             )
 
-        # 转换消息格式
+        # Convert message format
         messages = []
         for msg in request.messages:
             message = Message(
@@ -83,7 +83,7 @@ async def chat_completions(request: ChatCompletionRequest):
             )
             messages.append(message)
 
-        # 构建ChatRequest
+        # Build ChatRequest
         chat_request = ChatRequest(
             model=request.model,
             messages=messages,
@@ -98,22 +98,22 @@ async def chat_completions(request: ChatCompletionRequest):
         )
 
         if request.stream:
-            logger.info(f"流式响应: {chat_request}")
-            # 流式响应
+            logger.info(f"Stream response: {chat_request}")
+            # Stream response
             return StreamingResponse(
                 stream_chat_completion(chat_request),
                 media_type="text/event-stream",
                 headers={
                     "Cache-Control": "no-cache",
                     "Connection": "keep-alive",
-                    "X-Accel-Buffering": "no",  # 禁用nginx缓冲
+                    "X-Accel-Buffering": "no",  # Disable nginx buffering
                 },
             )
         else:
-            # 普通响应
+            # Normal response
             response = await router.route_request(chat_request)
 
-            # 转换为OpenAI兼容格式
+            # Convert to OpenAI compatible format
             return ChatCompletionResponse(
                 id=response.id,
                 created=response.created,
@@ -126,40 +126,40 @@ async def chat_completions(request: ChatCompletionRequest):
     except Exception as e:
         import traceback
 
-        error_detail = f"聊天完成失败: {str(e)}\n{traceback.format_exc()}"
-        logger.error(f"API错误详情: {error_detail}")
-        raise HTTPException(status_code=500, detail=f"聊天完成失败: {str(e)}")
+        error_detail = f"Chat completion failed: {str(e)}\n{traceback.format_exc()}"
+        logger.error(f"API error detail: {error_detail}")
+        raise HTTPException(status_code=500, detail=f"Chat completion failed: {str(e)}")
 
 
 async def stream_chat_completion(request: ChatRequest):
-    """流式聊天完成"""
+    """Stream chat completion"""
     try:
-        # 获取适配器管理器
+        # Get adapter manager
         from app.services import adapter_manager
 
-        # 获取最佳适配器
+        # Get best adapter
         adapter = adapter_manager.get_best_adapter(request.model)
-        logger.info(f"获取适配器: {adapter}")
+        logger.info(f"Get adapter: {adapter}")
         if not adapter:
-            logger.error(f"没有找到模型 {request.model} 的适配器")
+            logger.error(f"No adapter found for model {request.model}")
             yield f"data: {json.dumps({'error': 'No available adapter for model'})}\n\n"
             return
 
-        # 调用适配器进行流式响应
+        # Call adapter to stream response
         try:
-            # 检查适配器是否支持流式响应
+            # Check if adapter supports stream response
             if hasattr(adapter, "stream_chat_completion"):
-                logger.info(f"开始流式响应，适配器类型: {type(adapter).__name__}")
+                logger.info(f"Start stream response, adapter type: {type(adapter).__name__}")
                 async for chunk in adapter.stream_chat_completion(request):
-                    # 直接返回原生流式响应
+                    # Return native stream response
                     yield chunk
             else:
-                # 如果适配器不支持流式，返回错误
+                # If adapter does not support stream, return error
                 yield f"data: {json.dumps({'error': 'This model does not support streaming'})}\n\n"
                 return
 
         except Exception as e:
-            logger.error(f"流式响应失败: {e}")
+            logger.error(f"Stream response failed: {e}")
             yield f"data: {json.dumps({'error': f'Stream response failed: {str(e)}'})}\n\n"
             return
 
@@ -169,22 +169,22 @@ async def stream_chat_completion(request: ChatRequest):
 
 @chat_router.post("/embeddings")
 async def create_embeddings(request: Dict[str, Any]):
-    """创建文本嵌入"""
+    """Create text embedding"""
     try:
         model = request.get("model", "text-embedding-v1")
         input_text = request.get("input")
 
         if not input_text:
-            raise HTTPException(status_code=400, detail="缺少input参数")
+            raise HTTPException(status_code=400, detail="Missing input parameter")
 
-        # 这里需要实现嵌入功能
-        # 暂时返回示例响应
+        # Here we need to implement embedding functionality
+        # For now, return example response
         return {
             "object": "list",
             "data": [
                 {
                     "object": "embedding",
-                    "embedding": [0.1] * 1536,  # 示例嵌入向量
+                    "embedding": [0.1] * 1536,  # Example embedding vector
                     "index": 0,
                 }
             ],
@@ -195,4 +195,4 @@ async def create_embeddings(request: Dict[str, Any]):
             },
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"创建嵌入失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Create embedding failed: {str(e)}")

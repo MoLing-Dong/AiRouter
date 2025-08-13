@@ -3,15 +3,15 @@ from typing import List, Optional
 from app.services.database_service import db_service
 from app.utils.logging_config import get_factory_logger
 
-# 获取日志器
+# Get logger
 logger = get_factory_logger()
 
-providers_router = APIRouter(prefix="/v1/providers", tags=["提供商管理"])
+providers_router = APIRouter(prefix="/v1/providers", tags=["Provider Management"])
 
 
 @providers_router.get("/")
 async def get_all_providers_with_health():
-    """获取所有提供商及其健康状态"""
+    """Get all providers and their health status"""
     try:
         providers = db_service.get_all_providers_with_health()
         return {
@@ -29,12 +29,12 @@ async def get_all_providers_with_health():
             ]
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"获取提供商列表失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Get provider list failed: {str(e)}")
 
 
 @providers_router.get("/top")
 async def get_top_providers(limit: int = Query(5, ge=1, le=20)):
-    """获取排名前几的提供商"""
+    """Get top providers"""
     try:
         top_providers = db_service.get_top_providers(limit)
         return {
@@ -51,42 +51,42 @@ async def get_top_providers(limit: int = Query(5, ge=1, le=20)):
             ]
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"获取顶级提供商失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Get top providers failed: {str(e)}")
 
 
 @providers_router.get("/{provider_name}/health")
 async def get_provider_health(provider_name: str):
-    """获取指定提供商的健康状态"""
+    """Get specified provider's health status"""
     try:
         health_info = db_service.get_provider_health_status(provider_name)
         if not health_info:
-            raise HTTPException(status_code=404, detail=f"提供商 {provider_name} 不存在")
+            raise HTTPException(status_code=404, detail=f"Provider {provider_name} does not exist")
         
         return health_info
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"获取提供商健康状态失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Get provider health status failed: {str(e)}")
 
 
 @providers_router.get("/{provider_name}/performance")
 async def get_provider_performance(provider_name: str):
-    """获取指定提供商的性能统计"""
+    """Get specified provider's performance statistics"""
     try:
         performance_stats = db_service.get_provider_performance_stats(provider_name)
         if not performance_stats:
-            raise HTTPException(status_code=404, detail=f"提供商 {provider_name} 不存在")
+            raise HTTPException(status_code=404, detail=f"Provider {provider_name} does not exist")
         
         return performance_stats
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"获取提供商性能统计失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Get provider performance statistics failed: {str(e)}")
 
 
 @providers_router.get("/recommendations")
 async def get_provider_recommendations(model_name: Optional[str] = Query(None)):
-    """获取提供商推荐"""
+    """Get provider recommendations"""
     try:
         recommendations = db_service.get_provider_recommendations(model_name)
         return {
@@ -106,16 +106,16 @@ async def get_provider_recommendations(model_name: Optional[str] = Query(None)):
             ]
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"获取提供商推荐失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Get provider recommendations failed: {str(e)}")
 
 
 @providers_router.get("/{provider_name}/best-for-model")
 async def get_best_provider_for_model(model_name: str):
-    """为指定模型获取最佳提供商"""
+    """Get best provider for specified model"""
     try:
         best_provider = db_service.get_best_provider_for_model(model_name)
         if not best_provider:
-            raise HTTPException(status_code=404, detail=f"模型 {model_name} 没有可用的提供商")
+            raise HTTPException(status_code=404, detail=f"Model {model_name} has no available provider")
         
         return {
             "model_name": model_name,
@@ -130,30 +130,30 @@ async def get_best_provider_for_model(model_name: str):
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"获取最佳提供商失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Get best provider for model failed: {str(e)}")
 
 
 @providers_router.put("/{provider_name}/health")
 async def update_provider_health(provider_name: str, health_status: str):
-    """更新提供商的健康状态"""
+    """Update provider's health status"""
     try:
         if health_status not in ["healthy", "degraded", "unhealthy"]:
-            raise HTTPException(status_code=400, detail="健康状态必须是 healthy、degraded 或 unhealthy")
+            raise HTTPException(status_code=400, detail="Health status must be healthy, degraded or unhealthy")
         
         success = db_service.update_provider_health_status(provider_name, health_status)
         if not success:
-            raise HTTPException(status_code=404, detail=f"提供商 {provider_name} 不存在")
+            raise HTTPException(status_code=404, detail=f"Provider {provider_name} does not exist")
         
-        return {"message": f"提供商 {provider_name} 的健康状态已更新为 {health_status}"}
+        return {"message": f"Provider {provider_name}'s health status has been updated to {health_status}"}
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"更新提供商健康状态失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Update provider health status failed: {str(e)}")
 
 
 @providers_router.get("/stats/overview")
 async def get_providers_overview():
-    """获取提供商概览统计"""
+    """Get provider overview statistics"""
     try:
         providers_with_health = db_service.get_all_providers_with_health()
         
@@ -177,4 +177,4 @@ async def get_providers_overview():
             }
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"获取提供商概览失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Get provider overview statistics failed: {str(e)}")

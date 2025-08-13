@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-AI路由器应用启动脚本
+AI Router Application Launcher
 """
 import uvicorn
 from config.settings import settings
