@@ -120,6 +120,40 @@ class BaseAdapter(ABC):
         """Stream chat completion - subclass must override this method to support true streaming response"""
         raise NotImplementedError("This adapter does not support streaming")
 
+    async def create_image(
+        self,
+        prompt: str,
+        n: int = 1,
+        size: str = "1024x1024",
+        quality: str = "standard",
+        style: str = "vivid",
+        response_format: str = "url",
+    ) -> List[Dict[str, Any]]:
+        """Create image from text prompt - subclass must override this method to support image generation"""
+        raise NotImplementedError("This adapter does not support image generation")
+
+    async def edit_image(
+        self,
+        image: str,
+        prompt: str,
+        mask: Optional[str] = None,
+        n: int = 1,
+        size: str = "1024x1024",
+        response_format: str = "url",
+    ) -> List[Dict[str, Any]]:
+        """Edit image based on prompt and optional mask - subclass must override this method to support image editing"""
+        raise NotImplementedError("This adapter does not support image editing")
+
+    async def create_image_variation(
+        self,
+        image: str,
+        n: int = 1,
+        size: str = "1024x1024",
+        response_format: str = "url",
+    ) -> List[Dict[str, Any]]:
+        """Create image variations from base image - subclass must override this method to support image variations"""
+        raise NotImplementedError("This adapter does not support image variations")
+
     def update_metrics(self, response_time: float, success: bool, tokens_used: int = 0):
         """Update model metrics"""
         self.metrics.response_time = response_time

@@ -1,6 +1,7 @@
 from fastapi import APIRouter
 from app.api.v1 import (
     chat_router, 
+    image_router,
     models_router, 
     stats_router, 
     db_router, 
@@ -19,6 +20,7 @@ def register_routes(app):
     
     # Register v1 version routes - These routes already contain the /v1 prefix
     app.include_router(chat_router, tags=["Chat"])
+    app.include_router(image_router, tags=["Images"])
     app.include_router(models_router, tags=["Model Management"])
     app.include_router(stats_router, tags=["Statistics"])
     app.include_router(db_router, tags=["Database Management"])

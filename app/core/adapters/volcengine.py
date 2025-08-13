@@ -1,5 +1,5 @@
 import time
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Optional
 from .base import BaseAdapter, ChatRequest, ChatResponse, Message, HealthStatus
 import openai
 from app.utils.logging_config import get_factory_logger
@@ -154,7 +154,9 @@ class VolcengineAdapter(BaseAdapter):
                     messages=[{"role": "user", "content": "test"}],
                     max_tokens=1,
                 )
-                logger.info(f"VolcengineAdapter health check successful - test chat completion")
+                logger.info(
+                    f"VolcengineAdapter health check successful - test chat completion"
+                )
                 self.health_status = HealthStatus.HEALTHY
                 self.metrics.last_health_check = time.time()
                 return HealthStatus.HEALTHY
@@ -206,3 +208,82 @@ class VolcengineAdapter(BaseAdapter):
 
         except Exception as e:
             raise Exception(f"Volcengine model list get error: {str(e)}")
+
+    async def create_image(
+        self,
+        prompt: str,
+        n: int = 1,
+        size: str = "1024x1024",
+        quality: str = "standard",
+        style: str = "vivid",
+        response_format: str = "url",
+    ) -> List[Dict[str, Any]]:
+        """Create image from text prompt using Volcengine API"""
+        try:
+            payload = {
+                "prompt": prompt,
+                "n": n,
+                "size": size,
+                "response_format": response_format,
+            }
+
+            # Add quality and style for DALL-E 3 compatible models
+            if "dall-e-3" in self.model_name.lower():
+                payload["quality"] = quality
+                payload["style"] = style
+
+            response = await self.client.images.generate(**payload)
+            return response.data
+
+        except Exception as e:
+            raise Exception(f"Volcengine image generation error: {str(e)}")
+
+    async def edit_image(
+        self,
+        image: str,
+        prompt: str,
+        mask: Optional[str] = None,
+        n: int = 1,
+        size: str = "1024x1024",
+        response_format: str = "url",
+    ) -> List[Dict[str, Any]]:
+        """Edit image based on prompt and optional mask using Volcengine API"""
+        try:
+            payload = {
+                "image": image,
+                "prompt": prompt,
+                "n": n,
+                "size": size,
+                "response_format": response_format,
+            }
+
+            if mask:
+                payload["mask"] = mask
+
+            response = await self.client.images.edit(**payload)
+            return response.data
+
+        except Exception as e:
+            raise Exception(f"Volcengine image editing error: {str(e)}")
+
+    async def create_image_variation(
+        self,
+        image: str,
+        n: int = 1,
+        size: str = "1024x1024",
+        response_format: str = "url",
+    ) -> List[Dict[str, Any]]:
+        """Create image variations from base image using Volcengine API"""
+        try:
+            payload = {
+                "image": image,
+                "n": n,
+                "size": size,
+                "response_format": response_format,
+            }
+
+            response = await self.client.images.create_variation(**payload)
+            return response.data
+
+        except Exception as e:
+            raise Exception(f"Volcengine image variation creation error: {str(e)}")

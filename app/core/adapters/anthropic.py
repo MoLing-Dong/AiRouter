@@ -186,7 +186,10 @@ class AnthropicAdapter(BaseAdapter):
             # If /models endpoint is not available, try simple HEAD request
             try:
                 response = await self.client.head(f"{self.base_url}/v1/messages")
-                if response.status_code in [200, 405]:  # 405 means method not allowed, but endpoint exists
+                if response.status_code in [
+                    200,
+                    405,
+                ]:  # 405 means method not allowed, but endpoint exists
                     self.health_status = HealthStatus.HEALTHY
                     self.metrics.last_health_check = time.time()
                     return HealthStatus.HEALTHY
@@ -227,3 +230,37 @@ class AnthropicAdapter(BaseAdapter):
 
         except Exception as e:
             raise Exception(f"Anthropic model list get error: {str(e)}")
+
+    async def create_image(
+        self,
+        prompt: str,
+        n: int = 1,
+        size: str = "1024x1024",
+        quality: str = "standard",
+        style: str = "vivid",
+        response_format: str = "url",
+    ) -> List[Dict[str, Any]]:
+        """Create image from text prompt (Anthropic does not support image generation)"""
+        raise NotImplementedError("Anthropic does not support image generation")
+
+    async def edit_image(
+        self,
+        image: str,
+        prompt: str,
+        mask: Optional[str] = None,
+        n: int = 1,
+        size: str = "1024x1024",
+        response_format: str = "url",
+    ) -> List[Dict[str, Any]]:
+        """Edit image based on prompt and optional mask (Anthropic does not support image editing)"""
+        raise NotImplementedError("Anthropic does not support image editing")
+
+    async def create_image_variation(
+        self,
+        image: str,
+        n: int = 1,
+        size: str = "1024x1024",
+        response_format: str = "url",
+    ) -> List[Dict[str, Any]]:
+        """Create image variations from base image (Anthropic does not support image variations)"""
+        raise NotImplementedError("Anthropic does not support image variations")

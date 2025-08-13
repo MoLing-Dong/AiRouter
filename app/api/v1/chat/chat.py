@@ -1,11 +1,10 @@
-from fastapi import APIRouter, HTTPException, Request, Response
+from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 from typing import Optional, List, Dict, Any
 from pydantic import BaseModel
 import json
-import asyncio
 
-from app.core.adapters import ChatRequest, ChatResponse, Message, MessageRole
+from app.core.adapters import ChatRequest, Message, MessageRole
 from app.services.router import router
 from app.utils.logging_config import get_chat_logger
 
@@ -43,7 +42,7 @@ class ChatCompletionResponse(BaseModel):
     created: int
     model: str
     choices: List[Dict[str, Any]]
-    usage: Optional[Dict[str, Any]] = None  # Change to Any to compatible with different usage formats
+    usage: Optional[Dict[str, Any]] = None  # Change to Any to compatible with different usage formats,
     system_fingerprint: Optional[str] = None
 
 

@@ -1,5 +1,5 @@
 import time
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Optional
 from .base import BaseAdapter, ChatRequest, ChatResponse, Message, HealthStatus
 import openai
 from app.utils.logging_config import get_factory_logger
@@ -154,7 +154,9 @@ class AliQwenAdapter(BaseAdapter):
                     messages=[{"role": "user", "content": "test"}],
                     max_tokens=1,
                 )
-                logger.info(f"AliQwenAdapter health check successful - test chat completed")
+                logger.info(
+                    f"AliQwenAdapter health check successful - test chat completed"
+                )
                 self.health_status = HealthStatus.HEALTHY
                 self.metrics.last_health_check = time.time()
                 return HealthStatus.HEALTHY
@@ -199,10 +201,45 @@ class AliQwenAdapter(BaseAdapter):
             raise Exception(f"AliQwen embedding creation error: {str(e)}")
 
     async def list_models(self) -> List[Dict[str, Any]]:
-        """Get available model list - using OpenAI library"""
+        """Get available model list"""
         try:
-            response = await self.client.models.list()
-            return [model.model_dump() for model in response.data]
+            response = await self.client.get(f"{self.base_url}/v1/models")
+            response.raise_for_status()
+            return response.json().get("data", [])
 
         except Exception as e:
             raise Exception(f"AliQwen model list get error: {str(e)}")
+
+    async def create_image(
+        self,
+        prompt: str,
+        n: int = 1,
+        size: str = "1024x1024",
+        quality: str = "standard",
+        style: str = "vivid",
+        response_format: str = "url",
+    ) -> List[Dict[str, Any]]:
+        """Create image from text prompt (AliQwen does not support image generation)"""
+        raise NotImplementedError("AliQwen does not support image generation")
+
+    async def edit_image(
+        self,
+        image: str,
+        prompt: str,
+        mask: Optional[str] = None,
+        n: int = 1,
+        size: str = "1024x1024",
+        response_format: str = "url",
+    ) -> List[Dict[str, Any]]:
+        """Edit image based on prompt and optional mask (AliQwen does not support image editing)"""
+        raise NotImplementedError("AliQwen does not support image editing")
+
+    async def create_image_variation(
+        self,
+        image: str,
+        n: int = 1,
+        size: str = "1024x1024",
+        response_format: str = "url",
+    ) -> List[Dict[str, Any]]:
+        """Create image variations from base image (AliQwen does not support image variations)"""
+        raise NotImplementedError("AliQwen does not support image variations")

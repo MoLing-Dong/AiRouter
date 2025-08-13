@@ -144,7 +144,9 @@ class OpenAIAdapter(BaseAdapter):
                     yield f"data: {chunk.model_dump_json()}\n\n"
 
             except Exception as openai_error:
-                logger.info(f"OpenAI library streaming failed, fallback to httpx: {openai_error}")
+                logger.info(
+                    f"OpenAI library streaming failed, fallback to httpx: {openai_error}"
+                )
 
                 # Fallback to httpx streaming
                 async with self.client.stream(
@@ -199,7 +201,9 @@ class OpenAIAdapter(BaseAdapter):
             try:
                 response = await self.client.get(f"{self.base_url}/models")
                 if response.status_code == 200:
-                    logger.info("OpenAIAdapter health check successful - get model list")
+                    logger.info(
+                        "OpenAIAdapter health check successful - get model list"
+                    )
                     self.health_status = HealthStatus.HEALTHY
                     self.metrics.last_health_check = time.time()
                     return HealthStatus.HEALTHY
@@ -209,7 +213,10 @@ class OpenAIAdapter(BaseAdapter):
             # If /models endpoint is not available, try simple HEAD request
             try:
                 response = await self.client.head(f"{self.base_url}/chat/completions")
-                if response.status_code in [200, 405]:  # 405 means method not allowed, but endpoint exists
+                if response.status_code in [
+                    200,
+                    405,
+                ]:  # 405 means method not allowed, but endpoint exists
                     logger.info("OpenAI health check successful - simple HEAD request")
                     self.health_status = HealthStatus.HEALTHY
                     self.metrics.last_health_check = time.time()
@@ -262,3 +269,100 @@ class OpenAIAdapter(BaseAdapter):
 
         except Exception as e:
             raise Exception(f"OpenAI model list get error: {str(e)}")
+
+    async def create_image(
+        self,
+        prompt: str,
+        n: int = 1,
+        size: str = "1024x1024",
+        quality: str = "standard",
+        style: str = "vivid",
+        response_format: str = "url",
+    ) -> List[Dict[str, Any]]:
+        """Create image from text prompt using OpenAI DALL-E API"""
+        try:
+            payload = {
+                "prompt": prompt,
+                "n": n,
+                "size": size,
+                "response_format": response_format,
+            }
+
+            # Add quality and style for DALL-E 3
+            if "dall-e-3" in self.model_name.lower():
+                payload["quality"] = quality
+                payload["style"] = style
+
+            response = await self.client.post(
+                f"{self.base_url}/images/generations", json=payload
+            )
+
+            response.raise_for_status()
+            response_data = response.json()
+
+            return response_data.get("data", [])
+
+        except Exception as e:
+            raise Exception(f"OpenAI image generation error: {str(e)}")
+
+    async def edit_image(
+        self,
+        image: str,
+        prompt: str,
+        mask: Optional[str] = None,
+        n: int = 1,
+        size: str = "1024x1024",
+        response_format: str = "url",
+    ) -> List[Dict[str, Any]]:
+        """Edit image based on prompt and optional mask using OpenAI DALL-E API"""
+        try:
+            payload = {
+                "image": image,
+                "prompt": prompt,
+                "n": n,
+                "size": size,
+                "response_format": response_format,
+            }
+
+            if mask:
+                payload["mask"] = mask
+
+            response = await self.client.post(
+                f"{self.base_url}/images/edits", json=payload
+            )
+
+            response.raise_for_status()
+            response_data = response.json()
+
+            return response_data.get("data", [])
+
+        except Exception as e:
+            raise Exception(f"OpenAI image editing error: {str(e)}")
+
+    async def create_image_variation(
+        self,
+        image: str,
+        n: int = 1,
+        size: str = "1024x1024",
+        response_format: str = "url",
+    ) -> List[Dict[str, Any]]:
+        """Create image variations from base image using OpenAI DALL-E API"""
+        try:
+            payload = {
+                "image": image,
+                "n": n,
+                "size": size,
+                "response_format": response_format,
+            }
+
+            response = await self.client.post(
+                f"{self.base_url}/images/variations", json=payload
+            )
+
+            response.raise_for_status()
+            response_data = response.json()
+
+            return response_data.get("data", [])
+
+        except Exception as e:
+            raise Exception(f"OpenAI image variation creation error: {str(e)}")
