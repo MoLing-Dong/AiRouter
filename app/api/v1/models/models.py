@@ -24,6 +24,22 @@ async def list_models():
 
                     # Get all available providers
                     providers = [adapter.provider for adapter in adapters]
+
+                    # Get model capabilities from database
+                    capabilities = []
+                    try:
+                        from app.services.database_service import db_service
+
+                        # Get model by name to get ID
+                        model = db_service.get_model_by_name(model_name)
+                        if model:
+                            capabilities = db_service.get_model_capabilities(model.id)
+                    except Exception as e:
+                        logger.info(
+                            f"Error getting capabilities for model {model_name}: {e}"
+                        )
+                        # Capability retrieval failure does not affect model information return
+
                     models.append(
                         {
                             "id": model_name,
@@ -33,6 +49,8 @@ async def list_models():
                             "root": model_name,
                             "parent": None,
                             "providers_count": len(adapters),
+                            "capabilities": capabilities,
+                            "capabilities_count": len(capabilities),
                         }
                     )
             except Exception as e:
@@ -55,7 +73,9 @@ async def check_model_health(model_name: str):
         # Check if model exists
         available_models = adapter_manager.get_available_models()
         if model_name not in available_models:
-            raise HTTPException(status_code=404, detail=f"Model does not exist: {model_name}")
+            raise HTTPException(
+                status_code=404, detail=f"Model does not exist: {model_name}"
+            )
 
         # Get model's health status
         health_status = await adapter_manager.health_check_model(model_name)
@@ -81,7 +101,9 @@ async def check_model_health(model_name: str):
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Check model health status failed: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Check model health status failed: {str(e)}"
+        )
 
 
 @models_router.get("/{model_name}")
@@ -91,12 +113,17 @@ async def get_model_details(model_name: str):
         # Check if model exists
         available_models = adapter_manager.get_available_models()
         if model_name not in available_models:
-            raise HTTPException(status_code=404, detail=f"Model does not exist: {model_name}")
+            raise HTTPException(
+                status_code=404, detail=f"Model does not exist: {model_name}"
+            )
 
         # Get model configuration
         model_config = adapter_manager.get_model_config(model_name)
         if not model_config:
-            raise HTTPException(status_code=404, detail=f"Model configuration does not exist: {model_name}")
+            raise HTTPException(
+                status_code=404,
+                detail=f"Model configuration does not exist: {model_name}",
+            )
 
         # Get all adapters for the model
         adapters = adapter_manager.get_model_adapters(model_name)
@@ -128,6 +155,19 @@ async def get_model_details(model_name: str):
                 }
             )
 
+        # Get model capabilities from database
+        capabilities = []
+        try:
+            from app.services.database_service import db_service
+
+            # Get model by name to get ID
+            model = db_service.get_model_by_name(model_name)
+            if model:
+                capabilities = db_service.get_model_capabilities(model.id)
+        except Exception as e:
+            logger.info(f"Error getting capabilities for model {model_name}: {e}")
+            # Capability retrieval failure does not affect model information return
+
         return {
             "model_name": model_name,
             "model_type": model_config.model_type,
@@ -140,12 +180,16 @@ async def get_model_details(model_name: str):
             "priority": model_config.priority,
             "providers": providers,
             "providers_count": len(providers),
+            "capabilities": capabilities,
+            "capabilities_count": len(capabilities),
             "created_at": time.time(),
         }
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Get model detailed information failed: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Get model detailed information failed: {str(e)}"
+        )
 
 
 @models_router.get("/all/details")
@@ -254,10 +298,29 @@ async def get_all_models_details():
                     logger.info(f"Error getting parameters for model {model.name}: {e}")
                     # Parameter retrieval failure does not affect model information return
 
+                # Get model capabilities (if available)
+                try:
+                    model_capabilities = db_service.get_model_capabilities(model.id)
+                    if model_capabilities:
+                        model_detail["capabilities"] = model_capabilities
+                        model_detail["capabilities_count"] = len(model_capabilities)
+                    else:
+                        model_detail["capabilities"] = []
+                        model_detail["capabilities_count"] = 0
+                except Exception as e:
+                    logger.info(
+                        f"Error getting capabilities for model {model.name}: {e}"
+                    )
+                    # Capability retrieval failure does not affect model information return
+                    model_detail["capabilities"] = []
+                    model_detail["capabilities_count"] = 0
+
                 all_models_details.append(model_detail)
 
             except Exception as e:
-                logger.info(f"Error getting detailed information for model {model.name}: {e}")
+                logger.info(
+                    f"Error getting detailed information for model {model.name}: {e}"
+                )
                 continue
 
         return {
@@ -273,5 +336,130 @@ async def get_all_models_details():
 
         traceback.print_exc()
         raise HTTPException(
-            status_code=500, detail=f"Get all models' detailed information failed: {str(e)}"
+            status_code=500,
+            detail=f"Get all models' detailed information failed: {str(e)}",
+        )
+
+
+@models_router.get("/capabilities")
+async def get_all_capabilities():
+    """Get all available capabilities"""
+    try:
+        from app.services.database_service import db_service
+
+        capabilities = db_service.get_all_capabilities()
+
+        return {
+            "object": "list",
+            "data": capabilities,
+            "total_capabilities": len(capabilities),
+            "timestamp": time.time(),
+        }
+    except Exception as e:
+        logger.info(f"Get all capabilities failed: {e}")
+        raise HTTPException(
+            status_code=500, detail=f"Get all capabilities failed: {str(e)}"
+        )
+
+
+@models_router.get("/{model_name}/capabilities")
+async def get_model_capabilities(model_name: str):
+    """Get specific model capabilities"""
+    try:
+        from app.services.database_service import db_service
+
+        # Get model by name to get ID
+        model = db_service.get_model_by_name(model_name)
+        if not model:
+            raise HTTPException(
+                status_code=404, detail=f"Model does not exist: {model_name}"
+            )
+
+        capabilities = db_service.get_model_capabilities(model.id)
+
+        return {
+            "model_name": model_name,
+            "model_id": model.id,
+            "capabilities": capabilities,
+            "capabilities_count": len(capabilities),
+            "timestamp": time.time(),
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.info(f"Get model capabilities failed: {e}")
+        raise HTTPException(
+            status_code=500, detail=f"Get model capabilities failed: {str(e)}"
+        )
+
+
+@models_router.post("/{model_name}/capabilities")
+async def add_model_capability(model_name: str, capability_name: str):
+    """Add capability to model"""
+    try:
+        from app.services.database_service import db_service
+
+        # Get model by name to get ID
+        model = db_service.get_model_by_name(model_name)
+        if not model:
+            raise HTTPException(
+                status_code=404, detail=f"Model does not exist: {model_name}"
+            )
+
+        success = db_service.add_model_capability(model.id, capability_name)
+
+        if success:
+            return {
+                "message": f"Capability {capability_name} added to model {model_name}",
+                "model_name": model_name,
+                "capability_name": capability_name,
+                "timestamp": time.time(),
+            }
+        else:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Failed to add capability {capability_name} to model {model_name}",
+            )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.info(f"Add model capability failed: {e}")
+        raise HTTPException(
+            status_code=500, detail=f"Add model capability failed: {str(e)}"
+        )
+
+
+@models_router.delete("/{model_name}/capabilities/{capability_name}")
+async def remove_model_capability(model_name: str, capability_name: str):
+    """Remove capability from model"""
+    try:
+        from app.services.database_service import db_service
+
+        # Get model by name to get ID
+        model = db_service.get_model_by_name(model_name)
+        if not model:
+            raise HTTPException(
+                status_code=404, detail=f"Model does not exist: {model_name}"
+            )
+
+        success = db_service.remove_model_capability(model.id, capability_name)
+
+        if success:
+            return {
+                "message": f"Capability {capability_name} removed from model {model_name}",
+                "model_name": model_name,
+                "capability_name": capability_name,
+                "timestamp": time.time(),
+            }
+        else:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Failed to remove capability {capability_name} from model {model_name}",
+            )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.info(f"Remove model capability failed: {e}")
+        raise HTTPException(
+            status_code=500, detail=f"Remove model capability failed: {str(e)}"
         )

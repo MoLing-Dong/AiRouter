@@ -16,3 +16,4 @@ class ParamTypeEnum(enum.Enum):
     HYPERPARAMETER = "hyperparameter"
     CONFIG = "config"
     OTHER = "other"
+

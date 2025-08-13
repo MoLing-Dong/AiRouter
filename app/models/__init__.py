@@ -10,6 +10,8 @@ from .llm_provider import LLMProvider
 from .llm_provider_apikey import LLMProviderApiKey
 from .llm_model_provider import LLMModelProvider
 from .llm_model_param import LLMModelParam
+from .capability import Capability
+from .llm_model_capability import LLMModelCapability
 
 # Import Pydantic models
 from .schemas import (
@@ -35,6 +37,8 @@ __all__ = [
     "LLMProviderApiKey",
     "LLMModelProvider",
     "LLMModelParam",
+    "Capability",
+    "LLMModelCapability",
     "LLMModelCreate",
     "LLMModelUpdate",
     "LLMProviderCreate",

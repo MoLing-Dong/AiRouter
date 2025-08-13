@@ -24,3 +24,4 @@ class LLMModel(Base):
     # Relationships
     providers = relationship("LLMModelProvider", back_populates="llm_model")
     params = relationship("LLMModelParam", back_populates="llm_model")
+    capabilities = relationship("LLMModelCapability", back_populates="llm_model")

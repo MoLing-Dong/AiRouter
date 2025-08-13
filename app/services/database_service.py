@@ -265,7 +265,9 @@ class DatabaseService:
             )
 
             if not model_provider:
-                raise ValueError(f"Model-provider association does not exist: ID {model_provider_id}")
+                raise ValueError(
+                    f"Model-provider association does not exist: ID {model_provider_id}"
+                )
 
             # Get update data
             update_data = model_provider_data.dict(exclude_unset=True)
@@ -283,7 +285,8 @@ class DatabaseService:
                     .filter(
                         LLMModelProvider.llm_id == new_llm_id,
                         LLMModelProvider.provider_id == new_provider_id,
-                        LLMModelProvider.id != model_provider_id,  # Exclude current record
+                        LLMModelProvider.id
+                        != model_provider_id,  # Exclude current record
                     )
                     .first()
                 )
@@ -328,7 +331,9 @@ class DatabaseService:
             # Get best API key
             api_key_obj = self.get_best_api_key(provider.id)
             if not api_key_obj:
-                logger.info(f"Warning: Provider {provider.name} has no available API keys")
+                logger.info(
+                    f"Warning: Provider {provider.name} has no available API keys"
+                )
                 continue
 
             # Get provider parameters
@@ -1190,6 +1195,143 @@ class DatabaseService:
         except Exception as e:
             logger.info(f"Get strategy statistics failed: {e}")
             return {}
+
+    def get_model_capabilities(self, model_id: int) -> List[Dict[str, Any]]:
+        """Get model capabilities by model ID"""
+        try:
+            from ..models import LLMModelCapability, Capability
+
+            with self.get_session() as session:
+                capabilities = (
+                    session.query(Capability)
+                    .join(LLMModelCapability)
+                    .filter(LLMModelCapability.model_id == model_id)
+                    .all()
+                )
+
+                return [
+                    {
+                        "capability_id": cap.capability_id,
+                        "capability_name": cap.capability_name,
+                        "description": cap.description,
+                    }
+                    for cap in capabilities
+                ]
+        except Exception as e:
+            logger.info(f"Get model capabilities failed for model {model_id}: {e}")
+            return []
+
+    def get_all_capabilities(self) -> List[Dict[str, Any]]:
+        """Get all available capabilities"""
+        try:
+            from ..models import Capability
+
+            with self.get_session() as session:
+                capabilities = session.query(Capability).all()
+
+                return [
+                    {
+                        "capability_id": cap.capability_id,
+                        "capability_name": cap.capability_name,
+                        "description": cap.description,
+                    }
+                    for cap in capabilities
+                ]
+        except Exception as e:
+            logger.info(f"Get all capabilities failed: {e}")
+            return []
+
+    def add_model_capability(self, model_id: int, capability_name: str) -> bool:
+        """Add capability to model"""
+        try:
+            from ..models import LLMModelCapability, Capability
+
+            with self.get_session() as session:
+                # Check if capability exists
+                capability = (
+                    session.query(Capability)
+                    .filter(Capability.capability_name == capability_name)
+                    .first()
+                )
+
+                if not capability:
+                    logger.info(f"Capability {capability_name} does not exist")
+                    return False
+
+                # Check if association already exists
+                existing = (
+                    session.query(LLMModelCapability)
+                    .filter(
+                        LLMModelCapability.model_id == model_id,
+                        LLMModelCapability.capability_id == capability.capability_id,
+                    )
+                    .first()
+                )
+
+                if existing:
+                    logger.info(
+                        f"Model {model_id} already has capability {capability_name}"
+                    )
+                    return True  # Already exists, consider as success
+
+                # Create new association
+                model_capability = LLMModelCapability(
+                    model_id=model_id, capability_id=capability.capability_id
+                )
+
+                session.add(model_capability)
+                session.commit()
+
+                logger.info(f"Added capability {capability_name} to model {model_id}")
+                return True
+
+        except Exception as e:
+            logger.info(f"Add model capability failed: {e}")
+            return False
+
+    def remove_model_capability(self, model_id: int, capability_name: str) -> bool:
+        """Remove capability from model"""
+        try:
+            from ..models import LLMModelCapability, Capability
+
+            with self.get_session() as session:
+                # Find capability
+                capability = (
+                    session.query(Capability)
+                    .filter(Capability.capability_name == capability_name)
+                    .first()
+                )
+
+                if not capability:
+                    logger.info(f"Capability {capability_name} does not exist")
+                    return False
+
+                # Remove association
+                result = (
+                    session.query(LLMModelCapability)
+                    .filter(
+                        LLMModelCapability.model_id == model_id,
+                        LLMModelCapability.capability_id == capability.capability_id,
+                    )
+                    .delete()
+                )
+
+                session.commit()
+
+                if result > 0:
+                    logger.info(
+                        f"Removed capability {capability_name} from model {model_id}"
+                    )
+                    return True
+                else:
+                    logger.info(
+                        f"Model {model_id} does not have capability {capability_name}"
+                    )
+                    return False
+
+        except Exception as e:
+            logger.info(f"Remove model capability failed: {e}")
+            return False
 
 
 # Global database service instance
