@@ -68,7 +68,7 @@ async def create_image(request: ImageGenerationRequest):
 
         # Only get models that support image generation (text-to-image capability)
         available_models = adapter_manager.get_available_models(
-            capabilities=["MULTIMODAL_TEXT_TO_IMAGE"]
+            capabilities=["TEXT_TO_IMAGE"]
         )
 
         if request.model not in available_models:
@@ -126,7 +126,7 @@ async def edit_image(request: ImageEditRequest):
 
         # Only get models that support image editing (image-to-image capability)
         available_models = adapter_manager.get_available_models(
-            capabilities=["MULTIMODAL_IMAGE_TO_IMAGE"]
+            capabilities=["IMAGE_TO_IMAGE"]
         )
 
         # For image editing, we'll use a default model if none specified

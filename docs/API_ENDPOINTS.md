@@ -27,7 +27,7 @@ GET /v1/models/?capabilities=TEXT,MULTIMODAL_IMAGE_UNDERSTANDING
 **获取图片生成模型**:
 
 ```bash
-GET /v1/models/?capabilities=MULTIMODAL_TEXT_TO_IMAGE,MULTIMODAL_IMAGE_TO_IMAGE
+GET /v1/models/?capabilities=TEXT_TO_IMAGE,IMAGE_TO_IMAGE
 ```
 
 **获取纯文本模型**:
@@ -39,7 +39,7 @@ GET /v1/models/?capabilities=TEXT
 **获取多模态模型**:
 
 ```bash
-GET /v1/models/?capabilities=MULTIMODAL_IMAGE_UNDERSTANDING,MULTIMODAL_TEXT_TO_IMAGE,MULTIMODAL_IMAGE_TO_IMAGE
+GET /v1/models/?capabilities=MULTIMODAL_IMAGE_UNDERSTANDING,TEXT_TO_IMAGE,IMAGE_TO_IMAGE
 ```
 
 ## 聊天 API
@@ -57,13 +57,13 @@ GET /v1/models/?capabilities=MULTIMODAL_IMAGE_UNDERSTANDING,MULTIMODAL_TEXT_TO_I
 
 - **端点**: `POST /v1/images/generations`
 - **描述**: 从文本提示生成图片
-- **模型过滤**: 自动过滤支持 `MULTIMODAL_TEXT_TO_IMAGE` 能力的模型
+- **模型过滤**: 自动过滤支持 `TEXT_TO_IMAGE` 能力的模型
 
 ### 图片编辑
 
 - **端点**: `POST /v1/images/edits`
 - **描述**: 基于提示和可选遮罩编辑图片
-- **模型过滤**: 自动过滤支持 `MULTIMODAL_IMAGE_TO_IMAGE` 能力的模型
+- **模型过滤**: 自动过滤支持 `IMAGE_TO_IMAGE` 能力的模型
 
 ## 能力类型说明
 
@@ -76,8 +76,8 @@ GET /v1/models/?capabilities=MULTIMODAL_IMAGE_UNDERSTANDING,MULTIMODAL_TEXT_TO_I
 | 3 | VIDEO | 视频处理能力 |
 | 4 | AUDIO | 音频处理能力 |
 | 5 | MULTIMODAL_IMAGE_UNDERSTANDING | 图片内容理解能力 |
-| 6 | MULTIMODAL_TEXT_TO_IMAGE | 文生图能力 |
-| 7 | MULTIMODAL_IMAGE_TO_IMAGE | 图生图能力 |
+| 6 | TEXT_TO_IMAGE | 文生图能力 |
+| 7 | IMAGE_TO_IMAGE | 图生图能力 |
 
 ## 使用示例
 
@@ -90,7 +90,7 @@ curl -X GET "http://localhost:8000/v1/models/?capabilities=TEXT,MULTIMODAL_IMAGE
 ### 获取图片生成模型
 
 ```bash
-curl -X GET "http://localhost:8000/v1/models/?capabilities=MULTIMODAL_TEXT_TO_IMAGE,MULTIMODAL_IMAGE_TO_IMAGE"
+curl -X GET "http://localhost:8000/v1/models/?capabilities=TEXT_TO_IMAGE,IMAGE_TO_IMAGE"
 ```
 
 ### 获取纯文本模型

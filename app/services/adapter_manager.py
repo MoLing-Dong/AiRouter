@@ -184,7 +184,7 @@ class ModelAdapterManager:
                         If None, returns all models
             capabilities: List of capability names to filter by.
                         Common capabilities: "TEXT", "IMAGE", "VIDEO", "AUDIO", 
-                        "MULTIMODAL_IMAGE_UNDERSTANDING", "MULTIMODAL_TEXT_TO_IMAGE", "MULTIMODAL_IMAGE_TO_IMAGE"
+                        "MULTIMODAL_IMAGE_UNDERSTANDING", "TEXT_TO_IMAGE", "IMAGE_TO_IMAGE"
                         If None, ignores capability filtering
         """
         if not model_types and not capabilities:
