@@ -63,7 +63,10 @@ async def chat_completions(request: ChatCompletionRequest):
         # Check if model is available
         from app.services import adapter_manager
 
-        available_models = adapter_manager.get_available_models()
+        # Only get models that support chat functionality (text processing and multimodal understanding)
+        available_models = adapter_manager.get_available_models(
+            capabilities=["TEXT", "MULTIMODAL_IMAGE_UNDERSTANDING"]
+        )
 
         if request.model not in available_models:
             raise HTTPException(

@@ -66,7 +66,10 @@ async def create_image(request: ImageGenerationRequest):
         # Check if model is available
         from app.services import adapter_manager
 
-        available_models = adapter_manager.get_available_models()
+        # Only get models that support image generation (text-to-image capability)
+        available_models = adapter_manager.get_available_models(
+            capabilities=["MULTIMODAL_TEXT_TO_IMAGE"]
+        )
 
         if request.model not in available_models:
             raise HTTPException(
@@ -121,7 +124,10 @@ async def edit_image(request: ImageEditRequest):
         # Check if model is available
         from app.services import adapter_manager
 
-        available_models = adapter_manager.get_available_models()
+        # Only get models that support image editing (image-to-image capability)
+        available_models = adapter_manager.get_available_models(
+            capabilities=["MULTIMODAL_IMAGE_TO_IMAGE"]
+        )
 
         # For image editing, we'll use a default model if none specified
         model = request.model or "dall-e-2"

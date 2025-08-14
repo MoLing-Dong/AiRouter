@@ -175,9 +175,54 @@ class ModelAdapterManager:
         scored_adapters.sort(key=lambda x: x[1], reverse=True)
         return scored_adapters[0][0] if scored_adapters else None
 
-    def get_available_models(self) -> List[str]:
-        """Get all available models"""
-        return list(self.model_configs.keys())
+    def get_available_models(self, model_types: Optional[List[str]] = None, capabilities: Optional[List[str]] = None) -> List[str]:
+        """Get available models filtered by model types or capabilities
+        
+        Args:
+            model_types: List of model types to filter by. 
+                        Common types: "chat", "text", "multimodal", "embedding"
+                        If None, returns all models
+            capabilities: List of capability names to filter by.
+                        Common capabilities: "TEXT", "IMAGE", "VIDEO", "AUDIO", 
+                        "MULTIMODAL_IMAGE_UNDERSTANDING", "MULTIMODAL_TEXT_TO_IMAGE", "MULTIMODAL_IMAGE_TO_IMAGE"
+                        If None, ignores capability filtering
+        """
+        if not model_types and not capabilities:
+            return list(self.model_configs.keys())
+        
+        filtered_models = []
+        
+        for model_name, config in self.model_configs.items():
+            # Check model type filter
+            if model_types and config.model_type not in model_types:
+                continue
+                
+            # Check capability filter
+            if capabilities:
+                model_capabilities = self._get_model_capabilities(model_name)
+                if not model_capabilities:
+                    continue
+                    
+                # Check if model has any of the required capabilities
+                model_capability_names = [cap["capability_name"] for cap in model_capabilities]
+                if not any(cap in model_capability_names for cap in capabilities):
+                    continue
+            
+            filtered_models.append(model_name)
+        
+        return filtered_models
+    
+    def _get_model_capabilities(self, model_name: str) -> List[Dict[str, Any]]:
+        """Get model capabilities from database"""
+        try:
+            from .database_service import db_service
+            model = db_service.get_model_by_name(model_name)
+            if model:
+                return db_service.get_model_capabilities(model.id)
+            return []
+        except Exception as e:
+            logger.info(f"Failed to get capabilities for model {model_name}: {e}")
+            return []
 
     def get_model_config(self, model_name: str) -> Optional[ModelConfig]:
         """Get model configuration"""

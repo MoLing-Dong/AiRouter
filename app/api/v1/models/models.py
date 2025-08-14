@@ -1,4 +1,5 @@
 import time
+from typing import Optional
 from fastapi import APIRouter, HTTPException
 from app.services import adapter_manager
 from app.utils.logging_config import get_factory_logger
@@ -10,12 +11,25 @@ logger = get_factory_logger()
 
 
 @models_router.get("/")
-async def list_models():
-    """Get available model list"""
+async def list_models(capabilities: Optional[str] = None):
+    """Get available model list with optional capability filtering
+    
+    Args:
+        capabilities: Comma-separated list of capability names to filter by.
+                     Examples: "TEXT", "TEXT,MULTIMODAL_IMAGE_UNDERSTANDING", "MULTIMODAL_TEXT_TO_IMAGE"
+                     If not provided, returns all models
+    """
     try:
         models = []
-        # Get available model list from adapter manager
-        available_models = adapter_manager.get_available_models()
+        
+        # Parse capabilities parameter
+        capability_list = None
+        if capabilities:
+            capability_list = [cap.strip() for cap in capabilities.split(",")]
+            logger.info(f"Filtering models by capabilities: {capability_list}")
+        
+        # Get available model list from adapter manager with capability filtering
+        available_models = adapter_manager.get_available_models(capabilities=capability_list)
 
         for model_name in available_models:
             try:
@@ -64,7 +78,6 @@ async def list_models():
 
         traceback.logger.info_exc()
         raise HTTPException(status_code=500, detail=f"Get model list failed: {str(e)}")
-
 
 @models_router.get("/{model_name}/health")
 async def check_model_health(model_name: str):
