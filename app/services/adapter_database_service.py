@@ -16,6 +16,22 @@ class ModelDatabaseService:
             logger.info(f"Failed to get model configurations from database: {e}")
             return {}
 
+    def get_model_config_by_name(self, model_name: str) -> Optional[Dict[str, Any]]:
+        """Get single model configuration by name"""
+        try:
+            return db_service.get_model_config_by_name(model_name)
+        except Exception as e:
+            logger.info(f"Failed to get model configuration for {model_name}: {e}")
+            return None
+
+    def get_model_updated_timestamp(self, model_name: str) -> Optional[float]:
+        """Get model updated timestamp for version checking"""
+        try:
+            return db_service.get_model_updated_timestamp(model_name)
+        except Exception as e:
+            logger.info(f"Failed to get model timestamp for {model_name}: {e}")
+            return None
+
     def get_api_key_for_provider(self, provider_name: str) -> str:
         """Get API key for provider (prioritize database)"""
         # First try to get from database

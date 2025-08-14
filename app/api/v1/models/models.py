@@ -10,69 +10,151 @@ models_router = APIRouter(prefix="/v1/models", tags=["Model Management"])
 # Get logger
 logger = get_factory_logger()
 
+# 性能优化: 添加缓存机制
+_models_cache = {}
+_cache_timestamp = 0
+_cache_ttl = 30  # 缓存30秒
+
+
+def _get_cached_models():
+    """获取缓存的模型列表"""
+    global _models_cache, _cache_timestamp
+
+    current_time = time.time()
+    if current_time - _cache_timestamp < _cache_ttl and _models_cache:
+        return _models_cache, True
+
+    return None, False
+
+
+def _set_cached_models(models_data):
+    """设置模型列表缓存"""
+    global _models_cache, _cache_timestamp
+
+    _models_cache = models_data
+    _cache_timestamp = time.time()
+
+
+def clear_models_cache():
+    """清理模型列表缓存"""
+    global _models_cache, _cache_timestamp
+
+    _models_cache = {}
+    _cache_timestamp = 0
+    logger.info("🧹 Models cache cleared")
+
+
+@models_router.post("/clear-cache")
+async def clear_cache():
+    """Clear models cache (admin only)"""
+    try:
+        clear_models_cache()
+        return {
+            "message": "Models cache cleared successfully",
+            "timestamp": time.time(),
+        }
+    except Exception as e:
+        logger.info(f"Clear cache failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Clear cache failed: {str(e)}")
+
 
 @models_router.get("/")
 async def list_models(capabilities: Optional[str] = None):
     """Get available model list with optional capability filtering
-    
+
     Args:
         capabilities: Comma-separated list of capability names to filter by.
                      Examples: "TEXT", "TEXT,MULTIMODAL_IMAGE_UNDERSTANDING", "TEXT_TO_IMAGE"
                      If not provided, returns all models
     """
     try:
-        models = []
-        
+        start_time = time.time()
+
+        # 性能优化0: 检查缓存
+        if not capabilities:  # 只有无过滤条件时才使用缓存
+            cached_data, is_cached = _get_cached_models()
+            if is_cached:
+                logger.info(
+                    f"✅ Models list served from cache in {time.time() - start_time:.3f}s"
+                )
+                return cached_data
+
         # Parse capabilities parameter
         capability_list = None
         if capabilities:
             capability_list = [cap.strip() for cap in capabilities.split(",")]
             logger.info(f"Filtering models by capabilities: {capability_list}")
-        
-        # Get available model list from adapter manager with capability filtering
-        available_models = adapter_manager.get_available_models(capabilities=capability_list)
 
+        # 性能优化1: 批量获取所有模型配置，避免N+1查询
+        from app.services.database_service import db_service
+
+        # 一次性获取所有启用的模型
+        all_models = db_service.get_all_models(is_enabled=True)
+
+        # 性能优化2: 批量获取所有模型的capabilities
+        all_capabilities = {}
+        if all_models:
+            model_ids = [model.id for model in all_models]
+            all_capabilities = db_service.get_all_models_capabilities_batch(model_ids)
+
+        # 性能优化3: 批量获取所有模型的providers信息
+        all_providers = {}
+        if all_models:
+            all_providers = db_service.get_all_models_providers_batch(model_ids)
+
+        # 性能优化4: 从adapter_manager获取可用模型（避免重复查询）
+        available_models = adapter_manager.get_available_models_fast(
+            skip_version_check=True
+        )
+
+        models = []
         for model_name in available_models:
             try:
-                adapters = adapter_manager.get_model_adapters(model_name)
-                if adapters:
+                # 性能优化5: 从缓存获取adapters，避免重复版本检查
+                adapters = adapter_manager.get_model_adapters_fast(
+                    model_name, skip_version_check=True
+                )
+                if not adapters:
+                    continue
 
-                    # Get all available providers
-                    providers = [adapter.provider for adapter in adapters]
+                # 从批量查询结果中获取providers信息
+                providers = [adapter.provider for adapter in adapters]
 
-                    # Get model capabilities from database
-                    capabilities = []
-                    try:
-                        from app.services.database_service import db_service
+                # 从批量查询结果中获取capabilities信息
+                model_obj = next((m for m in all_models if m.name == model_name), None)
+                capabilities = (
+                    all_capabilities.get(model_obj.id, []) if model_obj else []
+                )
 
-                        # Get model by name to get ID
-                        model = db_service.get_model_by_name(model_name)
-                        if model:
-                            capabilities = db_service.get_model_capabilities(model.id)
-                    except Exception as e:
-                        logger.info(
-                            f"Error getting capabilities for model {model_name}: {e}"
-                        )
-                        # Capability retrieval failure does not affect model information return
-
-                    models.append(
-                        {
-                            "id": model_name,
-                            "object": "model",
-                            "created": int(time.time()),
-                            "permission": providers,
-                            "root": model_name,
-                            "parent": None,
-                            "providers_count": len(adapters),
-                            "capabilities": capabilities,
-                            "capabilities_count": len(capabilities),
-                        }
-                    )
+                models.append(
+                    {
+                        "id": model_name,
+                        "object": "model",
+                        "created": int(time.time()),
+                        "permission": providers,
+                        "root": model_name,
+                        "parent": None,
+                        "providers_count": len(adapters),
+                        "capabilities": capabilities,
+                        "capabilities_count": len(capabilities),
+                    }
+                )
             except Exception as e:
                 logger.info(f"Error processing model {model_name}: {e}")
                 continue
 
-        return {"object": "list", "data": models}
+        response_data = {"object": "list", "data": models}
+        response_time = time.time() - start_time
+
+        # 性能优化6: 设置缓存（仅对无过滤条件的请求）
+        if not capabilities:
+            _set_cached_models(response_data)
+
+        logger.info(
+            f"✅ Models list generated in {response_time:.3f}s, returned {len(models)} models"
+        )
+
+        return response_data
     except Exception as e:
         logger.info(f"Get model list failed: {e}")
         traceback.print_exc()
@@ -220,7 +302,9 @@ async def get_all_models_details():
                             for cap in model_capabilities
                         ]
                 except Exception as e:
-                    logger.info(f"Error getting capabilities for model {model.name}: {e}")
+                    logger.info(
+                        f"Error getting capabilities for model {model.name}: {e}"
+                    )
 
                 all_models_details.append(model_detail)
 
@@ -238,7 +322,8 @@ async def get_all_models_details():
         logger.info(f"Get all models' detailed information failed: {e}")
         traceback.print_exc()
         raise HTTPException(
-            status_code=500, detail=f"Get all models' detailed information failed: {str(e)}",
+            status_code=500,
+            detail=f"Get all models' detailed information failed: {str(e)}",
         )
 
 
@@ -366,7 +451,6 @@ async def get_model_details(model_name: str):
         raise HTTPException(
             status_code=500, detail=f"Get model detailed information failed: {str(e)}"
         )
-
 
 
 @models_router.get("/{model_name}/capabilities")

@@ -2,6 +2,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session
 from typing import List, Dict, Optional, Any
 from datetime import datetime
+import time
 from ..models import (
     Base,
     LLMModel,
@@ -389,9 +390,179 @@ class DatabaseService:
             "presence_penalty": 0.0,
             "enabled": model.is_enabled,
             "priority": 0,
+            "updated_at": (
+                model.updated_at.timestamp() if model.updated_at else time.time()
+            ),
         }
 
         return model_config
+
+    def get_model_config_by_name(self, model_name: str) -> Optional[Dict[str, Any]]:
+        """Get single model configuration by name (alias for get_model_config_from_db)"""
+        return self.get_model_config_from_db(model_name)
+
+    def get_model_updated_timestamp(self, model_name: str) -> Optional[float]:
+        """Get model updated timestamp for version checking"""
+        try:
+            model = self.get_model_by_name(model_name, is_enabled=True)
+            if model and model.updated_at:
+                # Convert datetime to timestamp
+                return model.updated_at.timestamp()
+            return None
+        except Exception as e:
+            logger.info(f"Failed to get model timestamp for {model_name}: {e}")
+            return None
+
+    def get_all_models_capabilities_batch(
+        self, model_ids: List[int]
+    ) -> Dict[int, List[Dict[str, Any]]]:
+        """Get capabilities for multiple models in batch (performance optimization)"""
+        try:
+            with self.get_session() as session:
+                # 批量查询所有模型的capabilities
+                from ..models.llm_model_capability import LLMModelCapability
+                from ..models.capability import Capability
+
+                logger.info(f"🔍 批量查询capabilities，模型ID: {model_ids}")
+
+                # 首先检查LLMModelCapability表中是否有数据
+                capability_count = session.query(LLMModelCapability).count()
+                logger.info(f"📊 LLMModelCapability表中共有 {capability_count} 条记录")
+
+                # 检查Capability表中是否有数据
+                capability_type_count = session.query(Capability).count()
+                logger.info(f"📊 Capability表中共有 {capability_type_count} 条记录")
+
+                # 检查特定模型的capabilities
+                for model_id in model_ids:
+                    model_capabilities = (
+                        session.query(LLMModelCapability)
+                        .filter(LLMModelCapability.model_id == model_id)
+                        .all()
+                    )
+                    logger.info(
+                        f"📊 模型ID {model_id} 有 {len(model_capabilities)} 个capabilities"
+                    )
+
+                capabilities = (
+                    session.query(
+                        LLMModelCapability.model_id,
+                        LLMModelCapability.capability_id,
+                        Capability.capability_name,
+                        Capability.description,
+                    )
+                    .join(
+                        Capability,
+                        LLMModelCapability.capability_id == Capability.capability_id,
+                    )
+                    .filter(
+                        LLMModelCapability.model_id.in_(model_ids),
+                    )
+                    .all()
+                )
+
+                logger.info(f"🔍 JOIN查询结果: {len(capabilities)} 条记录")
+
+                # 按模型ID分组
+                result = {}
+                for cap in capabilities:
+                    if cap.model_id not in result:
+                        result[cap.model_id] = []
+                    result[cap.model_id].append(
+                        {
+                            "capability_id": cap.capability_id,
+                            "capability_name": cap.capability_name,
+                            "description": cap.description,
+                        }
+                    )
+
+                logger.info(f"✅ 最终结果: {len(result)} 个模型有capabilities")
+                return result
+        except Exception as e:
+            logger.info(f"Failed to get batch capabilities: {e}")
+            return {}
+
+    def get_all_models_providers_batch(
+        self, model_ids: List[int]
+    ) -> Dict[int, List[Dict[str, Any]]]:
+        """Get providers for multiple models in batch (performance optimization)"""
+        try:
+            with self.get_session() as session:
+                # 批量查询所有模型的providers
+                from ..models.llm_model_provider import LLMModelProvider
+                from ..models.llm_provider import LLMProvider
+
+                logger.info(f"🔍 批量查询providers，模型ID: {model_ids}")
+
+                # 首先检查LLMModelProvider表中是否有数据
+                provider_count = session.query(LLMModelProvider).count()
+                logger.info(f"📊 LLMModelProvider表中共有 {provider_count} 条记录")
+
+                # 检查LLMProvider表中是否有数据
+                provider_type_count = session.query(LLMProvider).count()
+                logger.info(f"📊 LLMProvider表中共有 {provider_type_count} 条记录")
+
+                # 检查特定模型的providers
+                for model_id in model_ids:
+                    model_providers = (
+                        session.query(LLMModelProvider)
+                        .filter(LLMModelProvider.llm_id == model_id)
+                        .all()
+                    )
+                    logger.info(
+                        f"📊 模型ID {model_id} 有 {len(model_providers)} 个providers"
+                    )
+
+                providers = (
+                    session.query(
+                        LLMModelProvider.llm_id,
+                        LLMModelProvider.provider_id,
+                        LLMModelProvider.weight,
+                        LLMModelProvider.priority,
+                        LLMModelProvider.health_status,
+                        LLMModelProvider.is_enabled,
+                        LLMModelProvider.is_preferred,
+                        LLMModelProvider.cost_per_1k_tokens,
+                        LLMModelProvider.overall_score,
+                        LLMProvider.name,
+                        LLMProvider.provider_type,
+                        LLMProvider.official_endpoint,
+                        LLMProvider.third_party_endpoint,
+                    )
+                    .join(LLMProvider, LLMModelProvider.provider_id == LLMProvider.id)
+                    .filter(LLMModelProvider.llm_id.in_(model_ids))
+                    .all()
+                )
+
+                logger.info(f"🔍 JOIN查询结果: {len(providers)} 条记录")
+
+                # 按模型ID分组
+                result = {}
+                for prov in providers:
+                    if prov.llm_id not in result:
+                        result[prov.llm_id] = []
+                    result[prov.llm_id].append(
+                        {
+                            "provider_id": prov.provider_id,
+                            "name": prov.name,
+                            "provider_type": prov.provider_type,
+                            "base_url": prov.official_endpoint
+                            or prov.third_party_endpoint,
+                            "weight": prov.weight,
+                            "priority": prov.priority,
+                            "health_status": prov.health_status,
+                            "is_enabled": prov.is_enabled,
+                            "is_preferred": prov.is_preferred,
+                            "cost_per_1k_tokens": prov.cost_per_1k_tokens,
+                            "overall_score": prov.overall_score,
+                        }
+                    )
+
+                logger.info(f"✅ 最终结果: {len(result)} 个模型有providers")
+                return result
+        except Exception as e:
+            logger.info(f"Failed to get batch providers: {e}")
+            return {}
 
     def get_all_model_configs_from_db(self) -> Dict[str, Dict[str, Any]]:
         """Get all model configurations from database"""
