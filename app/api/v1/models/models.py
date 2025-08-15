@@ -24,7 +24,7 @@ logger = get_factory_logger()
 @models_router.get("/")
 async def list_models(capabilities: Optional[str] = None):
     """Get available model list with optional capability filtering
-    
+
     Args:
         capabilities: Comma-separated list of capability names to filter by.
                      Examples: "TEXT", "TEXT,MULTIMODAL_IMAGE_UNDERSTANDING", "TEXT_TO_IMAGE"
@@ -37,16 +37,14 @@ async def list_models(capabilities: Optional[str] = None):
         if not capabilities:  # 只有无过滤条件时才使用缓存
             cached_data, is_cached = models_cache.get_cached_models()
             if is_cached:
-                logger.info(
-                    f"✅ Models list served from cache in {time.time() - start_time:.3f}s"
-                )
+                response_time = time.time() - start_time
+                logger.info(f"✅ Models served from cache in {response_time:.3f}s")
                 return cached_data
 
         # Parse capabilities parameter
         capability_list = None
         if capabilities:
             capability_list = [cap.strip() for cap in capabilities.split(",")]
-            logger.info(f"Filtering models by capabilities: {capability_list}")
 
         # 使用模型查询服务获取模型列表
         models = model_service.get_models_with_capabilities(capability_list)
@@ -61,7 +59,6 @@ async def list_models(capabilities: Optional[str] = None):
         logger.info(
             f"✅ Models list generated in {response_time:.3f}s, returned {len(models)} models"
         )
-
         return response_data
     except Exception as e:
         logger.error(f"Get model list failed: {e}")

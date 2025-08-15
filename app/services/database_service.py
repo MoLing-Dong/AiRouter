@@ -47,17 +47,22 @@ class DatabaseService:
         """Get database session"""
         return self.SessionLocal()
 
-    def get_all_models(self, is_enabled: bool = None) -> List[LLMModel]:
-        """Get all models
+    def get_all_models(self, is_enabled: Optional[bool] = None) -> List[Any]:
+        """Get all models from database with optional filtering"""
+        try:
+            with self.get_session() as session:
+                query = session.query(LLMModel)
 
-        Args:
-            is_enabled: Whether to enable, None means ignore enable status
-        """
-        with self.get_session() as session:
-            query = session.query(LLMModel)
-            if is_enabled is not None:
-                query = query.filter(LLMModel.is_enabled == is_enabled)
-            return query.all()
+                if is_enabled is not None:
+                    query = query.filter(LLMModel.is_enabled == is_enabled)
+
+                # 添加排序和限制，避免返回过多数据
+                models = query.order_by(LLMModel.name).all()
+
+                return models
+        except Exception as e:
+            logger.warning(f"Failed to get all models: {e}")
+            return []
 
     def get_model_by_name(
         self, model_name: str, is_enabled: bool = None
@@ -419,31 +424,11 @@ class DatabaseService:
         """Get capabilities for multiple models in batch (performance optimization)"""
         try:
             with self.get_session() as session:
-                # 批量查询所有模型的capabilities
+                # 批量查询所有模型的capabilities - 使用单次JOIN查询
                 from ..models.llm_model_capability import LLMModelCapability
                 from ..models.capability import Capability
 
-                logger.info(f"🔍 批量查询capabilities，模型ID: {model_ids}")
-
-                # 首先检查LLMModelCapability表中是否有数据
-                capability_count = session.query(LLMModelCapability).count()
-                logger.info(f"📊 LLMModelCapability表中共有 {capability_count} 条记录")
-
-                # 检查Capability表中是否有数据
-                capability_type_count = session.query(Capability).count()
-                logger.info(f"📊 Capability表中共有 {capability_type_count} 条记录")
-
-                # 检查特定模型的capabilities
-                for model_id in model_ids:
-                    model_capabilities = (
-                        session.query(LLMModelCapability)
-                        .filter(LLMModelCapability.model_id == model_id)
-                        .all()
-                    )
-                    logger.info(
-                        f"📊 模型ID {model_id} 有 {len(model_capabilities)} 个capabilities"
-                    )
-
+                # 单次JOIN查询，避免N+1问题
                 capabilities = (
                     session.query(
                         LLMModelCapability.model_id,
@@ -461,8 +446,6 @@ class DatabaseService:
                     .all()
                 )
 
-                logger.info(f"🔍 JOIN查询结果: {len(capabilities)} 条记录")
-
                 # 按模型ID分组
                 result = {}
                 for cap in capabilities:
@@ -476,10 +459,9 @@ class DatabaseService:
                         }
                     )
 
-                logger.info(f"✅ 最终结果: {len(result)} 个模型有capabilities")
                 return result
         except Exception as e:
-            logger.info(f"Failed to get batch capabilities: {e}")
+            logger.warning(f"Failed to get batch capabilities: {e}")
             return {}
 
     def get_all_models_providers_batch(

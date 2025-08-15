@@ -364,9 +364,9 @@ class ModelAdapterManager:
         """通知相关服务清理缓存"""
         try:
             # 清理models接口的缓存
-            from app.api.v1.models.models import clear_models_cache
+            from app.api.v1.models.cache_manager import models_cache
 
-            clear_models_cache()
+            models_cache.clear_cache()
             logger.info("✅ Notified models cache to clear")
         except Exception as e:
             logger.warning(f"Failed to notify cache clear: {e}")

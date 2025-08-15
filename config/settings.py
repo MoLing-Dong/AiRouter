@@ -74,6 +74,7 @@ class Settings(BaseSettings):
     # Application base configuration
     APP_NAME: str = "AI Router"
     APP_VERSION: str = "1.0.0"
+    APP_DESCRIPTION: str = "AI Router is a tool that allows you to route requests to the appropriate model provider based on the request payload."
     DEBUG: bool = False
     RUN_ENV: str = "dev"
     LOG_LEVEL: str = "INFO"

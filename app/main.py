@@ -14,20 +14,34 @@ register_routes(app)
 
 # Get logger
 logger = get_app_logger()
+
+
 @asynccontextmanager
 async def lifespan(app):
     """Application lifecycle management"""
     # Initialize on startup
     logger.info(f"🚀 Starting {settings.APP_NAME} v{settings.APP_VERSION}")
 
+    # Apply performance optimizations
+    from app.core.performance import performance_config
+
+    performance_config.log_performance_settings()
+
     # Start adapter pool
     logger.info("🔄 Starting adapter pool...")
     from app.services.adapter_pool import adapter_pool
+
     await adapter_pool.start()
 
     # Load model configurations from database
     logger.info("📊 Loading model configurations from database...")
     adapter_manager.load_models_from_database()
+
+    # Preload models cache for faster first request
+    logger.info("🔥 Preloading models cache...")
+    from app.api.v1.models.model_service import model_service
+
+    await model_service.preload_models_cache()
 
     # Display load balancing strategy information
     logger.info("📊 Load balancing strategy system enabled")
