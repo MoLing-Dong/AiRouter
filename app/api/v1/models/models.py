@@ -1,3 +1,8 @@
+"""
+模型管理API路由
+提供模型列表、健康检查、能力管理等功能
+"""
+
 import time
 import traceback
 from typing import Optional
@@ -5,63 +10,21 @@ from fastapi import APIRouter, HTTPException
 from app.services import adapter_manager
 from app.utils.logging_config import get_factory_logger
 
+# 导入拆分后的模块
+from .cache_manager import models_cache
+from .model_service import model_service
+from .capability_service import capability_service
+
 models_router = APIRouter(prefix="/v1/models", tags=["Model Management"])
 
 # Get logger
 logger = get_factory_logger()
 
-# 性能优化: 添加缓存机制
-_models_cache = {}
-_cache_timestamp = 0
-_cache_ttl = 30  # 缓存30秒
-
-
-def _get_cached_models():
-    """获取缓存的模型列表"""
-    global _models_cache, _cache_timestamp
-
-    current_time = time.time()
-    if current_time - _cache_timestamp < _cache_ttl and _models_cache:
-        return _models_cache, True
-
-    return None, False
-
-
-def _set_cached_models(models_data):
-    """设置模型列表缓存"""
-    global _models_cache, _cache_timestamp
-
-    _models_cache = models_data
-    _cache_timestamp = time.time()
-
-
-def clear_models_cache():
-    """清理模型列表缓存"""
-    global _models_cache, _cache_timestamp
-
-    _models_cache = {}
-    _cache_timestamp = 0
-    logger.info("🧹 Models cache cleared")
-
-
-@models_router.post("/clear-cache")
-async def clear_cache():
-    """Clear models cache (admin only)"""
-    try:
-        clear_models_cache()
-        return {
-            "message": "Models cache cleared successfully",
-            "timestamp": time.time(),
-        }
-    except Exception as e:
-        logger.info(f"Clear cache failed: {e}")
-        raise HTTPException(status_code=500, detail=f"Clear cache failed: {str(e)}")
-
 
 @models_router.get("/")
 async def list_models(capabilities: Optional[str] = None):
     """Get available model list with optional capability filtering
-
+    
     Args:
         capabilities: Comma-separated list of capability names to filter by.
                      Examples: "TEXT", "TEXT,MULTIMODAL_IMAGE_UNDERSTANDING", "TEXT_TO_IMAGE"
@@ -70,9 +33,9 @@ async def list_models(capabilities: Optional[str] = None):
     try:
         start_time = time.time()
 
-        # 性能优化0: 检查缓存
+        # 性能优化: 检查缓存
         if not capabilities:  # 只有无过滤条件时才使用缓存
-            cached_data, is_cached = _get_cached_models()
+            cached_data, is_cached = models_cache.get_cached_models()
             if is_cached:
                 logger.info(
                     f"✅ Models list served from cache in {time.time() - start_time:.3f}s"
@@ -85,70 +48,15 @@ async def list_models(capabilities: Optional[str] = None):
             capability_list = [cap.strip() for cap in capabilities.split(",")]
             logger.info(f"Filtering models by capabilities: {capability_list}")
 
-        # 性能优化1: 批量获取所有模型配置，避免N+1查询
-        from app.services.database_service import db_service
-
-        # 一次性获取所有启用的模型
-        all_models = db_service.get_all_models(is_enabled=True)
-
-        # 性能优化2: 批量获取所有模型的capabilities
-        all_capabilities = {}
-        if all_models:
-            model_ids = [model.id for model in all_models]
-            all_capabilities = db_service.get_all_models_capabilities_batch(model_ids)
-
-        # 性能优化3: 批量获取所有模型的providers信息
-        all_providers = {}
-        if all_models:
-            all_providers = db_service.get_all_models_providers_batch(model_ids)
-
-        # 性能优化4: 从adapter_manager获取可用模型（避免重复查询）
-        available_models = adapter_manager.get_available_models_fast(
-            skip_version_check=True
-        )
-
-        models = []
-        for model_name in available_models:
-            try:
-                # 性能优化5: 从缓存获取adapters，避免重复版本检查
-                adapters = adapter_manager.get_model_adapters_fast(
-                    model_name, skip_version_check=True
-                )
-                if not adapters:
-                    continue
-
-                # 从批量查询结果中获取providers信息
-                providers = [adapter.provider for adapter in adapters]
-
-                # 从批量查询结果中获取capabilities信息
-                model_obj = next((m for m in all_models if m.name == model_name), None)
-                capabilities = (
-                    all_capabilities.get(model_obj.id, []) if model_obj else []
-                )
-
-                models.append(
-                    {
-                        "id": model_name,
-                        "object": "model",
-                        "created": int(time.time()),
-                        "permission": providers,
-                        "root": model_name,
-                        "parent": None,
-                        "providers_count": len(adapters),
-                        "capabilities": capabilities,
-                        "capabilities_count": len(capabilities),
-                    }
-                )
-            except Exception as e:
-                logger.info(f"Error processing model {model_name}: {e}")
-                continue
+        # 使用模型查询服务获取模型列表
+        models = model_service.get_models_with_capabilities(capability_list)
 
         response_data = {"object": "list", "data": models}
         response_time = time.time() - start_time
 
-        # 性能优化6: 设置缓存（仅对无过滤条件的请求）
+        # 设置缓存（仅对无过滤条件的请求）
         if not capabilities:
-            _set_cached_models(response_data)
+            models_cache.set_cached_models(response_data)
 
         logger.info(
             f"✅ Models list generated in {response_time:.3f}s, returned {len(models)} models"
@@ -156,7 +64,7 @@ async def list_models(capabilities: Optional[str] = None):
 
         return response_data
     except Exception as e:
-        logger.info(f"Get model list failed: {e}")
+        logger.error(f"Get model list failed: {e}")
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Get model list failed: {str(e)}")
 
@@ -165,22 +73,7 @@ async def list_models(capabilities: Optional[str] = None):
 @models_router.get("/capabilities")
 async def get_all_capabilities():
     """Get all available capabilities"""
-    try:
-        from app.services.database_service import db_service
-
-        capabilities = db_service.get_all_capabilities()
-
-        return {
-            "object": "list",
-            "data": capabilities,
-            "total_capabilities": len(capabilities),
-            "timestamp": time.time(),
-        }
-    except Exception as e:
-        logger.info(f"Get all capabilities failed: {e}")
-        raise HTTPException(
-            status_code=500, detail=f"Get all capabilities failed: {str(e)}"
-        )
+    return capability_service.get_all_capabilities()
 
 
 @models_router.get("/all/details")
@@ -456,101 +349,45 @@ async def get_model_details(model_name: str):
 @models_router.get("/{model_name}/capabilities")
 async def get_model_capabilities(model_name: str):
     """Get specific model capabilities"""
+    return capability_service.get_model_capabilities(model_name)
+
+
+@models_router.post("/clear-cache")
+async def clear_cache():
+    """Clear models cache (admin only)"""
     try:
-        from app.services.database_service import db_service
-
-        # Get model by name to get ID
-        model = db_service.get_model_by_name(model_name)
-        if not model:
-            raise HTTPException(
-                status_code=404, detail=f"Model does not exist: {model_name}"
-            )
-
-        capabilities = db_service.get_model_capabilities(model.id)
-
+        models_cache.clear_cache()
         return {
-            "model_name": model_name,
-            "model_id": model.id,
-            "capabilities": capabilities,
-            "capabilities_count": len(capabilities),
+            "message": "Models cache cleared successfully",
             "timestamp": time.time(),
         }
-    except HTTPException:
-        raise
     except Exception as e:
-        logger.info(f"Get model capabilities failed: {e}")
-        raise HTTPException(
-            status_code=500, detail=f"Get model capabilities failed: {str(e)}"
-        )
+        logger.error(f"Clear cache failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Clear cache failed: {str(e)}")
+
+
+@models_router.get("/cache/stats")
+async def get_cache_stats():
+    """Get cache statistics"""
+    try:
+        stats = models_cache.get_cache_stats()
+        return {
+            "message": "Cache statistics retrieved successfully",
+            "stats": stats,
+            "timestamp": time.time(),
+        }
+    except Exception as e:
+        logger.error(f"Get cache stats failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Get cache stats failed: {str(e)}")
 
 
 @models_router.post("/{model_name}/capabilities")
 async def add_model_capability(model_name: str, capability_name: str):
     """Add capability to model"""
-    try:
-        from app.services.database_service import db_service
-
-        # Get model by name to get ID
-        model = db_service.get_model_by_name(model_name)
-        if not model:
-            raise HTTPException(
-                status_code=404, detail=f"Model does not exist: {model_name}"
-            )
-
-        success = db_service.add_model_capability(model.id, capability_name)
-
-        if success:
-            return {
-                "message": f"Capability {capability_name} added to model {model_name}",
-                "model_name": model_name,
-                "capability_name": capability_name,
-                "timestamp": time.time(),
-            }
-        else:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Failed to add capability {capability_name} to model {model_name}",
-            )
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.info(f"Add model capability failed: {e}")
-        raise HTTPException(
-            status_code=500, detail=f"Add model capability failed: {str(e)}"
-        )
+    return capability_service.add_model_capability(model_name, capability_name)
 
 
 @models_router.delete("/{model_name}/capabilities/{capability_name}")
 async def remove_model_capability(model_name: str, capability_name: str):
     """Remove capability from model"""
-    try:
-        from app.services.database_service import db_service
-
-        # Get model by name to get ID
-        model = db_service.get_model_by_name(model_name)
-        if not model:
-            raise HTTPException(
-                status_code=404, detail=f"Model does not exist: {model_name}"
-            )
-
-        success = db_service.remove_model_capability(model.id, capability_name)
-
-        if success:
-            return {
-                "message": f"Capability {capability_name} removed from model {model_name}",
-                "model_name": model_name,
-                "capability_name": capability_name,
-                "timestamp": time.time(),
-            }
-        else:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Failed to remove capability {capability_name} from model {model_name}",
-            )
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.info(f"Remove model capability failed: {e}")
-        raise HTTPException(
-            status_code=500, detail=f"Remove model capability failed: {str(e)}"
-        )
+    return capability_service.remove_model_capability(model_name, capability_name)
