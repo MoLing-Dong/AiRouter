@@ -20,7 +20,7 @@ RUN apt-get update && apt-get install -y \
 RUN pip install uv
 
 # Copy dependency files
-COPY pyproject.toml uv.lock .
+COPY pyproject.toml uv.lock /app/
 
 # Install Python dependencies
 RUN uv pip install --system -r <(uv pip compile pyproject.toml)

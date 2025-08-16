@@ -168,53 +168,54 @@ class AnthropicAdapter(BaseAdapter):
             raise Exception(f"Anthropic stream adapter error: {str(e)}")
 
     async def health_check(self) -> HealthStatus:
-        """Execute Anthropic health check"""
+        """Execute health check"""
         try:
-            # Use simpler health check method - only check API connection
-            # Anthropic supports /models endpoint, but we also provide fallback
+            start_time = time.time()
+            response = await self.client.get(f"{self.base_url}/v1/models")
+            response_time = time.time() - start_time
 
-            # Try to get model list
-            try:
-                response = await self.client.get(f"{self.base_url}/v1/models")
-                if response.status_code == 200:
-                    self.health_status = HealthStatus.HEALTHY
-                    self.metrics.last_health_check = time.time()
-                    return HealthStatus.HEALTHY
-            except:
-                pass
+            if response.status_code == 200:
+                logger.info("AnthropicAdapter health check successful")
+                self.health_status = HealthStatus.HEALTHY
+                self.metrics.last_health_check = time.time()
 
-            # If /models endpoint is not available, try simple HEAD request
-            try:
-                response = await self.client.head(f"{self.base_url}/v1/messages")
-                if response.status_code in [
-                    200,
-                    405,
-                ]:  # 405 means method not allowed, but endpoint exists
-                    self.health_status = HealthStatus.HEALTHY
-                    self.metrics.last_health_check = time.time()
-                    return HealthStatus.HEALTHY
-            except:
-                pass
+                # Sync health status to database
+                self.sync_health_status_to_database("healthy")
 
-            # If all fail, mark as degraded
-            self.health_status = HealthStatus.DEGRADED
-            return HealthStatus.DEGRADED
+                return HealthStatus.HEALTHY
+            else:
+                self.health_status = HealthStatus.DEGRADED
+
+                # 异步更新数据库
+                await self.update_database_health_status(
+                    HealthStatus.DEGRADED, response_time
+                )
+
+                return HealthStatus.DEGRADED
 
         except httpx.ConnectError:
-            # Connection error
             self.health_status = HealthStatus.UNHEALTHY
+
+            # 异步更新数据库
+            await self.update_database_health_status(HealthStatus.UNHEALTHY)
+
             return HealthStatus.UNHEALTHY
         except httpx.HTTPStatusError as e:
-            # HTTP error
             if e.response.status_code == 401:
-                # Authentication error
                 self.health_status = HealthStatus.UNHEALTHY
             else:
                 self.health_status = HealthStatus.DEGRADED
+
+            # 异步更新数据库
+            await self.update_database_health_status(self.health_status)
+
             return self.health_status
         except Exception as e:
-            # Other error
             self.health_status = HealthStatus.UNHEALTHY
+
+            # 异步更新数据库
+            await self.update_database_health_status(HealthStatus.UNHEALTHY)
+
             return HealthStatus.UNHEALTHY
 
     async def create_embedding(self, text: str) -> Dict[str, Any]:

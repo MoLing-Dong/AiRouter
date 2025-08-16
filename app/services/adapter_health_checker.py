@@ -1,3 +1,4 @@
+import asyncio
 from typing import Dict, List, Optional
 from app.core.adapters.base import BaseAdapter, HealthStatus
 from app.services.database_service import db_service
@@ -7,18 +8,78 @@ from app.utils.logging_config import get_factory_logger
 # Get logger
 logger = get_factory_logger()
 
+
 class HealthChecker:
     """Health check service - specifically handle adapter health check logic"""
+
+    async def check_single_adapter_health(
+        self, model_name: str, adapter: BaseAdapter
+    ) -> tuple[str, str]:
+        """Check single adapter health status"""
+        try:
+            logger.info(f"Checking adapter: {type(adapter).__name__} - {adapter.provider}")
+            status = await adapter.health_check()
+            logger.info(f"Health status: {status.value}")
+            
+            # 更新数据库中的健康状态
+            self._update_db_health_status(model_name, adapter.provider, status.value)
+            
+            return f"{model_name}:{adapter.provider}", status.value
+            
+        except Exception as e:
+            logger.info(f"Health check failed: {adapter.provider} - {e}")
+            
+            # 更新数据库中的健康状态
+            self._update_db_health_status(model_name, adapter.provider, "unhealthy")
+            
+            return f"{model_name}:{adapter.provider}", "unhealthy"
 
     async def check_model_health(
         self, model_name: str, adapters: List[BaseAdapter]
     ) -> Dict[str, str]:
-        """Check all adapter health status for the model"""
+        """Check all adapter health status for the model concurrently"""
+        if not adapters:
+            return {}
+
+        # 创建所有适配器的健康检查任务
+        tasks = [
+            self.check_single_adapter_health(model_name, adapter)
+            for adapter in adapters
+        ]
+        
+        # 并发执行所有健康检查
+        try:
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+            
+            # 处理结果
+            health_status = {}
+            for result in results:
+                if isinstance(result, Exception):
+                    logger.error(f"Health check task failed: {result}")
+                    continue
+                    
+                if isinstance(result, tuple) and len(result) == 2:
+                    key, status = result
+                    health_status[key] = status
+                else:
+                    logger.warning(f"Unexpected health check result format: {result}")
+            
+            return health_status
+            
+        except Exception as e:
+            logger.error(f"Concurrent health check failed for model {model_name}: {e}")
+            # 回退到串行执行
+            return await self._check_model_health_sequential(model_name, adapters)
+
+    async def _check_model_health_sequential(
+        self, model_name: str, adapters: List[BaseAdapter]
+    ) -> Dict[str, str]:
+        """Fallback sequential health check method"""
         health_status = {}
 
         for adapter in adapters:
             try:
-                logger.info(f"Checking adapter: {type(adapter).__name__} - {adapter.provider}")
+                logger.info(f"Sequential health check: {type(adapter).__name__} - {adapter.provider}")
                 status = await adapter.health_check()
                 logger.info(f"Health status: {status.value}")
                 health_status[f"{model_name}:{adapter.provider}"] = status.value
@@ -38,15 +99,99 @@ class HealthChecker:
     async def check_all_models(
         self, model_names: List[str], model_adapters: Dict[str, List[BaseAdapter]]
     ) -> Dict[str, str]:
-        """Check health status for all models"""
+        """Check health status for all models concurrently"""
+        if not model_names:
+            return {}
+
+        # 创建所有模型的健康检查任务
+        tasks = []
+        for model_name in model_names:
+            adapters = model_adapters.get(model_name, [])
+            if adapters:  # 只检查有适配器的模型
+                task = self.check_model_health(model_name, adapters)
+                tasks.append(task)
+
+        if not tasks:
+            return {}
+
+        # 并发执行所有模型的健康检查
+        try:
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+            
+            # 合并所有结果
+            all_health_status = {}
+            for i, result in enumerate(results):
+                if isinstance(result, Exception):
+                    model_name = model_names[i] if i < len(model_names) else "unknown"
+                    logger.error(f"Health check failed for model {model_name}: {result}")
+                    continue
+                    
+                if isinstance(result, dict):
+                    all_health_status.update(result)
+                else:
+                    logger.warning(f"Unexpected model health check result: {result}")
+            
+            return all_health_status
+            
+        except Exception as e:
+            logger.error(f"Concurrent model health check failed: {e}")
+            # 回退到串行执行
+            return await self._check_all_models_sequential(model_names, model_adapters)
+
+    async def _check_all_models_sequential(
+        self, model_names: List[str], model_adapters: Dict[str, List[BaseAdapter]]
+    ) -> Dict[str, str]:
+        """Fallback sequential health check for all models"""
         all_health_status = {}
 
         for model_name in model_names:
             adapters = model_adapters.get(model_name, [])
-            model_health = await self.check_model_health(model_name, adapters)
+            model_health = await self._check_model_health_sequential(model_name, adapters)
             all_health_status.update(model_health)
 
         return all_health_status
+
+    async def check_all_models_with_timeout(
+        self, 
+        model_names: List[str], 
+        model_adapters: Dict[str, List[BaseAdapter]], 
+        timeout: float = 30.0
+    ) -> Dict[str, str]:
+        """Check health status for all models with timeout"""
+        try:
+            # 使用超时机制执行并发健康检查
+            result = await asyncio.wait_for(
+                self.check_all_models(model_names, model_adapters),
+                timeout=timeout
+            )
+            return result
+        except asyncio.TimeoutError:
+            logger.warning(f"Health check timeout after {timeout} seconds, falling back to sequential")
+            return await self._check_all_models_sequential(model_names, model_adapters)
+        except Exception as e:
+            logger.error(f"Health check with timeout failed: {e}")
+            return await self._check_all_models_sequential(model_names, model_adapters)
+
+    async def check_model_health_with_timeout(
+        self, 
+        model_name: str, 
+        adapters: List[BaseAdapter], 
+        timeout: float = 10.0
+    ) -> Dict[str, str]:
+        """Check single model health status with timeout"""
+        try:
+            # 使用超时机制执行并发健康检查
+            result = await asyncio.wait_for(
+                self.check_model_health(model_name, adapters),
+                timeout=timeout
+            )
+            return result
+        except asyncio.TimeoutError:
+            logger.warning(f"Model health check timeout after {timeout} seconds, falling back to sequential")
+            return await self._check_model_health_sequential(model_name, adapters)
+        except Exception as e:
+            logger.error(f"Model health check with timeout failed: {e}")
+            return await self._check_model_health_sequential(model_name, adapters)
 
     def get_adapter_health_score(self, adapter: BaseAdapter) -> float:
         """Calculate adapter health score"""

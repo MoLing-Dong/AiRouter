@@ -100,6 +100,10 @@ class OpenAIAdapter(BaseAdapter):
             response_time = time.time() - start_time
             self.update_metrics(response_time, False)
             self.health_status = HealthStatus.UNHEALTHY
+
+            # Sync health status to database
+            self.sync_health_status_to_database("unhealthy", str(e))
+
             raise Exception(f"OpenAI adapter error: {str(e)}")
 
     async def stream_chat_completion(self, request: ChatRequest):
@@ -191,28 +195,34 @@ class OpenAIAdapter(BaseAdapter):
             raise Exception(f"OpenAI stream adapter error: {str(e)}")
 
     async def health_check(self) -> HealthStatus:
-        """Execute OpenAI health check"""
+        """Execute health check"""
         try:
-            # Use simpler health check method - only check API connection
-            # Note: Some third-party OpenAI compatible APIs may not support /models endpoint
-            # So we use a more generic method
-
             # Try to get model list
             try:
+                start_time = time.time()
                 response = await self.client.get(f"{self.base_url}/models")
+                response_time = time.time() - start_time
+
                 if response.status_code == 200:
                     logger.info(
                         "OpenAIAdapter health check successful - get model list"
                     )
                     self.health_status = HealthStatus.HEALTHY
                     self.metrics.last_health_check = time.time()
+
+                    # Sync health status to database
+                    self.sync_health_status_to_database("healthy")
+
                     return HealthStatus.HEALTHY
             except:
                 pass
 
             # If /models endpoint is not available, try simple HEAD request
             try:
+                start_time = time.time()
                 response = await self.client.head(f"{self.base_url}/chat/completions")
+                response_time = time.time() - start_time
+
                 if response.status_code in [
                     200,
                     405,
@@ -220,17 +230,29 @@ class OpenAIAdapter(BaseAdapter):
                     logger.info("OpenAI health check successful - simple HEAD request")
                     self.health_status = HealthStatus.HEALTHY
                     self.metrics.last_health_check = time.time()
+
+                    # Sync health status to database
+                    self.sync_health_status_to_database("healthy")
+
                     return HealthStatus.HEALTHY
             except:
                 pass
 
             # If all fail, mark as degraded
             self.health_status = HealthStatus.DEGRADED
+
+            # Sync health status to database
+            self.sync_health_status_to_database("degraded")
+
             return HealthStatus.DEGRADED
 
         except httpx.ConnectError:
             # Connection error
             self.health_status = HealthStatus.UNHEALTHY
+
+            # Sync health status to database
+            self.sync_health_status_to_database("unhealthy")
+
             return HealthStatus.UNHEALTHY
         except httpx.HTTPStatusError as e:
             # HTTP error
@@ -239,10 +261,20 @@ class OpenAIAdapter(BaseAdapter):
                 self.health_status = HealthStatus.UNHEALTHY
             else:
                 self.health_status = HealthStatus.DEGRADED
+
+            # Sync health status to database
+            self.sync_health_status_to_database(
+                self._convert_health_status(self.health_status)
+            )
+
             return self.health_status
         except Exception as e:
             # Other error
             self.health_status = HealthStatus.UNHEALTHY
+
+            # Sync health status to database
+            self.sync_health_status_to_database("unhealthy")
+
             return HealthStatus.UNHEALTHY
 
     async def create_embedding(self, text: str) -> Dict[str, Any]:

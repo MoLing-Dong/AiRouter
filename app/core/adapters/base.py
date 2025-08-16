@@ -7,6 +7,8 @@ from enum import Enum
 import httpx
 import json
 from app.utils.logging_config import get_factory_logger
+from app.models.llm_model_provider import HealthStatusEnum
+from app.services.database_service import db_service
 
 # Get logger
 logger = get_factory_logger()
@@ -84,6 +86,8 @@ class BaseAdapter(ABC):
         self.base_url = model_config.get("base_url")
         self.model_name = model_config.get("model")
         self.provider = model_config.get("provider")
+        self.model_id = model_config.get("model_id")  # 添加模型ID
+        self.provider_id = model_config.get("provider_id")  # 添加提供商ID
 
         # Initialize metrics
         self.metrics = ModelMetrics(
@@ -176,6 +180,39 @@ class BaseAdapter(ABC):
                 current_success_rate * (total_requests - 1)
             ) / total_requests
 
+        # Update last health check time
+        self.metrics.last_health_check = time.time()
+
+        # Try to sync metrics to database if we have model_id and provider_id
+        if (
+            hasattr(self, "model_id")
+            and hasattr(self, "provider_id")
+            and self.model_id
+            and self.provider_id
+        ):
+            try:
+                from app.services.health_check_service import HealthCheckService
+                from app.services.database_service import db_service
+
+                health_service = HealthCheckService(db_service)
+                health_service.sync_adapter_metrics_to_database(
+                    model_id=self.model_id,
+                    provider_id=self.provider_id,
+                    response_time=response_time,
+                    success=success,
+                    tokens_used=tokens_used,
+                    cost=(
+                        self.get_cost_estimate(tokens_used) if tokens_used > 0 else 0.0
+                    ),
+                )
+            except Exception as e:
+                # Log error but don't fail the main operation
+                import logging
+
+                logging.getLogger(__name__).warning(
+                    f"Failed to sync metrics to database: {e}"
+                )
+
     def get_cost_estimate(self, tokens: int) -> float:
         """Estimate cost"""
         return (tokens / 1000) * self.metrics.cost_per_1k_tokens
@@ -206,3 +243,50 @@ class BaseAdapter(ABC):
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         await self.close()
+
+    def sync_health_status_to_database(
+        self, health_status: str, error_message: str = None
+    ):
+        """Sync health status to database
+
+        Args:
+            health_status: Current health status
+            error_message: Error message if any
+        """
+        if (
+            not hasattr(self, "model_id")
+            or not hasattr(self, "provider_id")
+            or not self.model_id
+            or not self.provider_id
+        ):
+            return False
+
+        try:
+            from app.services.health_check_service import HealthCheckService
+            from app.services.database_service import db_service
+
+            health_service = HealthCheckService(db_service)
+            return health_service.sync_adapter_health_to_database(
+                model_id=self.model_id,
+                provider_id=self.provider_id,
+                health_status=health_status,
+                response_time=self.metrics.response_time,
+                success=self.metrics.success_rate > 0.5,  # Rough estimate
+                error_message=error_message,
+            )
+        except Exception as e:
+            import logging
+
+            logging.getLogger(__name__).warning(
+                f"Failed to sync health status to database: {e}"
+            )
+            return False
+
+    def _convert_health_status(self, health_status: HealthStatus) -> str:
+        """Convert health status enum to database format"""
+        if health_status == HealthStatus.HEALTHY:
+            return "healthy"
+        elif health_status == HealthStatus.DEGRADED:
+            return "degraded"
+        else:
+            return "unhealthy"
