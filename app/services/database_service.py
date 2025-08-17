@@ -20,6 +20,7 @@ from ..models import (
 from ..models.llm_model_provider import HealthStatusEnum
 from config.settings import settings
 from app.utils.logging_config import get_factory_logger
+from .transaction_manager import DatabaseTransactionManager
 
 # Get logger
 logger = get_factory_logger()
@@ -39,6 +40,9 @@ class DatabaseService:
         self.SessionLocal = sessionmaker(
             autocommit=False, autoflush=False, bind=self.engine
         )
+
+        # Initialize transaction manager
+        self.tx_manager = DatabaseTransactionManager(self.SessionLocal)
 
         # Create tables
         Base.metadata.create_all(bind=self.engine)
@@ -77,13 +81,115 @@ class DatabaseService:
             return query.first()
 
     def create_model(self, model_data: LLMModelCreate) -> LLMModel:
-        """Create model"""
-        with self.get_session() as session:
-            model = LLMModel(**model_data.dict())
+        """Create model with optional provider association"""
+
+        def _create_model_operation(session: Session) -> LLMModel:
+            # Extract provider association data
+            provider_id = getattr(model_data, "provider_id", None)
+            provider_weight = getattr(model_data, "provider_weight", 10)
+            is_provider_preferred = getattr(model_data, "is_provider_preferred", False)
+
+            # Validate provider if specified
+            if provider_id:
+                provider = self.tx_manager.validate_entity_exists(
+                    session, LLMProvider, provider_id, "Provider"
+                )
+                self.tx_manager.validate_entity_enabled(provider, "Provider")
+
+            # Create model (excluding provider fields)
+            model_dict = model_data.dict()
+            model_dict.pop("provider_id", None)
+            model_dict.pop("provider_weight", None)
+            model_dict.pop("is_provider_preferred", None)
+
+            # Check if model name already exists
+            self.tx_manager.check_unique_constraint(
+                session, LLMModel, {"name": model_dict["name"]}, "Model"
+            )
+
+            # Create and add model
+            model = LLMModel(**model_dict)
             session.add(model)
-            session.commit()
+
+            # Flush to get the model ID without committing
+            session.flush()
+
+            # Verify model was created successfully
+            if not model.id:
+                raise RuntimeError("Failed to create model - no ID generated")
+
+            # Create model-provider association if provider_id is provided
+            if provider_id:
+                from ..models.llm_model_provider import LLMModelProvider
+
+                # Check if association already exists
+                self.tx_manager.check_unique_constraint(
+                    session,
+                    LLMModelProvider,
+                    {"llm_id": model.id, "provider_id": provider_id},
+                    "Model-Provider association",
+                )
+
+                # Create model-provider association
+                model_provider = LLMModelProvider(
+                    llm_id=model.id,
+                    provider_id=provider_id,
+                    weight=provider_weight,
+                    is_preferred=is_provider_preferred,
+                    is_enabled=True,
+                )
+                session.add(model_provider)
+
+            # Refresh model to get all attributes
             session.refresh(model)
             return model
+
+        # Execute in transaction with retry mechanism
+        try:
+            logger.info(f"🔄 Starting model creation process for '{model_data.name}'")
+            logger.debug(f"   📋 Model data: {model_data.dict()}")
+
+            model = self.tx_manager.execute_with_retry(
+                _create_model_operation,
+                max_retries=2,
+                description=f"Create model '{model_data.name}' with provider association",
+            )
+
+            # Log success details
+            provider_info = ""
+            if getattr(model_data, "provider_id", None):
+                provider_info = f" with provider association (ID: {getattr(model_data, 'provider_id', None)})"
+                logger.info(
+                    f"✅ Successfully created model '{model.name}' (ID: {model.id}){provider_info}"
+                )
+                logger.debug(
+                    f"   📍 Model details: name='{model.name}', type='{model.llm_type}', enabled={model.is_enabled}"
+                )
+                logger.debug(
+                    f"   🔗 Provider association: provider_id={getattr(model_data, 'provider_id')}, weight={getattr(model_data, 'provider_weight', 10)}, preferred={getattr(model_data, 'is_provider_preferred', False)}"
+                )
+            else:
+                logger.info(
+                    f"✅ Successfully created model '{model.name}' (ID: {model.id}) without provider association"
+                )
+                logger.debug(
+                    f"   📍 Model details: name='{model.name}', type='{model.llm_type}', enabled={model.is_enabled}"
+                )
+
+            return model
+
+        except Exception as e:
+            logger.error(f"❌ Failed to create model '{model_data.name}'")
+            logger.error(f"   🚨 Error type: {type(e).__name__}")
+            logger.error(f"   💬 Error message: {str(e)}")
+            logger.error(f"   📋 Model data: {model_data.dict()}")
+
+            # 记录详细的错误信息
+            import traceback
+
+            logger.error(f"   📚 Stack trace:\n{traceback.format_exc()}")
+
+            raise
 
     def update_model_enabled_status(self, model_name: str, enabled: bool) -> bool:
         """Update model enabled status"""
@@ -1013,12 +1119,53 @@ class DatabaseService:
 
     def create_provider(self, provider_data: LLMProviderCreate) -> LLMProvider:
         """Create provider"""
-        with self.get_session() as session:
+        session = None
+        try:
+            session = self.get_session()
+
+            # Check if provider already exists
+            existing_provider = (
+                session.query(LLMProvider)
+                .filter(
+                    LLMProvider.name == provider_data.name,
+                    LLMProvider.provider_type == provider_data.provider_type,
+                )
+                .first()
+            )
+
+            if existing_provider:
+                raise ValueError(
+                    f"Provider with name '{provider_data.name}' and type '{provider_data.provider_type}' already exists"
+                )
+
+            # Create and add provider
             provider = LLMProvider(**provider_data.dict())
             session.add(provider)
+
+            # Commit transaction
             session.commit()
             session.refresh(provider)
+
+            logger.info(
+                f"Successfully created provider '{provider.name}' (ID: {provider.id})"
+            )
             return provider
+
+        except Exception as e:
+            # Rollback transaction on error
+            if session:
+                session.rollback()
+                logger.error(
+                    f"Failed to create provider: {str(e)}. Transaction rolled back."
+                )
+
+            # Re-raise the exception for proper error handling
+            raise
+
+        finally:
+            # Always close session
+            if session:
+                session.close()
 
     # ==================== Core Model-Provider Operations ====================
 
@@ -1051,12 +1198,83 @@ class DatabaseService:
         self, model_provider_data: LLMModelProviderCreate
     ) -> LLMModelProvider:
         """Create model-provider association"""
-        with self.get_session() as session:
+        session = None
+        try:
+            session = self.get_session()
+
+            # Validate model exists
+            model = (
+                session.query(LLMModel)
+                .filter(LLMModel.id == model_provider_data.llm_id)
+                .first()
+            )
+            if not model:
+                raise ValueError(
+                    f"Model with ID {model_provider_data.llm_id} does not exist"
+                )
+            if not model.is_enabled:
+                raise ValueError(
+                    f"Model with ID {model_provider_data.llm_id} is disabled"
+                )
+
+            # Validate provider exists
+            provider = (
+                session.query(LLMProvider)
+                .filter(LLMProvider.id == model_provider_data.provider_id)
+                .first()
+            )
+            if not provider:
+                raise ValueError(
+                    f"Provider with ID {model_provider_data.provider_id} does not exist"
+                )
+            if not provider.is_enabled:
+                raise ValueError(
+                    f"Provider with ID {model_provider_data.provider_id} is disabled"
+                )
+
+            # Check if association already exists
+            existing_association = (
+                session.query(LLMModelProvider)
+                .filter(
+                    LLMModelProvider.llm_id == model_provider_data.llm_id,
+                    LLMModelProvider.provider_id == model_provider_data.provider_id,
+                )
+                .first()
+            )
+
+            if existing_association:
+                raise ValueError(
+                    f"Model-provider association already exists for model {model_provider_data.llm_id} and provider {model_provider_data.provider_id}"
+                )
+
+            # Create and add association
             model_provider = LLMModelProvider(**model_provider_data.dict())
             session.add(model_provider)
+
+            # Commit transaction
             session.commit()
             session.refresh(model_provider)
+
+            logger.info(
+                f"Successfully created model-provider association: Model {model_provider_data.llm_id} -> Provider {model_provider_data.provider_id}"
+            )
             return model_provider
+
+        except Exception as e:
+            # Rollback transaction on error
+            if session:
+                session.rollback()
+                logger.error(
+                    f"Failed to create model-provider association: {str(e)}. Transaction rolled back."
+                )
+
+            # Re-raise the exception for proper error handling
+            raise
+
+        finally:
+            # Always close session
+            if session:
+                session.close()
 
     def update_model_provider(
         self, model_provider_id: int, model_provider_data: LLMModelProviderUpdate

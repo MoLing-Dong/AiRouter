@@ -58,6 +58,65 @@
 2. **支持动态更新**，无需重启服务
 3. **安全存储**，密钥加密存储在数据库中
 
+### 模型创建与供应商关联
+
+系统支持在创建模型时同时建立与供应商的关联，简化配置流程：
+
+#### 创建模型（可选供应商关联）
+
+```bash
+# 创建模型并关联供应商
+curl -X POST "http://localhost:8000/v1/db/models" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "gpt-4",
+    "llm_type": "chat",
+    "description": "GPT-4 模型",
+    "provider_id": 1,
+    "provider_weight": 10,
+    "is_provider_preferred": true
+  }'
+```
+
+**响应示例：**
+
+```json
+{
+  "message": "Model created successfully",
+  "id": 1,
+  "name": "gpt-4",
+  "provider_info": {
+    "provider_id": 1,
+    "provider_name": "OpenAI",
+    "weight": 10,
+    "is_preferred": true
+  }
+}
+```
+
+#### 创建模型（仅模型，无供应商关联）
+
+```bash
+# 仅创建模型，后续单独配置供应商
+curl -X POST "http://localhost:8000/v1/db/models" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "claude-3",
+    "llm_type": "chat",
+    "description": "Claude-3 模型"
+  }'
+```
+
+**响应示例：**
+
+```json
+{
+  "message": "Model created successfully",
+  "id": 2,
+  "name": "claude-3"
+}
+```
+
 #### 3. 启动服务
 
 **方法一：一键部署（推荐）**

@@ -7,6 +7,10 @@ class LLMModelCreate(BaseModel):
     llm_type: str
     description: Optional[str] = None
     is_enabled: bool = True
+    # Optional provider association fields
+    provider_id: Optional[int] = None
+    provider_weight: Optional[int] = 10
+    is_provider_preferred: Optional[bool] = False
 
 
 class LLMModelUpdate(BaseModel):

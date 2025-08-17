@@ -34,12 +34,14 @@ async def get_db_models():
             ]
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Get database models failed: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Get database models failed: {str(e)}"
+        )
 
 
 @db_router.post("/models")
 async def create_db_model(model_data: LLMModelCreate):
-    """Create model"""
+    """Create model with optional provider association"""
     try:
         # Check if model already exists
         existing_model = db_service.get_model_by_name(model_data.name)
@@ -50,11 +52,29 @@ async def create_db_model(model_data: LLMModelCreate):
             )
 
         model = db_service.create_model(model_data)
-        return {
+
+        # Prepare response
+        response = {
             "message": "Model created successfully",
             "id": model.id,
             "name": model.name,
         }
+
+        # If provider association was created, add provider info to response
+        if model_data.provider_id:
+            try:
+                provider = db_service.get_provider_by_id(model_data.provider_id)
+                if provider:
+                    response["provider_info"] = {
+                        "provider_id": model_data.provider_id,
+                        "provider_name": provider.name,
+                        "weight": model_data.provider_weight or 10,
+                        "is_preferred": model_data.is_provider_preferred or False,
+                    }
+            except Exception as e:
+                logger.warning(f"Failed to get provider info for response: {e}")
+
+        return response
     except HTTPException:
         raise
     except Exception as e:
@@ -82,7 +102,9 @@ async def get_db_providers():
             ]
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Get providers list failed: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Get providers list failed: {str(e)}"
+        )
 
 
 @db_router.post("/providers")
@@ -128,12 +150,16 @@ async def create_db_model_provider(model_provider_data: LLMModelProviderCreate):
             )
 
         model_provider = db_service.create_model_provider(model_provider_data)
-        return {"message": "Model-provider association created successfully", "id": model_provider.id}
+        return {
+            "message": "Model-provider association created successfully",
+            "id": model_provider.id,
+        }
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(
-            status_code=500, detail=f"Create model-provider association failed: {str(e)}"
+            status_code=500,
+            detail=f"Create model-provider association failed: {str(e)}",
         )
 
 
@@ -147,13 +173,18 @@ async def update_db_model_provider(
         model_provider = db_service.update_model_provider(
             model_provider_id, model_provider_data
         )
-        return {"message": "Model-provider association updated successfully", "id": model_provider.id}
+        return {
+            "message": "Model-provider association updated successfully",
+            "id": model_provider.id,
+        }
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(
-            status_code=500, detail=f"Update model-provider association failed: {str(e)}"
+            status_code=500,
+            detail=f"Update model-provider association failed: {str(e)}",
         )
+
 
 @db_router.post("/model-params")
 async def create_db_model_param(param_data: LLMModelParamCreate):
@@ -173,8 +204,13 @@ async def create_db_model_param(param_data: LLMModelParamCreate):
             )
 
         param = db_service.create_model_param(param_data)
-        return {"message": "Model parameter created successfully", "param_id": param.param_id}
+        return {
+            "message": "Model parameter created successfully",
+            "param_id": param.param_id,
+        }
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Create model parameter failed: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Create model parameter failed: {str(e)}"
+        )
