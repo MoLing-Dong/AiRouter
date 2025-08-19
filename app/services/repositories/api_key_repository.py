@@ -231,20 +231,3 @@ class ApiKeyRepository(BaseRepository[LLMProviderApiKey]):
         return self.tx_manager.execute_in_transaction(
             operation, f"Reset daily usage for provider {provider_id}"
         )
-
-    def get_api_keys_by_endpoint(self, base_url: str) -> List[LLMProviderApiKey]:
-        """Get API keys by base URL"""
-
-        def operation(session: Session) -> List[LLMProviderApiKey]:
-            return (
-                session.query(LLMProviderApiKey)
-                .filter(
-                    LLMProviderApiKey.base_url == base_url,
-                    LLMProviderApiKey.is_enabled == True,
-                )
-                .all()
-            )
-
-        return self.tx_manager.execute_in_transaction(
-            operation, f"Get API keys by endpoint {base_url}"
-        )

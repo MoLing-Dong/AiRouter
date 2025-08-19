@@ -88,6 +88,7 @@ class BaseAdapter(ABC):
         self.provider = model_config.get("provider")
         self.model_id = model_config.get("model_id")  # 添加模型ID
         self.provider_id = model_config.get("provider_id")  # 添加提供商ID
+        self.api_key_id = model_config.get("api_key_id")  # 添加API key ID用于用量追踪
 
         # Initialize metrics
         self.metrics = ModelMetrics(

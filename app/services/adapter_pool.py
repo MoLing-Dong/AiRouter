@@ -14,6 +14,7 @@ logger = get_factory_logger()
 
 class PoolStatus(str, Enum):
     """Pool status enumeration"""
+
     AVAILABLE = "available"
     IN_USE = "in_use"
     UNHEALTHY = "unhealthy"
@@ -23,6 +24,7 @@ class PoolStatus(str, Enum):
 @dataclass
 class PooledAdapter:
     """Pooled adapter"""
+
     adapter: BaseAdapter
     provider_name: str
     model_name: str
@@ -40,8 +42,10 @@ class AdapterPool:
 
     def __init__(self):
         self.pools: Dict[str, List[PooledAdapter]] = {}  # key: "model:provider"
-        self.max_pool_size: int = 10  # Max pool size for each model-provider combination
-        self.min_pool_size: int = 2   # Min pool size for each model-provider combination
+        self.max_pool_size: int = (
+            10  # Max pool size for each model-provider combination
+        )
+        self.min_pool_size: int = 2  # Min pool size for each model-provider combination
         self.cleanup_interval: float = 60.0  # Cleanup interval (seconds)
         self.health_check_interval: float = 300.0  # Health check interval (seconds)
         self._cleanup_task: Optional[asyncio.Task] = None
@@ -80,6 +84,7 @@ class AdapterPool:
 
     async def get_adapter_context(self, model_name: str, provider_name: str):
         """Get adapter context manager"""
+
         class AdapterContext:
             def __init__(self, pool, model_name, provider_name):
                 self.pool = pool
@@ -88,19 +93,25 @@ class AdapterPool:
                 self.adapter = None
 
             async def __aenter__(self):
-                self.adapter = await self.pool.get_adapter(self.model_name, self.provider_name)
+                self.adapter = await self.pool.get_adapter(
+                    self.model_name, self.provider_name
+                )
                 return self.adapter
 
             async def __aexit__(self, exc_type, exc_val, exc_tb):
                 if self.adapter:
-                    await self.pool.release_adapter(self.adapter, self.model_name, self.provider_name)
+                    await self.pool.release_adapter(
+                        self.adapter, self.model_name, self.provider_name
+                    )
 
         return AdapterContext(self, model_name, provider_name)
 
-    async def get_adapter(self, model_name: str, provider_name: str) -> Optional[BaseAdapter]:
+    async def get_adapter(
+        self, model_name: str, provider_name: str
+    ) -> Optional[BaseAdapter]:
         """Get adapter instance"""
         pool_key = f"{model_name}:{provider_name}"
-        
+
         async with self._lock:
             # Get or create pool
             if pool_key not in self.pools:
@@ -108,26 +119,31 @@ class AdapterPool:
                 await self._initialize_pool(pool_key, model_name, provider_name)
 
             pool = self.pools[pool_key]
-            
+
             # Find available adapters
             for pooled_adapter in pool:
                 if pooled_adapter.status == PoolStatus.AVAILABLE:
                     # Check if expired
-                    if time.time() - pooled_adapter.last_used_time > pooled_adapter.max_idle_time:
+                    if (
+                        time.time() - pooled_adapter.last_used_time
+                        > pooled_adapter.max_idle_time
+                    ):
                         pooled_adapter.status = PoolStatus.EXPIRED
                         continue
-                    
+
                     # Check usage count
                     if pooled_adapter.use_count >= pooled_adapter.max_use_count:
                         pooled_adapter.status = PoolStatus.EXPIRED
                         continue
-                    
+
                     # Mark as in use
                     pooled_adapter.status = PoolStatus.IN_USE
                     pooled_adapter.last_used_time = time.time()
                     pooled_adapter.use_count += 1
-                    
-                    logger.info(f"🔄 Get adapter from pool: {model_name}:{provider_name} (usage count: {pooled_adapter.use_count})")
+
+                    logger.info(
+                        f"🔄 Get adapter from pool: {model_name}:{provider_name} (usage count: {pooled_adapter.use_count})"
+                    )
                     return pooled_adapter.adapter
 
             # If no available adapters, try to create new ones
@@ -142,39 +158,49 @@ class AdapterPool:
                         last_used_time=time.time(),
                         use_count=1,
                         status=PoolStatus.IN_USE,
-                        health_check_time=time.time()
+                        health_check_time=time.time(),
                     )
                     pool.append(pooled_adapter)
-                    logger.info(f"🆕 Create new adapter and add to pool: {model_name}:{provider_name}")
+                    logger.info(
+                        f"🆕 Create new adapter and add to pool: {model_name}:{provider_name}"
+                    )
                     return new_adapter
 
             # If pool is full, wait for available adapters
-            logger.warning(f"⏳ Pool is full, waiting for available adapters: {model_name}:{provider_name}")
+            logger.warning(
+                f"⏳ Pool is full, waiting for available adapters: {model_name}:{provider_name}"
+            )
             return await self._wait_for_available_adapter(pool_key)
 
-    async def release_adapter(self, adapter: BaseAdapter, model_name: str, provider_name: str):
+    async def release_adapter(
+        self, adapter: BaseAdapter, model_name: str, provider_name: str
+    ):
         """Release adapter back to pool"""
         pool_key = f"{model_name}:{provider_name}"
-        
+
         async with self._lock:
             if pool_key not in self.pools:
                 return
 
             pool = self.pools[pool_key]
-            
+
             # Find corresponding pooled adapter
             for pooled_adapter in pool:
                 if pooled_adapter.adapter == adapter:
                     if pooled_adapter.status == PoolStatus.IN_USE:
                         pooled_adapter.status = PoolStatus.AVAILABLE
                         pooled_adapter.last_used_time = time.time()
-                        logger.info(f"🔄 Release adapter back to pool: {model_name}:{provider_name} (usage count: {pooled_adapter.use_count})")
+                        logger.info(
+                            f"🔄 Release adapter back to pool: {model_name}:{provider_name} (usage count: {pooled_adapter.use_count})"
+                        )
                     break
 
-    async def _initialize_pool(self, pool_key: str, model_name: str, provider_name: str):
+    async def _initialize_pool(
+        self, pool_key: str, model_name: str, provider_name: str
+    ):
         """Initialize adapter pool"""
         logger.info(f"🔧 Initialize adapter pool: {pool_key}")
-        
+
         # Create initial adapters
         for _ in range(self.min_pool_size):
             adapter = await self._create_adapter(model_name, provider_name)
@@ -187,11 +213,13 @@ class AdapterPool:
                     last_used_time=time.time(),
                     use_count=0,
                     status=PoolStatus.AVAILABLE,
-                    health_check_time=time.time()
+                    health_check_time=time.time(),
                 )
                 self.pools[pool_key].append(pooled_adapter)
 
-    async def _create_adapter(self, model_name: str, provider_name: str) -> Optional[BaseAdapter]:
+    async def _create_adapter(
+        self, model_name: str, provider_name: str
+    ) -> Optional[BaseAdapter]:
         """Create new adapter instance"""
         try:
             # Get model
@@ -209,7 +237,9 @@ class AdapterPool:
             # Get model-provider association
             model_provider = db_service.get_model_provider_by_ids(model.id, provider.id)
             if not model_provider or not model_provider.is_enabled:
-                logger.error(f"❌ Model-provider association does not exist or is not enabled: {model_name}:{provider_name}")
+                logger.error(
+                    f"❌ Model-provider association does not exist or is not enabled: {model_name}:{provider_name}"
+                )
                 return None
 
             # Get API key
@@ -224,6 +254,7 @@ class AdapterPool:
                 "provider": provider.name,
                 "base_url": provider.official_endpoint or provider.third_party_endpoint,
                 "api_key": api_key_obj.api_key,
+                "api_key_id": api_key_obj.id,  # 添加API key ID用于用量追踪
                 "model": model.name,
                 "weight": model_provider.weight,
                 "cost_per_1k_tokens": model_provider.cost_per_1k_tokens,
@@ -236,14 +267,18 @@ class AdapterPool:
             # Create adapter
             adapter = create_adapter(provider.name, config)
             if adapter:
-                logger.success(f"✅ Create adapter successfully: {model_name}:{provider_name}")
+                logger.success(
+                    f"✅ Create adapter successfully: {model_name}:{provider_name}"
+                )
                 return adapter
             else:
                 logger.error(f"❌ Create adapter failed: {model_name}:{provider_name}")
                 return None
 
         except Exception as e:
-            logger.exception(f"❌ Create adapter exception: {model_name}:{provider_name} - {e}")
+            logger.exception(
+                f"❌ Create adapter exception: {model_name}:{provider_name} - {e}"
+            )
             return None
 
     async def _wait_for_available_adapter(self, pool_key: str) -> Optional[BaseAdapter]:
@@ -251,7 +286,7 @@ class AdapterPool:
         pool = self.pools[pool_key]
         max_wait_time = 30.0  # Max wait time 30 seconds
         start_time = time.time()
-        
+
         while time.time() - start_time < max_wait_time:
             # Check if there are available adapters
             for pooled_adapter in pool:
@@ -260,10 +295,10 @@ class AdapterPool:
                     pooled_adapter.last_used_time = time.time()
                     pooled_adapter.use_count += 1
                     return pooled_adapter.adapter
-            
+
             # Wait for a while and try again
             await asyncio.sleep(0.1)
-        
+
         logger.error(f"⏰ Wait for adapter timeout: {pool_key}")
         return None
 
@@ -294,17 +329,18 @@ class AdapterPool:
         async with self._lock:
             current_time = time.time()
             removed_count = 0
-            
+
             for pool_key, pool in list(self.pools.items()):
                 # Filter out expired adapters
                 original_size = len(pool)
                 pool[:] = [
-                    pooled_adapter for pooled_adapter in pool
+                    pooled_adapter
+                    for pooled_adapter in pool
                     if not self._is_adapter_expired(pooled_adapter, current_time)
                 ]
-                
+
                 removed_count += original_size - len(pool)
-                
+
                 # If pool is too small, add new adapters
                 if len(pool) < self.min_pool_size:
                     model_name, provider_name = pool_key.split(":", 1)
@@ -319,10 +355,10 @@ class AdapterPool:
                                 last_used_time=current_time,
                                 use_count=0,
                                 status=PoolStatus.AVAILABLE,
-                                health_check_time=current_time
+                                health_check_time=current_time,
                             )
                             pool.append(pooled_adapter)
-            
+
             if removed_count > 0:
                 logger.info(f"🧹 Cleaned up {removed_count} expired adapters")
 
@@ -330,47 +366,58 @@ class AdapterPool:
         """Check health status for all adapters"""
         async with self._lock:
             current_time = time.time()
-            
+
             for pool_key, pool in self.pools.items():
                 for pooled_adapter in pool:
                     # Only check available adapters
                     if pooled_adapter.status != PoolStatus.AVAILABLE:
                         continue
-                        
+
                     # Check if health check is needed
-                    if current_time - pooled_adapter.health_check_time > self.health_check_interval:
+                    if (
+                        current_time - pooled_adapter.health_check_time
+                        > self.health_check_interval
+                    ):
                         try:
                             health_status = await pooled_adapter.adapter.health_check()
                             pooled_adapter.health_check_time = current_time
-                            
+
                             if health_status == HealthStatus.UNHEALTHY:
                                 pooled_adapter.status = PoolStatus.UNHEALTHY
-                                logger.error(f"❌ Adapter health check failed: {pool_key}")
+                                logger.error(
+                                    f"❌ Adapter health check failed: {pool_key}"
+                                )
                             elif health_status == HealthStatus.HEALTHY:
                                 if pooled_adapter.status == PoolStatus.UNHEALTHY:
                                     pooled_adapter.status = PoolStatus.AVAILABLE
-                                    logger.success(f"✅ Adapter recovered health: {pool_key}")
-                                    
+                                    logger.success(
+                                        f"✅ Adapter recovered health: {pool_key}"
+                                    )
+
                         except Exception as e:
-                            logger.exception(f"❌ Health check exception: {pool_key} - {e}")
+                            logger.exception(
+                                f"❌ Health check exception: {pool_key} - {e}"
+                            )
                             # Don't immediately mark as unhealthy, give some tolerance
                             if pooled_adapter.status == PoolStatus.AVAILABLE:
                                 pooled_adapter.status = PoolStatus.UNHEALTHY
 
-    def _is_adapter_expired(self, pooled_adapter: PooledAdapter, current_time: float) -> bool:
+    def _is_adapter_expired(
+        self, pooled_adapter: PooledAdapter, current_time: float
+    ) -> bool:
         """Check if adapter is expired"""
         # Check idle time
         if current_time - pooled_adapter.last_used_time > pooled_adapter.max_idle_time:
             return True
-        
+
         # Check usage count
         if pooled_adapter.use_count >= pooled_adapter.max_use_count:
             return True
-        
+
         # Check status
         if pooled_adapter.status == PoolStatus.UNHEALTHY:
             return True
-        
+
         return False
 
     async def _close_all_adapters(self):
@@ -382,22 +429,19 @@ class AdapterPool:
                         await pooled_adapter.adapter.close()
                     except Exception as e:
                         logger.info(f"❌ Close adapter exception: {e}")
-            
+
             self.pools.clear()
 
     def get_pool_stats(self) -> Dict[str, Any]:
         """Get pool statistics"""
-        stats = {
-            "total_pools": len(self.pools),
-            "pools": {}
-        }
-        
+        stats = {"total_pools": len(self.pools), "pools": {}}
+
         for pool_key, pool in self.pools.items():
             available_count = sum(1 for pa in pool if pa.status == PoolStatus.AVAILABLE)
             in_use_count = sum(1 for pa in pool if pa.status == PoolStatus.IN_USE)
             unhealthy_count = sum(1 for pa in pool if pa.status == PoolStatus.UNHEALTHY)
             expired_count = sum(1 for pa in pool if pa.status == PoolStatus.EXPIRED)
-            
+
             stats["pools"][pool_key] = {
                 "total": len(pool),
                 "available": available_count,
@@ -405,9 +449,9 @@ class AdapterPool:
                 "unhealthy": unhealthy_count,
                 "expired": expired_count,
                 "max_pool_size": self.max_pool_size,
-                "min_pool_size": self.min_pool_size
+                "min_pool_size": self.min_pool_size,
             }
-        
+
         return stats
 
 

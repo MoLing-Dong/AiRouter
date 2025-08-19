@@ -8,6 +8,7 @@ from ..core.adapters import ChatRequest, ChatResponse
 from ..core.adapters.base import BaseAdapter, HealthStatus
 from .database_service import db_service
 from app.utils.logging_config import get_factory_logger
+
 # Get logger
 logger = get_factory_logger()
 
@@ -47,8 +48,12 @@ class LoadBalancingStrategyManager:
     """Load balancing strategy manager"""
 
     def __init__(self):
-        self.provider_connections: Dict[str, int] = {}  # Record current connection count of each provider
-        self.provider_last_used: Dict[str, float] = {}  # Record last used time of each provider
+        self.provider_connections: Dict[str, int] = (
+            {}
+        )  # Record current connection count of each provider
+        self.provider_last_used: Dict[str, float] = (
+            {}
+        )  # Record last used time of each provider
         self.round_robin_counters: Dict[str, int] = {}  # Round robin counter
 
     async def execute_strategy(
@@ -169,7 +174,9 @@ class LoadBalancingStrategyManager:
         """Specify provider strategy"""
         specified_provider = config.get("specified_provider")
         if not specified_provider:
-            raise Exception("Specify provider strategy needs to configure specified_provider parameter")
+            raise Exception(
+                "Specify provider strategy needs to configure specified_provider parameter"
+            )
 
         # Find the specified provider
         for provider in providers:
@@ -196,7 +203,9 @@ class LoadBalancingStrategyManager:
                             request, provider
                         )
                     except Exception as e:
-                        logger.info(f"Preferred provider {preferred_provider} failed: {e}")
+                        logger.info(
+                            f"Preferred provider {preferred_provider} failed: {e}"
+                        )
                         break
 
         # Sort by priority and score
@@ -300,7 +309,9 @@ class LoadBalancingStrategyManager:
         config: Dict[str, Any],
     ) -> ChatResponse:
         """Cost optimized strategy"""
-        max_cost_threshold = config.get("max_cost_threshold", 0.1)  # Maximum cost threshold
+        max_cost_threshold = config.get(
+            "max_cost_threshold", 0.1
+        )  # Maximum cost threshold
 
         # Filter out providers with too high cost
         affordable_providers = [
@@ -339,7 +350,8 @@ class LoadBalancingStrategyManager:
                 provider.overall_score * 0.4
                 + (1 - provider.response_time_avg / 10) * 0.3  # Response time score
                 + (1 - provider.cost_per_1k_tokens / 0.1) * 0.2  # Cost score
-                + (1 - provider.current_connections / 100) * 0.1  # Connection count score
+                + (1 - provider.current_connections / 100)
+                * 0.1  # Connection count score
             )
             provider.hybrid_score = hybrid_score
 
@@ -387,6 +399,9 @@ class LoadBalancingStrategyManager:
                 response_time = time.time() - start_time
                 await self._update_provider_metrics(provider.name, response_time, True)
 
+                # Update API key usage count in database
+                await self._update_api_key_usage(adapter, True)
+
                 return response
             finally:
                 # Release adapter back to pool
@@ -398,6 +413,19 @@ class LoadBalancingStrategyManager:
             # Update failure metrics
             response_time = time.time() - start_time
             await self._update_provider_metrics(provider.name, response_time, False)
+
+            # Update API key usage count in database (even for failed requests)
+            try:
+                from .adapter_pool import adapter_pool
+
+                adapter = await adapter_pool.get_adapter(request.model, provider.name)
+                if adapter:
+                    await self._update_api_key_usage(adapter, False)
+            except Exception as update_error:
+                logger.warning(
+                    f"Failed to update API key usage for failed request: {update_error}"
+                )
+
             raise
         finally:
             # Decrease connection count
@@ -415,7 +443,9 @@ class LoadBalancingStrategyManager:
             # Get adapter from adapter pool
             adapter = await adapter_pool.get_adapter(model_name, provider_name)
             if adapter:
-                logger.info(f"🔄 Get adapter from adapter pool: {model_name}:{provider_name}")
+                logger.info(
+                    f"🔄 Get adapter from adapter pool: {model_name}:{provider_name}"
+                )
                 return adapter
             else:
                 logger.info(
@@ -426,6 +456,27 @@ class LoadBalancingStrategyManager:
         except Exception as e:
             logger.info(f"Get provider adapter failed: {e}")
             return None
+
+    async def _update_api_key_usage(self, adapter, success: bool):
+        """Update API key usage count in database"""
+        try:
+            # Get API key ID from adapter
+            api_key_id = getattr(adapter, "api_key_id", None)
+            if not api_key_id:
+                # Try to get from model_config
+                api_key_id = adapter.model_config.get("api_key_id")
+
+            if api_key_id:
+                # Update usage count in database
+                from .database_service import db_service
+
+                db_service.update_api_key_usage(api_key_id, increment=True)
+                logger.info(f"Updated API key usage count for key {api_key_id}")
+            else:
+                logger.warning("Cannot find API key ID for usage tracking")
+
+        except Exception as e:
+            logger.error(f"Failed to update API key usage count: {e}")
 
     async def _update_provider_metrics(
         self, provider_name: str, response_time: float, success: bool

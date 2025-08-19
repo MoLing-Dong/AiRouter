@@ -42,7 +42,12 @@ def create_adapter(provider_name: str, config: dict):
         weight=config.get("weight", 1),
     )
 
-    return _adapter_factory.create_adapter(provider_config, config.get("model"))
+    # Pass the full config to the adapter factory so it can access api_key_id
+    adapter = _adapter_factory.create_adapter(
+        provider_config, config.get("model"), config
+    )
+
+    return adapter
 
 
 # Export all necessary classes

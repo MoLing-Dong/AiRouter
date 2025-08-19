@@ -42,7 +42,6 @@ class LLMProviderApiKeyCreate(BaseModel):
     provider_id: int
     name: Optional[str] = None
     api_key: str
-    base_url: Optional[str] = None
     is_enabled: bool = True
     is_preferred: bool = False
     weight: int = 10
@@ -53,7 +52,6 @@ class LLMProviderApiKeyCreate(BaseModel):
 class LLMProviderApiKeyUpdate(BaseModel):
     name: Optional[str] = None
     api_key: Optional[str] = None
-    base_url: Optional[str] = None
     is_enabled: Optional[bool] = None
     is_preferred: Optional[bool] = None
     weight: Optional[int] = None

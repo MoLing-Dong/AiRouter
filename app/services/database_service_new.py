@@ -273,10 +273,6 @@ class DatabaseService:
         """Reset daily usage count for all API keys of a provider"""
         return self.api_key_service.reset_daily_usage(provider_id)
 
-    def get_api_keys_by_endpoint(self, base_url):
-        """Get API keys by base URL"""
-        return self.api_key_service.get_api_keys_by_endpoint(base_url)
-
     def rotate_api_key(self, api_key_id, new_api_key):
         """Rotate API key"""
         return self.api_key_service.rotate_api_key(api_key_id, new_api_key)

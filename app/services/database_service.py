@@ -1420,19 +1420,23 @@ class DatabaseService:
             session.refresh(api_key)
             return api_key
 
-    def update_api_key_usage(self, apikey_id: int, usage_count: int = None) -> bool:
+    def update_api_key_usage(
+        self, api_key_id: int, increment: bool = True, usage_count: int = None
+    ) -> bool:
         """Update API key usage count"""
         with self.get_session() as session:
             api_key = (
                 session.query(LLMProviderApiKey)
-                .filter(LLMProviderApiKey.id == apikey_id)
+                .filter(LLMProviderApiKey.id == api_key_id)
                 .first()
             )
             if api_key:
                 if usage_count is not None:
                     api_key.usage_count = usage_count
-                else:
+                elif increment:
                     api_key.usage_count += 1
+                else:
+                    api_key.usage_count = max(0, api_key.usage_count - 1)
                 session.commit()
                 return True
             return False

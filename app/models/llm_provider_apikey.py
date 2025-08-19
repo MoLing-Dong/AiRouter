@@ -29,7 +29,6 @@ class LLMProviderApiKey(Base):
     )
     name = Column(String(100))
     api_key = Column(Text, nullable=False)
-    base_url = Column(String(255))
     is_enabled = Column(Boolean, default=True)
     is_preferred = Column(Boolean, default=False)
     weight = Column(Integer, default=10)

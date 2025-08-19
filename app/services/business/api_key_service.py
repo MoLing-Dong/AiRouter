@@ -132,10 +132,6 @@ class ApiKeyService:
         """Reset daily usage count for all API keys of a provider"""
         return self.api_key_repo.reset_daily_usage(provider_id)
 
-    def get_api_keys_by_endpoint(self, base_url: str) -> List[LLMProviderApiKey]:
-        """Get API keys by base URL"""
-        return self.api_key_repo.get_api_keys_by_endpoint(base_url)
-
     def rotate_api_key(self, api_key_id: int, new_api_key: str) -> bool:
         """Rotate API key (update the actual key value)"""
 

@@ -16,7 +16,10 @@ class AdapterFactory:
     """Adapter factory - responsible for creating different types of adapters"""
 
     def create_adapter(
-        self, provider_config: ModelProvider, model_name: str = None
+        self,
+        provider_config: ModelProvider,
+        model_name: str = None,
+        full_config: dict = None,
     ) -> Optional[BaseAdapter]:
         """Create adapter based on provider configuration"""
         try:
@@ -35,6 +38,10 @@ class AdapterFactory:
                 "retry_count": provider_config.retry_count,
                 "weight": provider_config.weight,
             }
+
+            # Merge with full config if provided (includes api_key_id and other fields)
+            if full_config:
+                adapter_config.update(full_config)
 
             logger.info(
                 f"🔧 Creating adapter: {provider_config.name} -> model: {adapter_config['model']}"
@@ -58,14 +65,18 @@ class AdapterFactory:
                 return AliQwenAdapter(adapter_config, provider_config.api_key)
             elif provider_name_lower == "google":
                 # TODO: Implement Google adapter
-                logger.info(f"Warning: Google adapter not implemented: {provider_config.name}")
+                logger.info(
+                    f"Warning: Google adapter not implemented: {provider_config.name}"
+                )
                 return None
             elif provider_name_lower == "private-server":
                 # Private server adapter
                 return OpenAIAdapter(adapter_config, provider_config.api_key)
             else:
                 # Use OpenAI adapter as default (compatible with third-party OpenAI API)
-                logger.info(f"Using OpenAI adapter as default adapter: {provider_config.name}")
+                logger.info(
+                    f"Using OpenAI adapter as default adapter: {provider_config.name}"
+                )
                 return OpenAIAdapter(adapter_config, provider_config.api_key)
 
         except Exception as e:
