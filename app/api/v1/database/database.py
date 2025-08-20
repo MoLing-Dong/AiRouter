@@ -39,6 +39,79 @@ async def get_db_models():
         )
 
 
+@db_router.get("/capabilities")
+async def get_capabilities():
+    """Get all capabilities"""
+    try:
+        from app.models.capability import Capability
+
+        session = db_service.get_session()
+        capabilities = session.query(Capability).all()
+
+        result = []
+        for cap in capabilities:
+            result.append(
+                {
+                    "capability_id": cap.capability_id,
+                    "capability_name": cap.capability_name,
+                    "description": cap.description,
+                }
+            )
+
+        session.close()
+        return result
+    except Exception as e:
+        logger.error(f"Get capabilities failed: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Get capabilities failed: {str(e)}"
+        )
+
+
+@db_router.post("/capabilities")
+async def create_capability(capability_name: str, description: str = None):
+    """Create a new capability"""
+    try:
+        from app.models.capability import Capability
+
+        session = db_service.get_session()
+
+        # Check if capability already exists
+        existing = (
+            session.query(Capability)
+            .filter_by(capability_name=capability_name.upper())
+            .first()
+        )
+        if existing:
+            session.close()
+            raise HTTPException(
+                status_code=400, detail=f"Capability already exists: {capability_name}"
+            )
+
+        # Create new capability
+        capability = Capability(
+            capability_name=capability_name.upper(), description=description
+        )
+        session.add(capability)
+        session.commit()
+
+        result = {
+            "message": "Capability created successfully",
+            "capability_id": capability.capability_id,
+            "capability_name": capability.capability_name,
+            "description": capability.description,
+        }
+
+        session.close()
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Create capability failed: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Create capability failed: {str(e)}"
+        )
+
+
 @db_router.post("/models")
 async def create_db_model(model_data: LLMModelCreate):
     """Create model with optional provider association"""
@@ -73,6 +146,33 @@ async def create_db_model(model_data: LLMModelCreate):
                     }
             except Exception as e:
                 logger.warning(f"Failed to get provider info for response: {e}")
+
+        # If capabilities associations were created, add capabilities info to response
+        if model_data.capability_ids:
+            try:
+                from app.models.capability import Capability
+
+                session = db_service.get_session()
+                capabilities = []
+                for cap_id in model_data.capability_ids:
+                    capability = (
+                        session.query(Capability)
+                        .filter_by(capability_id=cap_id)
+                        .first()
+                    )
+                    if capability:
+                        capabilities.append(
+                            {
+                                "capability_id": capability.capability_id,
+                                "capability_name": capability.capability_name,
+                                "description": capability.description,
+                            }
+                        )
+                session.close()
+                if capabilities:
+                    response["capabilities"] = capabilities
+            except Exception as e:
+                logger.warning(f"Failed to get capabilities info for response: {e}")
 
         return response
     except HTTPException:

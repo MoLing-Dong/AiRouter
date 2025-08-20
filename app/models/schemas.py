@@ -11,6 +11,8 @@ class LLMModelCreate(BaseModel):
     provider_id: Optional[int] = None
     provider_weight: Optional[int] = 10
     is_provider_preferred: Optional[bool] = False
+    # Optional capabilities association fields
+    capability_ids: Optional[List[int]] = None
 
 
 class LLMModelUpdate(BaseModel):

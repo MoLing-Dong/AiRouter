@@ -81,13 +81,16 @@ class DatabaseService:
             return query.first()
 
     def create_model(self, model_data: LLMModelCreate) -> LLMModel:
-        """Create model with optional provider association"""
+        """Create model with optional provider and capabilities association"""
 
-        def _create_model_operation(session: Session) -> LLMModel:
+        def _create_model_operation(session: Session):
             # Extract provider association data
             provider_id = getattr(model_data, "provider_id", None)
             provider_weight = getattr(model_data, "provider_weight", 10)
             is_provider_preferred = getattr(model_data, "is_provider_preferred", False)
+
+            # Extract capabilities association data
+            capability_ids = getattr(model_data, "capability_ids", None)
 
             # Validate provider if specified
             if provider_id:
@@ -96,11 +99,25 @@ class DatabaseService:
                 )
                 self.tx_manager.validate_entity_enabled(provider, "Provider")
 
-            # Create model (excluding provider fields)
+            # Validate capabilities if specified
+            if capability_ids:
+                from ..models.capability import Capability
+
+                for cap_id in capability_ids:
+                    capability = (
+                        session.query(Capability)
+                        .filter_by(capability_id=cap_id)
+                        .first()
+                    )
+                    if not capability:
+                        raise ValueError(f"Capability not found: ID {cap_id}")
+
+            # Create model (excluding provider and capability fields)
             model_dict = model_data.dict()
             model_dict.pop("provider_id", None)
             model_dict.pop("provider_weight", None)
             model_dict.pop("is_provider_preferred", None)
+            model_dict.pop("capability_ids", None)
 
             # Check if model name already exists
             self.tx_manager.check_unique_constraint(
@@ -140,8 +157,31 @@ class DatabaseService:
                 )
                 session.add(model_provider)
 
+            # Create model-capability associations if capability_ids are provided
+            if capability_ids:
+                from ..models.llm_model_capability import LLMModelCapability
+
+                for cap_id in capability_ids:
+                    # Check if association already exists
+                    existing = (
+                        session.query(LLMModelCapability)
+                        .filter_by(model_id=model.id, capability_id=cap_id)
+                        .first()
+                    )
+
+                    if not existing:
+                        # Create model-capability association
+                        model_capability = LLMModelCapability(
+                            model_id=model.id, capability_id=cap_id
+                        )
+                        session.add(model_capability)
+
             # Refresh model to get all attributes
             session.refresh(model)
+
+            # Expunge the model from session so it can be used after session closes
+            session.expunge(model)
+
             return model
 
         # Execute in transaction with retry mechanism
@@ -163,7 +203,7 @@ class DatabaseService:
                     f"✅ Successfully created model '{model.name}' (ID: {model.id}){provider_info}"
                 )
                 logger.debug(
-                    f"   📍 Model details: name='{model.name}', type='{model.llm_type}', enabled={model.is_enabled}"
+                    f"   📍 Model details: name='{model.name}', type='{model.llm_type.value if hasattr(model.llm_type, 'value') else model.llm_type}', enabled={model.is_enabled}"
                 )
                 logger.debug(
                     f"   🔗 Provider association: provider_id={getattr(model_data, 'provider_id')}, weight={getattr(model_data, 'provider_weight', 10)}, preferred={getattr(model_data, 'is_provider_preferred', False)}"
@@ -173,7 +213,7 @@ class DatabaseService:
                     f"✅ Successfully created model '{model.name}' (ID: {model.id}) without provider association"
                 )
                 logger.debug(
-                    f"   📍 Model details: name='{model.name}', type='{model.llm_type}', enabled={model.is_enabled}"
+                    f"   📍 Model details: name='{model.name}', type='{model.llm_type.value if hasattr(model.llm_type, 'value') else model.llm_type}', enabled={model.is_enabled}"
                 )
 
             return model

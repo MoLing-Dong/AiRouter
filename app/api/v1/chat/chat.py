@@ -1,3 +1,4 @@
+import asyncio
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 from typing import Optional, List, Dict, Any
@@ -11,6 +12,8 @@ from app.utils.logging_config import get_chat_logger
 # Get logger
 logger = get_chat_logger()
 
+# Global lock for configuration reloading
+_config_reload_lock = asyncio.Lock()
 
 chat_router = APIRouter(prefix="/v1", tags=["Chat"])
 
@@ -42,7 +45,9 @@ class ChatCompletionResponse(BaseModel):
     created: int
     model: str
     choices: List[Dict[str, Any]]
-    usage: Optional[Dict[str, Any]] = None  # Change to Any to compatible with different usage formats,
+    usage: Optional[Dict[str, Any]] = (
+        None  # Change to Any to compatible with different usage formats,
+    )
     system_fingerprint: Optional[str] = None
 
 
@@ -68,11 +73,46 @@ async def chat_completions(request: ChatCompletionRequest):
             capabilities=["TEXT", "MULTIMODAL_IMAGE_UNDERSTANDING"]
         )
 
+        # If model is not available, try to reload configuration from database
         if request.model not in available_models:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Model '{request.model}' is not available. Available models: {available_models}",
+            logger.warning(
+                f"Model '{request.model}' not found in available models: {available_models}"
             )
+            logger.info("Attempting to reload model configurations from database...")
+
+            # Use lock to prevent multiple simultaneous reloads
+            async with _config_reload_lock:
+                try:
+                    # Check again while holding the lock (in case another request already reloaded)
+                    available_models = adapter_manager.get_available_models(
+                        capabilities=["TEXT", "MULTIMODAL_IMAGE_UNDERSTANDING"]
+                    )
+
+                    if request.model not in available_models:
+                        # Reload configurations from database
+                        adapter_manager.load_models_from_database()
+
+                        # Check again after reload
+                        available_models = adapter_manager.get_available_models(
+                            capabilities=["TEXT", "MULTIMODAL_IMAGE_UNDERSTANDING"]
+                        )
+                        logger.info(
+                            f"After reload, available models: {available_models}"
+                        )
+
+                        if request.model not in available_models:
+                            raise HTTPException(
+                                status_code=400,
+                                detail=f"Model '{request.model}' is not available. Available models: {available_models}",
+                            )
+                except Exception as reload_error:
+                    logger.error(
+                        f"Failed to reload model configurations: {reload_error}"
+                    )
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Model '{request.model}' is not available. Available models: {available_models}",
+                    )
 
         # Convert message format
         messages = []
@@ -151,7 +191,9 @@ async def stream_chat_completion(request: ChatRequest):
         try:
             # Check if adapter supports stream response
             if hasattr(adapter, "stream_chat_completion"):
-                logger.info(f"Start stream response, adapter type: {type(adapter).__name__}")
+                logger.info(
+                    f"Start stream response, adapter type: {type(adapter).__name__}"
+                )
                 async for chunk in adapter.stream_chat_completion(request):
                     # Return native stream response
                     yield chunk
@@ -197,4 +239,6 @@ async def create_embeddings(request: Dict[str, Any]):
             },
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Create embedding failed: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Create embedding failed: {str(e)}"
+        )
