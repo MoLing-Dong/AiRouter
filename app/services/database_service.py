@@ -299,37 +299,58 @@ class DatabaseService:
             logger.warning(f"Failed to get batch capabilities: {e}")
             return {}
 
+    def get_all_models_params_batch(
+        self, model_ids: List[int]
+    ) -> Dict[int, List[Dict[str, Any]]]:
+        """Get parameters for multiple models in batch (performance optimization)"""
+        try:
+            with self.get_session() as session:
+                # 批量查询所有模型的parameters - 使用单次查询
+                from ..models.llm_model_param import LLMModelParam
+
+                # 单次查询，避免N+1问题
+                params = (
+                    session.query(
+                        LLMModelParam.llm_id,
+                        LLMModelParam.param_key,
+                        LLMModelParam.param_value,
+                        LLMModelParam.is_enabled,
+                    )
+                    .filter(
+                        LLMModelParam.llm_id.in_(model_ids),
+                    )
+                    .all()
+                )
+
+                # 按模型ID分组
+                result = {}
+                for param in params:
+                    if param.llm_id not in result:
+                        result[param.llm_id] = []
+                    result[param.llm_id].append(
+                        {
+                            "key": param.param_key,
+                            "value": param.param_value,
+                            "enabled": param.is_enabled,
+                        }
+                    )
+
+                return result
+        except Exception as e:
+            logger.warning(f"Failed to get batch parameters: {e}")
+            return {}
+
     def get_all_models_providers_batch(
         self, model_ids: List[int]
     ) -> Dict[int, List[Dict[str, Any]]]:
         """Get providers for multiple models in batch (performance optimization)"""
         try:
             with self.get_session() as session:
-                # 批量查询所有模型的providers
+                # 批量查询所有模型的providers - 使用单次JOIN查询
                 from ..models.llm_model_provider import LLMModelProvider
                 from ..models.llm_provider import LLMProvider
 
-                logger.info(f"🔍 批量查询providers，模型ID: {model_ids}")
-
-                # 首先检查LLMModelProvider表中是否有数据
-                provider_count = session.query(LLMModelProvider).count()
-                logger.info(f"📊 LLMModelProvider表中共有 {provider_count} 条记录")
-
-                # 检查LLMProvider表中是否有数据
-                provider_type_count = session.query(LLMProvider).count()
-                logger.info(f"📊 LLMProvider表中共有 {provider_type_count} 条记录")
-
-                # 检查特定模型的providers
-                for model_id in model_ids:
-                    model_providers = (
-                        session.query(LLMModelProvider)
-                        .filter(LLMModelProvider.llm_id == model_id)
-                        .all()
-                    )
-                    logger.info(
-                        f"📊 模型ID {model_id} 有 {len(model_providers)} 个providers"
-                    )
-
+                # 单次JOIN查询，避免N+1问题
                 providers = (
                     session.query(
                         LLMModelProvider.llm_id,
@@ -350,8 +371,6 @@ class DatabaseService:
                     .filter(LLMModelProvider.llm_id.in_(model_ids))
                     .all()
                 )
-
-                logger.info(f"🔍 JOIN查询结果: {len(providers)} 条记录")
 
                 # 按模型ID分组
                 result = {}
@@ -375,10 +394,67 @@ class DatabaseService:
                         }
                     )
 
-                logger.info(f"✅ 最终结果: {len(result)} 个模型有providers")
                 return result
         except Exception as e:
-            logger.info(f"Failed to get batch providers: {e}")
+            logger.warning(f"Failed to get batch providers: {e}")
+            return {}
+
+    def get_all_models_providers_batch_optimized(
+        self, model_ids: List[int]
+    ) -> Dict[int, List[Dict[str, Any]]]:
+        """Get providers for multiple models in batch using optimized SQL (best performance)"""
+        try:
+            with self.get_session() as session:
+                from sqlalchemy import text
+                
+                # 使用原生SQL查询，避免ORM开销
+                sql = text("""
+                    SELECT 
+                        mp.llm_id,
+                        mp.provider_id,
+                        mp.weight,
+                        mp.priority,
+                        mp.health_status,
+                        mp.is_enabled,
+                        mp.is_preferred,
+                        mp.cost_per_1k_tokens,
+                        mp.overall_score,
+                        p.name,
+                        p.provider_type,
+                        p.official_endpoint,
+                        p.third_party_endpoint
+                    FROM llm_model_providers mp
+                    JOIN llm_providers p ON mp.provider_id = p.id
+                    WHERE mp.llm_id = ANY(:model_ids)
+                    ORDER BY mp.llm_id, mp.priority DESC, mp.weight DESC
+                """)
+                
+                result = session.execute(sql, {"model_ids": model_ids})
+                
+                # 按模型ID分组
+                providers_by_model = {}
+                for row in result:
+                    if row.llm_id not in providers_by_model:
+                        providers_by_model[row.llm_id] = []
+                    
+                    providers_by_model[row.llm_id].append({
+                        "provider_id": row.provider_id,
+                        "name": row.name,
+                        "provider_type": row.provider_type,
+                        "base_url": row.official_endpoint or row.third_party_endpoint,
+                        "weight": row.weight,
+                        "priority": row.priority,
+                        "health_status": row.health_status,
+                        "is_enabled": row.is_enabled,
+                        "is_preferred": row.is_preferred,
+                        "cost_per_1k_tokens": row.cost_per_1k_tokens,
+                        "overall_score": row.overall_score,
+                    })
+                
+                return providers_by_model
+                
+        except Exception as e:
+            logger.warning(f"Failed to get optimized batch providers: {e}")
             return {}
 
     def get_model_capabilities(self, model_id: int) -> List[Dict[str, Any]]:

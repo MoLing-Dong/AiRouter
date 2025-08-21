@@ -75,62 +75,43 @@ async def get_all_capabilities():
 
 @models_router.get("/all/details")
 async def get_all_models_details():
-    """Get all models' detailed information from database"""
+    """Get all models' detailed information from database (optimized version)"""
     try:
-        all_models_details = []
-
-        # Get all models from database, not just available models
         from app.services.database_service import db_service
-
-        # Get all models (including disabled ones)
+        
+        # 使用批量查询优化性能
         all_models = db_service.get_all_models(is_enabled=None)
-
+        if not all_models:
+            return {
+                "object": "list",
+                "data": [],
+                "total_models": 0,
+                "timestamp": time.time(),
+            }
+        
+        # 批量获取所有模型的providers（使用优化版本）
+        model_ids = [model.id for model in all_models]
+        providers_by_model = db_service.get_all_models_providers_batch_optimized(model_ids)
+        
+        # 批量获取所有模型的capabilities
+        capabilities_by_model = db_service.get_all_models_capabilities_batch(model_ids)
+        
+        # 批量获取所有模型的parameters
+        params_by_model = db_service.get_all_models_params_batch(model_ids)
+        
+        all_models_details = []
+        
         for model in all_models:
             try:
-                # Get all provider associations for the model (including disabled ones)
-                model_providers = db_service.get_model_providers(
-                    model.id, is_enabled=None
-                )
-
-                # Build provider information
-                providers = []
-                for mp in model_providers:
-                    # Get provider information (including disabled ones)
-                    provider = db_service.get_provider_by_id(
-                        mp.provider_id, is_enabled=None
-                    )
-                    if not provider:
-                        continue
-
-                    provider_info = {
-                        "id": provider.id,
-                        "name": provider.name,
-                        "provider_type": provider.provider_type,
-                        "base_url": provider.official_endpoint
-                        or provider.third_party_endpoint,
-                        "weight": mp.weight,
-                        "priority": mp.priority,
-                        "health_status": mp.health_status,
-                        "is_enabled": mp.is_enabled,
-                        "is_preferred": mp.is_preferred,
-                        "cost_per_1k_tokens": mp.cost_per_1k_tokens,
-                        "overall_score": mp.overall_score,
-                    }
-
-                    # Add metrics information (if available)
-                    if hasattr(mp, "response_time_avg"):
-                        provider_info["response_time_avg"] = mp.response_time_avg
-                    if hasattr(mp, "success_rate"):
-                        provider_info["success_rate"] = mp.success_rate
-
-                    providers.append(provider_info)
-
-                # Calculate overall health status
+                # 获取该模型的providers（从批量查询结果中）
+                model_providers = providers_by_model.get(model.id, [])
+                
+                # 计算整体健康状态
                 healthy_count = sum(
-                    1 for p in providers if p.get("health_status") == "healthy"
+                    1 for p in model_providers if p.get("health_status") == "healthy"
                 )
-                total_count = len(providers)
-
+                total_count = len(model_providers)
+                
                 overall_status = (
                     "healthy" if healthy_count == total_count else "degraded"
                 )
@@ -138,8 +119,8 @@ async def get_all_models_details():
                     overall_status = "unhealthy"
                 if total_count == 0:
                     overall_status = "no_providers"
-
-                # Build model detailed information
+                
+                # 构建模型详细信息
                 model_detail = {
                     "id": model.id,
                     "model_name": model.name,
@@ -147,8 +128,8 @@ async def get_all_models_details():
                     "description": model.description,
                     "enabled": model.is_enabled,
                     "overall_health": overall_status,
-                    "providers": providers,
-                    "providers_count": len(providers),
+                    "providers": model_providers,
+                    "providers_count": total_count,
                     "healthy_providers": healthy_count,
                     "created_at": (
                         model.created_at.timestamp()
@@ -161,53 +142,30 @@ async def get_all_models_details():
                         else time.time()
                     ),
                 }
-
-                # Get model parameters (if available)
-                try:
-                    model_params = db_service.get_model_params(
-                        model.id, is_enabled=None
-                    )
-                    if model_params:
-                        model_detail["parameters"] = [
-                            {
-                                "key": param.param_key,
-                                "value": param.param_value,
-                                "enabled": param.is_enabled,
-                            }
-                            for param in model_params
-                        ]
-                except Exception as e:
-                    logger.info(f"Error getting parameters for model {model.name}: {e}")
-
-                # Get model capabilities (if available)
-                try:
-                    model_capabilities = db_service.get_model_capabilities(model.id)
-                    if model_capabilities:
-                        model_detail["capabilities"] = [
-                            {
-                                "id": cap["capability_id"],
-                                "name": cap["capability_name"],
-                                "description": cap["description"],
-                            }
-                            for cap in model_capabilities
-                        ]
-                except Exception as e:
-                    logger.info(
-                        f"Error getting capabilities for model {model.name}: {e}"
-                    )
-
+                
+                # 添加模型参数（从批量查询结果中）
+                model_params = params_by_model.get(model.id, [])
+                if model_params:
+                    model_detail["parameters"] = model_params
+                
+                # 添加模型能力（从批量查询结果中）
+                model_capabilities = capabilities_by_model.get(model.id, [])
+                if model_capabilities:
+                    model_detail["capabilities"] = model_capabilities
+                
                 all_models_details.append(model_detail)
-
+                
             except Exception as e:
                 logger.info(f"Error processing model {model.name}: {e}")
                 continue
-
+        
         return {
             "object": "list",
             "data": all_models_details,
             "total_models": len(all_models_details),
             "timestamp": time.time(),
         }
+        
     except Exception as e:
         logger.info(f"Get all models' detailed information failed: {e}")
         traceback.print_exc()

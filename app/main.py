@@ -79,10 +79,16 @@ async def root():
 
 # If running this file directly
 if __name__ == "__main__":
+    # 避免双重启动，只在直接运行main.py时启动
+    # 正常情况下应该通过run.py启动
+    print("⚠️  警告: 请使用 run.py 启动应用，而不是直接运行 main.py")
+    print("💡 建议: python run.py")
+    
+    # 如果一定要直接运行，也禁用reload避免双进程
     uvicorn.run(
         "app.main:app",
         host=settings.HOST,
         port=settings.PORT,
-        reload=settings.DEBUG,
+        reload=False,  # 禁用reload避免双进程
         log_level=settings.LOG_LEVEL.lower(),
     )
