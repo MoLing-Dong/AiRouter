@@ -4,9 +4,6 @@ from app.utils.logging_config import get_factory_logger
 from app.models import (
     LLMModelCreate,
     LLMProviderCreate,
-    LLMModelProviderCreate,
-    LLMModelProviderUpdate,
-    LLMModelParamCreate,
 )
 
 # Get logger
@@ -114,7 +111,7 @@ async def create_capability(capability_name: str, description: str = None):
 
 @db_router.post("/models")
 async def create_db_model(model_data: LLMModelCreate):
-    """Create model with optional provider association"""
+    """Create model"""
     try:
         # Check if model already exists
         existing_model = db_service.get_model_by_name(model_data.name)
@@ -209,7 +206,7 @@ async def get_db_providers():
 
 @db_router.post("/providers")
 async def create_db_provider(provider_data: LLMProviderCreate):
-    """Create database provider"""
+    """Create provider"""
     try:
         # Check if provider already exists
         existing_provider = db_service.get_provider_by_name_and_type(
@@ -232,85 +229,3 @@ async def create_db_provider(provider_data: LLMProviderCreate):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Create provider failed: {str(e)}")
-
-
-@db_router.post("/model-providers")
-async def create_db_model_provider(model_provider_data: LLMModelProviderCreate):
-    """Create model-provider association"""
-    try:
-        # Check if model-provider association already exists
-        existing_mp = db_service.get_model_provider_by_ids(
-            model_provider_data.llm_id, model_provider_data.provider_id
-        )
-
-        if existing_mp:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Model-provider association already exists: model ID {model_provider_data.llm_id}, provider ID {model_provider_data.provider_id}",
-            )
-
-        model_provider = db_service.create_model_provider(model_provider_data)
-        return {
-            "message": "Model-provider association created successfully",
-            "id": model_provider.id,
-        }
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Create model-provider association failed: {str(e)}",
-        )
-
-
-# Update model-provider association
-@db_router.put("/model-providers/{model_provider_id}")
-async def update_db_model_provider(
-    model_provider_id: int, model_provider_data: LLMModelProviderUpdate
-):
-    """Update model-provider association"""
-    try:
-        model_provider = db_service.update_model_provider(
-            model_provider_id, model_provider_data
-        )
-        return {
-            "message": "Model-provider association updated successfully",
-            "id": model_provider.id,
-        }
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Update model-provider association failed: {str(e)}",
-        )
-
-
-@db_router.post("/model-params")
-async def create_db_model_param(param_data: LLMModelParamCreate):
-    """Create model parameter"""
-    try:
-        # Check if model parameter already exists
-        existing_param = db_service.get_model_param_by_key(
-            param_data.llm_id,
-            param_data.provider_id,
-            param_data.param_key,
-        )
-
-        if existing_param:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Model parameter already exists: model ID {param_data.llm_id}, parameter key {param_data.param_key}",
-            )
-
-        param = db_service.create_model_param(param_data)
-        return {
-            "message": "Model parameter created successfully",
-            "param_id": param.param_id,
-        }
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Create model parameter failed: {str(e)}"
-        )
