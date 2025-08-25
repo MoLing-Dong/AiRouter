@@ -7,6 +7,7 @@ from .database import db_router
 from .health import health_router
 from .providers import providers_router
 from .load_balancing import router as load_balancing_router
+from .anthropic import anthropic_router
 
 __all__ = [
     "chat_router", 
@@ -16,5 +17,6 @@ __all__ = [
     "db_router", 
     "health_router",
     "providers_router",
-    "load_balancing_router"
+    "load_balancing_router",
+    "anthropic_router"
 ]

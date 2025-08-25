@@ -6,7 +6,8 @@ from app.api.v1 import (
     stats_router, 
     db_router, 
     health_router,
-    providers_router
+    providers_router,
+    anthropic_router
 )
 from app.api.v1.load_balancing import router as load_balancing_router
 from app.api.v1.pool import pool_router
@@ -25,6 +26,7 @@ def register_routes(app):
     app.include_router(stats_router, tags=["Statistics"])
     app.include_router(db_router, tags=["Database Management"])
     app.include_router(health_router, tags=["Health Check"])
+    app.include_router(anthropic_router, tags=["Anthropic"])
     
     # Register provider management routes
     app.include_router(providers_router, tags=["Provider Management"])
