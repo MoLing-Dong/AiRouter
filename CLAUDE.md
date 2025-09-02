@@ -23,6 +23,18 @@ uv pip install -e .
 uv pip install -e ".[dev]"
 ```
 
+### Important Startup Notes
+
+```bash
+# Always use run.py for production (prevents double process issues)
+python run.py
+
+# The application uses a two-phase startup:
+# 1. run.py - Main entry point with lifespan management
+# 2. app/main.py - Application core (should not be run directly)
+# WARNING: Using "python app/main.py" directly causes double process issues
+```
+
 ### Running the Application
 
 ```bash
@@ -102,20 +114,42 @@ The project follows a layered architecture:
 
 ### Load Balancing Strategies
 
-- Round Robin
-- Weighted Round Robin
-- Performance Based
-- Cost Optimized
-- Fallback
-- Specified Provider
+The system implements 8 sophisticated load balancing strategies:
+
+1. **auto** - Automatically selects the best provider based on health, performance, and cost
+2. **specified_provider** - Routes to a specific provider as requested
+3. **fallback** - Tries preferred provider first, falls back to others
+4. **weighted_round_robin** - Distributes load based on configured weights
+5. **least_connections** - Selects provider with fewest active connections
+6. **response_time** - Prioritizes providers with fastest response times
+7. **cost_optimized** - Balances cost and performance metrics
+8. **hybrid** - Combines multiple factors for optimal selection
+
+Strategy configuration is stored in the database and applied per-model basis.
 
 ## Key Files and Patterns
 
 ### Entry Points
 
-- `run.py`: Production entry point (no reload)
-- `app/main.py`: Application lifecycle management
-- `app/core/app.py`: FastAPI app configuration
+- `run.py`: Production entry point (no reload, prevents double processes)
+- `app/main.py`: Application lifecycle management with lifespan events
+- `app/core/app.py`: FastAPI app configuration with CORS middleware
+
+### Smart Routing System
+
+The core routing logic is implemented in `app/services/router.py`:
+
+1. **SmartRouter class**: Handles intelligent provider selection
+2. **RouteRequest method**: Main routing logic with strategy execution
+3. **Health-aware routing**: Only routes to healthy providers
+4. **Performance tracking**: Monitors response times, success rates, and costs
+5. **Statistics management**: Tracks request counters and failure rates
+
+### Adapter Pool Management
+
+- `app/services/adapter_pool.py`: Manages adapter lifecycle and connection pooling
+- `app/core/adapters/`: Provider-specific implementations
+- Health checks are performed automatically on startup and at configured intervals
 
 ### Configuration
 
@@ -145,21 +179,32 @@ The project follows a layered architecture:
 ### Adapter Pattern
 
 - All providers inherit from `BaseAdapter` in `app/core/adapters/base.py`
-- Implement provider-specific logic in respective adapter files
-- Use adapter pool for connection management
+- Provider-specific implementations in `app/core/adapters/`
+- Adapter pool manages connection lifecycle and health monitoring
+- Health status is tracked in real-time and affects routing decisions
+
+### Model Availability Logic
+
+The `get_available_models` method in `app/services/adapter_manager.py` has been enhanced to:
+- Only return models with at least one healthy provider
+- Filter out models with all providers in unhealthy/degraded states
+- Ensure `available_models` endpoint only shows healthy models
+- Apply the same filtering to both `get_available_models` and `get_available_models_fast`
 
 ### Error Handling
 
-- Use HTTPException for API errors
-- Implement proper logging with structured format
-- Handle provider failures gracefully with fallback strategies
+- Use HTTPException for API errors with proper status codes
+- Structured logging with performance metrics
+- Graceful fallback strategies when providers fail
+- Health status affects provider selection automatically
 
 ### Performance Considerations
 
-- Preload models cache on startup
-- Use connection pooling for database operations
-- Implement health checks for all providers
-- Monitor response times and success rates
+- Models cache preloaded on startup for faster first request
+- Connection pooling for database operations with configurable pool sizes
+- Automatic health checks with configurable intervals
+- Performance metrics tracking: response times, success rates, costs
+- Available models are filtered by health status to prevent routing to unhealthy providers
 
 ## Testing Strategy
 
@@ -211,3 +256,20 @@ The project follows a layered architecture:
 - API keys are stored in database, not configuration files
 - Use the management API to add providers and models
 - Health checks run automatically for all providers
+- Load balancing strategies are configurable per-model in the database
+
+### Environment Configuration
+
+Key environment variables in `.env`:
+- `LOAD_BALANCING_STRATEGY=auto` - Global default strategy
+- `LOAD_BALANCING_HEALTH_CHECK_INTERVAL=30` - Health check frequency
+- `LOAD_BALANCING_MAX_RETRIES=3` - Maximum retry attempts
+- `DATABASE_URL` - PostgreSQL connection string
+- `DEBUG` - Enable/disable debug mode (affects logging and error details)
+
+### Database Schema Relationships
+
+- Models can have multiple providers (one-to-many relationship)
+- Providers can have multiple API keys (for rotation/backup)
+- Model-provider associations include weights, priorities, and strategy configs
+- Health status and performance metrics are tracked automatically and updated in real-time

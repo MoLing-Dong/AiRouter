@@ -256,32 +256,48 @@ class ModelAdapterManager:
                         "MULTIMODAL_IMAGE_UNDERSTANDING", "TEXT_TO_IMAGE", "IMAGE_TO_IMAGE"
                         If None, ignores capability filtering
         """
+        # Get all models that pass the type and capability filters
         if not model_types and not capabilities:
-            return list(self.model_configs.keys())
+            candidate_models = list(self.model_configs.keys())
+        else:
+            candidate_models = []
+            for model_name, config in self.model_configs.items():
+                # Check model type filter
+                if model_types and config.model_type not in model_types:
+                    continue
 
-        filtered_models = []
+                # Check capability filter
+                if capabilities:
+                    model_capabilities = self._get_model_capabilities(model_name)
+                    if not model_capabilities:
+                        continue
 
-        for model_name, config in self.model_configs.items():
-            # Check model type filter
-            if model_types and config.model_type not in model_types:
+                    # Check if model has any of the required capabilities
+                    model_capability_names = [
+                        cap["capability_name"] for cap in model_capabilities
+                    ]
+                    if not any(cap in model_capability_names for cap in capabilities):
+                        continue
+
+                candidate_models.append(model_name)
+
+        # Filter models to only include those with at least one healthy provider
+        available_models = []
+        for model_name in candidate_models:
+            adapters = self.get_model_adapters(model_name)
+            if not adapters:
                 continue
+                
+            # Check if model has at least one healthy adapter
+            has_healthy_adapter = any(
+                adapter.health_status == HealthStatus.HEALTHY 
+                for adapter in adapters
+            )
+            
+            if has_healthy_adapter:
+                available_models.append(model_name)
 
-            # Check capability filter
-            if capabilities:
-                model_capabilities = self._get_model_capabilities(model_name)
-                if not model_capabilities:
-                    continue
-
-                # Check if model has any of the required capabilities
-                model_capability_names = [
-                    cap["capability_name"] for cap in model_capabilities
-                ]
-                if not any(cap in model_capability_names for cap in capabilities):
-                    continue
-
-            filtered_models.append(model_name)
-
-        return filtered_models
+        return available_models
 
     def get_available_models_fast(self, skip_version_check: bool = True) -> List[str]:
         """Get available models quickly without version checking (performance optimization)
@@ -290,8 +306,23 @@ class ModelAdapterManager:
             skip_version_check: Whether to skip version checking for performance
         """
         if skip_version_check:
-            # 直接返回缓存的模型列表，不进行版本检查
-            return list(self.model_configs.keys())
+            # 快速获取可用模型，包含健康状态检查但不包含版本检查
+            available_models = []
+            for model_name in self.model_configs.keys():
+                adapters = self.get_model_adapters(model_name)
+                if not adapters:
+                    continue
+                    
+                # Check if model has at least one healthy adapter
+                has_healthy_adapter = any(
+                    adapter.health_status == HealthStatus.HEALTHY 
+                    for adapter in adapters
+                )
+                
+                if has_healthy_adapter:
+                    available_models.append(model_name)
+
+            return available_models
         else:
             # 使用原有的方法，包含版本检查
             return self.get_available_models()
