@@ -31,6 +31,58 @@ class OpenAIAdapter(BaseAdapter):
             formatted_messages.append(formatted_msg)
         return formatted_messages
 
+    def _set_max_tokens_param(
+        self, payload: Dict[str, Any], request: ChatRequest
+    ) -> None:
+        """Set correct max tokens parameter depending on model.
+
+        For newer models (e.g., gpt-5), OpenAI expects `max_completion_tokens`.
+        For older chat completions, it remains `max_tokens`.
+        Toggle can also be forced via model_config["use_max_completion_tokens"].
+        """
+        max_tokens_value = request.max_tokens or self.model_config.get(
+            "max_tokens", 4096
+        )
+
+        use_new_param = bool(
+            self.model_config.get("use_max_completion_tokens")
+            or ("gpt-5" in self.model_name.lower())
+        )
+
+        if use_new_param:
+            payload.pop("max_tokens", None)
+            payload["max_completion_tokens"] = max_tokens_value
+        else:
+            payload.pop("max_completion_tokens", None)
+            payload["max_tokens"] = max_tokens_value
+
+    def _set_sampling_params(
+        self, payload: Dict[str, Any], request: ChatRequest
+    ) -> None:
+        """Set sampling-related parameters depending on model support.
+
+        Some newer models (e.g., gpt-5, gpt-5-mini) may not support custom temperature.
+        This can be overridden via model_config["supports_temperature"].
+        """
+        model_lower = self.model_name.lower()
+        supports_temperature_cfg = self.model_config.get("supports_temperature")
+
+        if supports_temperature_cfg is not None:
+            supports_temperature = bool(supports_temperature_cfg)
+        else:
+            # Heuristic: treat gpt-5 family as not supporting custom temperature
+            supports_temperature = not ("gpt-5" in model_lower)
+
+        # Remove any pre-existing sampling params to avoid conflicts
+        for key in ("temperature", "top_p", "frequency_penalty", "presence_penalty"):
+            payload.pop(key, None)
+
+        if supports_temperature:
+            payload["temperature"] = request.temperature
+            payload["top_p"] = request.top_p
+            payload["frequency_penalty"] = request.frequency_penalty
+            payload["presence_penalty"] = request.presence_penalty
+
     async def chat_completion(self, request: ChatRequest) -> ChatResponse:
         """Execute OpenAI chat completion request"""
         start_time = time.time()
@@ -40,14 +92,13 @@ class OpenAIAdapter(BaseAdapter):
             payload = {
                 "model": self.model_name,
                 "messages": self.format_messages(request.messages),
-                "temperature": request.temperature,
-                "max_tokens": request.max_tokens
-                or self.model_config.get("max_tokens", 4096),
-                "top_p": request.top_p,
-                "frequency_penalty": request.frequency_penalty,
-                "presence_penalty": request.presence_penalty,
                 "stream": request.stream,
             }
+
+            # Set correct token limit param
+            self._set_max_tokens_param(payload, request)
+            # Set sampling params depending on model support
+            self._set_sampling_params(payload, request)
 
             # Add tool configuration
             if request.tools:
@@ -115,14 +166,13 @@ class OpenAIAdapter(BaseAdapter):
             payload = {
                 "model": self.model_name,
                 "messages": self.format_messages(request.messages),
-                "temperature": request.temperature,
-                "max_tokens": request.max_tokens
-                or self.model_config.get("max_tokens", 4096),
-                "top_p": request.top_p,
-                "frequency_penalty": request.frequency_penalty,
-                "presence_penalty": request.presence_penalty,
                 "stream": True,  # Force enable streaming
             }
+
+            # Set correct token limit param
+            self._set_max_tokens_param(payload, request)
+            # Set sampling params depending on model support
+            self._set_sampling_params(payload, request)
 
             # Add tool configuration
             if request.tools:
