@@ -5,6 +5,8 @@ from app.core.app import app
 from app.services import adapter_manager
 from app.core.routes import register_routes
 from app.utils.logging_config import init_logging, get_app_logger
+from sqlalchemy import text
+from app.services.database_service import db_service
 
 # Initialize logging system
 init_logging()
@@ -26,6 +28,15 @@ async def lifespan(app):
     from app.core.performance import performance_config
 
     performance_config.log_performance_settings()
+
+    # Database connectivity check (fail-fast)
+    try:
+        with db_service.get_session() as _session:
+            _session.execute(text("SELECT 1"))
+        logger.info("✅ Database connectivity check passed")
+    except Exception as e:
+        logger.error(f"❌ Database connectivity check failed: {e}")
+        raise
 
     # Start adapter pool
     logger.info("🔄 Starting adapter pool...")
@@ -52,6 +63,11 @@ async def lifespan(app):
     logger.info("🛑 Shutting down application...")
     await adapter_pool.stop()
     await adapter_manager.close_all()
+    # Dispose DB connections
+    try:
+        db_service.close()
+    except Exception:
+        pass
 
 
 # Set lifespan event handler
@@ -83,7 +99,7 @@ if __name__ == "__main__":
     # 正常情况下应该通过run.py启动
     print("⚠️  警告: 请使用 run.py 启动应用，而不是直接运行 main.py")
     print("💡 建议: python run.py")
-    
+
     # 如果一定要直接运行，也禁用reload避免双进程
     uvicorn.run(
         "app.main:app",

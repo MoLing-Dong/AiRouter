@@ -8,14 +8,28 @@ from config.settings import settings
 
 
 if __name__ == "__main__":
-    # 建议设置为 CPU 核心数（生产环境），开发环境可设为 1
-    workers = settings.WORKERS if hasattr(settings, "WORKERS") else os.cpu_count()
+    cpu_count = os.cpu_count() or 1
+    # Prefer settings.WORKERS if provided; otherwise min(2*CPU, 8)
+    if (
+        hasattr(settings, "WORKERS")
+        and isinstance(settings.WORKERS, int)
+        and settings.WORKERS > 0
+    ):
+        workers = settings.WORKERS
+    else:
+        workers = min(2 * cpu_count, 8)
 
     uvicorn.run(
         "app.main:app",
         host=settings.HOST,
         port=settings.PORT,
-        reload=settings.DEBUG,
+        reload=False if not settings.DEBUG else True,
         log_level=settings.LOG_LEVEL.lower(),
-        workers=workers,  # 启用多进程，利用多核
+        workers=workers,
+        loop="uvloop",
+        http="h11",
+        backlog=getattr(settings, "BACKLOG", 2048),
+        timeout_keep_alive=getattr(settings, "TIMEOUT_KEEP_ALIVE", 5),
     )
+
+

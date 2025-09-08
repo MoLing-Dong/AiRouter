@@ -1,5 +1,5 @@
 from typing import Optional
-from .database_service import DatabaseService
+from .database_service import DatabaseService, db_service as global_db_service
 from .model_service import ModelService
 from .provider_service import ProviderService
 from .model_provider_service import ModelProviderService
@@ -13,8 +13,8 @@ class ServiceManager:
     """Service manager for coordinating all services"""
 
     def __init__(self):
-        # Initialize core database service
-        self.db_service = DatabaseService()
+        # Initialize core database service (reuse global lazy instance)
+        self.db_service = global_db_service
 
         # Initialize specialized services
         self.model_service = ModelService(self.db_service)

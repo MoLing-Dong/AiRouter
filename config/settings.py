@@ -82,6 +82,7 @@ class Settings(BaseSettings):
     # Server configuration
     HOST: str = "0.0.0.0"
     PORT: int = 8000
+    WORKERS: int = 1  # Disable multiprocessing to prevent double process issues
 
     # Redis configuration
     REDIS_URL: str = "redis://localhost:6379"

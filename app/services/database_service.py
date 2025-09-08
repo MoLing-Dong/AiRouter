@@ -4,7 +4,6 @@ from typing import List, Dict, Optional, Any
 from datetime import datetime
 import time
 from ..models import (
-    Base,
     LLMModel,
     LLMProvider,
     LLMModelProvider,
@@ -34,7 +33,10 @@ class DatabaseService:
         self.engine = create_engine(
             settings.DATABASE_URL,
             pool_pre_ping=True,
-            pool_recycle=300,
+            pool_size=getattr(settings, "DB_POOL_SIZE", 10),
+            max_overflow=getattr(settings, "DB_MAX_OVERFLOW", 20),
+            pool_timeout=getattr(settings, "DB_POOL_TIMEOUT", 30),
+            pool_recycle=getattr(settings, "DB_POOL_RECYCLE", 3600),
             # echo=settings.DEBUG,
         )
         self.SessionLocal = sessionmaker(
@@ -44,8 +46,14 @@ class DatabaseService:
         # Initialize transaction manager
         self.tx_manager = DatabaseTransactionManager(self.SessionLocal)
 
-        # Create tables
-        Base.metadata.create_all(bind=self.engine)
+    def close(self) -> None:
+        """Close database engine and dispose connection pool"""
+        try:
+            if self.engine:
+                self.engine.dispose()
+        except Exception:
+            # best effort close; avoid raising during shutdown
+            pass
 
     def get_session(self) -> Session:
         """Get database session"""
@@ -406,9 +414,10 @@ class DatabaseService:
         try:
             with self.get_session() as session:
                 from sqlalchemy import text
-                
+
                 # 使用原生SQL查询，避免ORM开销
-                sql = text("""
+                sql = text(
+                    """
                     SELECT 
                         mp.llm_id,
                         mp.provider_id,
@@ -427,32 +436,36 @@ class DatabaseService:
                     JOIN llm_providers p ON mp.provider_id = p.id
                     WHERE mp.llm_id = ANY(:model_ids)
                     ORDER BY mp.llm_id, mp.priority DESC, mp.weight DESC
-                """)
-                
+                """
+                )
+
                 result = session.execute(sql, {"model_ids": model_ids})
-                
+
                 # 按模型ID分组
                 providers_by_model = {}
                 for row in result:
                     if row.llm_id not in providers_by_model:
                         providers_by_model[row.llm_id] = []
-                    
-                    providers_by_model[row.llm_id].append({
-                        "provider_id": row.provider_id,
-                        "name": row.name,
-                        "provider_type": row.provider_type,
-                        "base_url": row.official_endpoint or row.third_party_endpoint,
-                        "weight": row.weight,
-                        "priority": row.priority,
-                        "health_status": row.health_status,
-                        "is_enabled": row.is_enabled,
-                        "is_preferred": row.is_preferred,
-                        "cost_per_1k_tokens": row.cost_per_1k_tokens,
-                        "overall_score": row.overall_score,
-                    })
-                
+
+                    providers_by_model[row.llm_id].append(
+                        {
+                            "provider_id": row.provider_id,
+                            "name": row.name,
+                            "provider_type": row.provider_type,
+                            "base_url": row.official_endpoint
+                            or row.third_party_endpoint,
+                            "weight": row.weight,
+                            "priority": row.priority,
+                            "health_status": row.health_status,
+                            "is_enabled": row.is_enabled,
+                            "is_preferred": row.is_preferred,
+                            "cost_per_1k_tokens": row.cost_per_1k_tokens,
+                            "overall_score": row.overall_score,
+                        }
+                    )
+
                 return providers_by_model
-                
+
         except Exception as e:
             logger.warning(f"Failed to get optimized batch providers: {e}")
             return {}
@@ -1792,5 +1805,24 @@ class DatabaseService:
         )
 
 
-# Global database service instance
-db_service = DatabaseService()
+class LazyDatabaseService:
+    """Lazy-initialized proxy for DatabaseService to avoid import-time side effects."""
+
+    _instance: Optional[DatabaseService] = None
+
+    def _ensure(self) -> DatabaseService:
+        if self._instance is None:
+            self._instance = DatabaseService()
+        return self._instance
+
+    def __getattr__(self, item):
+        service = self._ensure()
+        return getattr(service, item)
+
+    def close(self) -> None:
+        if self._instance is not None:
+            self._instance.close()
+
+
+# Global lazy database service instance
+db_service = LazyDatabaseService()
