@@ -13,6 +13,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 import httpx
 from pydantic import BaseModel
+from app.utils.logging_config import get_factory_logger
 
 logger = get_factory_logger()
 
