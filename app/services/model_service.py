@@ -5,8 +5,6 @@ import time
 from ..models import (
     LLMModel,
     LLMModelCreate,
-    LLMModelCapability,
-    Capability,
 )
 from .database.database_service import DatabaseService
 from app.utils.logging_config import get_factory_logger

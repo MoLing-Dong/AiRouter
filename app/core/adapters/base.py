@@ -7,7 +7,7 @@ from enum import Enum
 import httpx
 import json
 from app.utils.logging_config import get_factory_logger
-from app.models.llm_model_provider import HealthStatusEnum
+from app.models import HealthStatusEnum
 from app.services.database.database_service import db_service
 
 # Get logger

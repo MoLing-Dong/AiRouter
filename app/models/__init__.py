@@ -1,37 +1,51 @@
-# Import base model
-from .base import Base
-
-# Import enums
-from .enums import LLMTypeEnum, ProviderTypeEnum, ParamTypeEnum
-
-# Import all table models
-from .llm_model import LLMModel
-from .llm_provider import LLMProvider
-from .llm_provider_apikey import LLMProviderApiKey
-from .llm_model_provider import LLMModelProvider
-from .llm_model_param import LLMModelParam
-from .capability import Capability
-from .llm_model_capability import LLMModelCapability
-
-# Import Pydantic models
-from .schemas import (
-    LLMModelCreate,
-    LLMModelUpdate,
-    LLMProviderCreate,
-    LLMProviderUpdate,
-    LLMProviderApiKeyCreate,
-    LLMProviderApiKeyUpdate,
-    LLMModelProviderCreate,
-    LLMModelProviderUpdate,
-    LLMModelParamCreate,
+# Import SQLModel models and components
+from .sqlmodel_models import (
+    # Enums
+    HealthStatus,
+    HealthStatusEnum,  # backward compatibility
+    LLMType,
+    LLMTypeEnum,      # backward compatibility  
+    ProviderType,
+    ProviderTypeEnum, # backward compatibility
+    
+    # Table models
+    LLMModel,
+    LLMProvider,
+    LLMProviderApiKey,
+    LLMModelProvider,
+    LLMModelParam,
+    Capability,
+    LLMModelCapability,
+    
+    # Request/Response models
+    ModelCreateRequest as LLMModelCreate,
+    ProviderCreateRequest as LLMProviderCreate,
+    ModelProviderCreateRequest as LLMModelProviderCreate,
+    ModelProviderUpdateRequest as LLMModelProviderUpdate,
+    LLMModelParamCreateRequest as LLMModelParamCreate,
+    LLMProviderApiKeyCreateRequest as LLMProviderApiKeyCreate,
+    ModelResponse,
+    ProviderResponse,
+    ModelProviderResponse,
+    
+    # Utility classes
+    QueryBuilder,
+    PerformanceMetrics,
+    HealthCheckResult,
+    TimestampMixin
 )
 
 # Export all models
 __all__ = [
-    "Base",
-    "LLMTypeEnum",
-    "ProviderTypeEnum",
-    "ParamTypeEnum",
+    # Enums
+    "HealthStatus",
+    "HealthStatusEnum",  # backward compatibility
+    "LLMType", 
+    "LLMTypeEnum",      # backward compatibility
+    "ProviderType",
+    "ProviderTypeEnum", # backward compatibility
+    
+    # Table models
     "LLMModel",
     "LLMProvider",
     "LLMProviderApiKey",
@@ -39,13 +53,23 @@ __all__ = [
     "LLMModelParam",
     "Capability",
     "LLMModelCapability",
+    
+    # Request models (for backward compatibility)
     "LLMModelCreate",
-    "LLMModelUpdate",
-    "LLMProviderCreate",
-    "LLMProviderUpdate",
-    "LLMProviderApiKeyCreate",
-    "LLMProviderApiKeyUpdate",
+    "LLMProviderCreate", 
     "LLMModelProviderCreate",
     "LLMModelProviderUpdate",
     "LLMModelParamCreate",
+    "LLMProviderApiKeyCreate",
+    
+    # Response models
+    "ModelResponse",
+    "ProviderResponse",
+    "ModelProviderResponse",
+    
+    # Utility classes
+    "QueryBuilder",
+    "PerformanceMetrics",
+    "HealthCheckResult",
+    "TimestampMixin"
 ]

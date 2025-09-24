@@ -25,8 +25,9 @@ from app.models import (
     LLMModelProvider,
     LLMModelParam,
     LLMProviderApiKey,
+    HealthStatusEnum,
+    QueryBuilder,
 )
-from app.models.llm_model_provider import HealthStatusEnum
 from config.settings import settings
 from app.utils.logging_config import get_factory_logger
 
@@ -40,7 +41,7 @@ class AsyncDatabaseService:
         # 创建异步引擎，优化连接池配置
         self.async_engine = create_async_engine(
             settings.DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://"),
-            echo=settings.DEBUG,
+            echo=False,  # 关闭数据库查询日志
             # 连接池优化配置
             pool_size=25,
             max_overflow=50,

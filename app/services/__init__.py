@@ -20,7 +20,7 @@ from .service_manager import ServiceManager
 # 数据库服务导入
 from .database.database_service import db_service
 from .database.async_database_service import async_db_service
-from .database.database_service_integration import integrated_db_service
+from .database.sqlmodel_database_service import sqlmodel_db_service
 
 # 适配器服务导入
 from .adapters.adapter_manager import adapter_manager
@@ -33,7 +33,6 @@ from .load_balancing.router import SmartRouter
 
 # 监控服务导入
 from .monitoring.health_check_service import HealthCheckService
-from .monitoring.enhanced_model_service import enhanced_model_service
 
 __all__ = [
     # 核心服务
@@ -45,8 +44,8 @@ __all__ = [
     
     # 数据库服务
     "db_service",
-    "async_db_service", 
-    "integrated_db_service",
+    "async_db_service",
+    "sqlmodel_db_service",
     
     # 适配器服务
     "adapter_manager",
@@ -59,5 +58,4 @@ __all__ = [
     
     # 监控服务
     "HealthCheckService",
-    "enhanced_model_service",
 ]

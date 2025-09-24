@@ -1,5 +1,5 @@
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, Session
+from sqlmodel import create_engine, Session, select
+from sqlalchemy.orm import sessionmaker
 from typing import List, Dict, Optional, Any
 from datetime import datetime
 import time
@@ -15,8 +15,9 @@ from app.models import (
     LLMModelProviderUpdate,
     LLMModelParamCreate,
     LLMProviderApiKeyCreate,
+    HealthStatusEnum,
+    QueryBuilder,
 )
-from app.models.llm_model_provider import HealthStatusEnum
 from config.settings import settings
 from app.utils.logging_config import get_factory_logger
 from .transaction_manager import DatabaseTransactionManager
@@ -29,7 +30,7 @@ class DatabaseService:
     """Core database service for connection and basic operations"""
 
     def __init__(self):
-        # PostgreSQL database
+        # PostgreSQL database - SQLModel compatible
         self.engine = create_engine(
             settings.DATABASE_URL,
             pool_pre_ping=True,
@@ -37,8 +38,9 @@ class DatabaseService:
             max_overflow=getattr(settings, "DB_MAX_OVERFLOW", 20),
             pool_timeout=getattr(settings, "DB_POOL_TIMEOUT", 30),
             pool_recycle=getattr(settings, "DB_POOL_RECYCLE", 3600),
-            # echo=settings.DEBUG,
+            echo=False,  # 关闭数据库查询日志
         )
+        # SQLModel uses Session directly, but keep SessionLocal for compatibility
         self.SessionLocal = sessionmaker(
             autocommit=False, autoflush=False, bind=self.engine
         )
@@ -109,7 +111,7 @@ class DatabaseService:
 
             # Validate capabilities if specified
             if capability_ids:
-                from app.models.capability import Capability
+                from app.models import Capability
 
                 for cap_id in capability_ids:
                     capability = (
@@ -167,7 +169,7 @@ class DatabaseService:
 
             # Create model-capability associations if capability_ids are provided
             if capability_ids:
-                from app.models.llm_model_capability import LLMModelCapability
+                from app.models import LLMModelCapability
 
                 for cap_id in capability_ids:
                     # Check if association already exists
@@ -268,8 +270,7 @@ class DatabaseService:
         try:
             with self.get_session() as session:
                 # 批量查询所有模型的capabilities - 使用单次JOIN查询
-                from app.models.llm_model_capability import LLMModelCapability
-                from app.models.capability import Capability
+                from app.models import LLMModelCapability, Capability
 
                 # 单次JOIN查询，避免N+1问题
                 capabilities = (
@@ -314,7 +315,7 @@ class DatabaseService:
         try:
             with self.get_session() as session:
                 # 批量查询所有模型的parameters - 使用单次查询
-                from app.models.llm_model_param import LLMModelParam
+                from app.models import LLMModelParam
 
                 # 单次查询，避免N+1问题
                 params = (

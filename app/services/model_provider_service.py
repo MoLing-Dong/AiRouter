@@ -8,7 +8,7 @@ from ..models import (
     LLMModelParam,
     LLMModelParamCreate,
 )
-from ..models.llm_model_provider import HealthStatusEnum
+from ..models import HealthStatusEnum
 from .database.database_service import DatabaseService
 from app.utils.logging_config import get_factory_logger
 
