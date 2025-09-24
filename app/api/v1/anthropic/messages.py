@@ -72,70 +72,61 @@ async def create_message(
 ):
     """Anthropic compatible messages endpoint"""
     try:
-        # Check if model is available
+        # 请求开始计时
+        import time
+
+        request_start = time.time()
+        logger.info(f"📥 收到Anthropic消息请求 - 模型: {request.model}")
+
+        # 快速路径：直接获取适配器（避免数据库查询）
         from app.services.adapters import adapter_manager
 
-        # Only get models that support chat functionality
-        available_models = adapter_manager.get_available_models(
-            capabilities=["TEXT", "MULTIMODAL_IMAGE_UNDERSTANDING"]
+        adapter = adapter_manager.get_best_adapter_fast(
+            request.model, skip_version_check=True
         )
 
-        # If model is not available, try to reload configuration from database
-        if request.model not in available_models:
-            logger.warning(
-                f"Model '{request.model}' not found in available models: {available_models}"
-            )
-            logger.info("Attempting to reload model configurations from database...")
+        # 如果没有找到适配器，尝试重新加载配置（仅在必要时）
+        if not adapter:
+            logger.info(f"⚠️ 未找到模型适配器，尝试重新加载配置: {request.model}")
 
             # Use lock to prevent multiple simultaneous reloads
             async with _config_reload_lock:
                 try:
-                    # Check again while holding the lock
-                    available_models = adapter_manager.get_available_models(
-                        capabilities=["TEXT", "MULTIMODAL_IMAGE_UNDERSTANDING"]
+                    # 重新加载配置
+                    adapter_manager.load_models_from_database()
+
+                    # 再次尝试获取适配器
+                    adapter = adapter_manager.get_best_adapter_fast(
+                        request.model, skip_version_check=True
                     )
 
-                    if request.model not in available_models:
-                        # Reload configurations from database
-                        adapter_manager.load_models_from_database()
-
-                        # Check again after reload
-                        available_models = adapter_manager.get_available_models(
-                            capabilities=["TEXT", "MULTIMODAL_IMAGE_UNDERSTANDING"]
+                    if not adapter:
+                        # 获取可用模型列表用于错误消息
+                        available_models = list(adapter_manager.model_configs.keys())
+                        raise HTTPException(
+                            status_code=400,
+                            detail=f"Model '{request.model}' is not available. Available models: {available_models}",
                         )
-                        logger.info(
-                            f"After reload, available models: {available_models}"
-                        )
-
-                        if request.model not in available_models:
-                            raise HTTPException(
-                                status_code=400,
-                                detail=f"Model '{request.model}' is not available. Available models: {available_models}",
-                            )
                 except Exception as reload_error:
-                    logger.error(
-                        f"Failed to reload model configurations: {reload_error}"
-                    )
+                    logger.error(f"重新加载配置失败: {reload_error}")
+                    available_models = list(adapter_manager.model_configs.keys())
                     raise HTTPException(
                         status_code=400,
                         detail=f"Model '{request.model}' is not available. Available models: {available_models}",
                     )
 
-        # Convert Anthropic message format to internal format
-        messages = []
-        for msg in request.messages:
-            # Combine all content pieces into single text content
-            content_text = " ".join([content.text for content in msg.content])
-
-            message = Message(
+        # 快速消息格式转换（优化版本）
+        messages = [
+            Message(
                 role=MessageRole(msg.role),
-                content=content_text,
+                content=" ".join([content.text for content in msg.content]),
                 name=None,
                 function_call=None,
             )
-            messages.append(message)
+            for msg in request.messages
+        ]
 
-        # Build ChatRequest
+        # 快速ChatRequest构建
         chat_request = ChatRequest(
             model=request.model,
             messages=messages,
@@ -148,6 +139,10 @@ async def create_message(
             tool_choice=None,
             stream=request.stream,
         )
+
+        # 总预处理时间
+        total_prep_time = time.time() - request_start
+        logger.info(f"⚡ Anthropic请求预处理完成，总耗时: {total_prep_time*1000:.1f}ms")
 
         if request.stream:
             logger.info(f"Stream response: {chat_request}")
@@ -162,8 +157,15 @@ async def create_message(
                 },
             )
         else:
-            # Normal response
-            response = await router.route_request(chat_request)
+            # Normal response - 使用快速适配器方法获得更好性能
+            if not adapter:
+                raise HTTPException(
+                    status_code=503,
+                    detail=f"No available adapter for model {chat_request.model}",
+                )
+
+            # 直接使用适配器而不是路由器以获得更好性能
+            response = await adapter.chat_completion(chat_request)
 
             # Convert to Anthropic compatible format
             content_text = response.choices[0]["message"]["content"]
@@ -203,15 +205,21 @@ async def create_message(
 
 async def stream_anthropic_message(request: ChatRequest):
     """Stream Anthropic message response"""
+    import time
+
+    start_time = time.time()
+    logger.info(f"🚀 开始Anthropic流式响应处理 - 模型: {request.model}")
+
     try:
-        # Get adapter manager
+        # 快速获取适配器（减少中间变量和时间计算）
         from app.services.adapters import adapter_manager
 
-        # Get best adapter
-        adapter = adapter_manager.get_best_adapter(request.model)
-        logger.info(f"Get adapter: {adapter}")
+        adapter = adapter_manager.get_best_adapter_fast(
+            request.model, skip_version_check=True
+        )
+
         if not adapter:
-            logger.error(f"No adapter found for model {request.model}")
+            logger.error(f"❌ 未找到模型适配器: {request.model}")
             yield f"event: error\ndata: {json.dumps({'type': 'error', 'error': {'type': 'not_found_error', 'message': 'No available adapter for model'}})}\n\n"
             return
 
@@ -219,13 +227,7 @@ async def stream_anthropic_message(request: ChatRequest):
         try:
             # Check if adapter supports stream response
             if hasattr(adapter, "stream_chat_completion"):
-                logger.info(
-                    f"Start stream response, adapter type: {type(adapter).__name__}"
-                )
-
-                # Send message_start event
-                import time
-
+                # 发送消息开始事件
                 message_start_data = {
                     "type": "message_start",
                     "message": {
@@ -241,7 +243,17 @@ async def stream_anthropic_message(request: ChatRequest):
                 }
                 yield f"event: message_start\ndata: {json.dumps(message_start_data)}\n\n"
 
+                # 性能监控标志
+                first_chunk_received = False
+
                 async for chunk in adapter.stream_chat_completion(request):
+                    # 首个chunk性能记录
+                    if not first_chunk_received:
+                        first_chunk_received = True
+                        total_delay = time.time() - start_time
+                        logger.info(
+                            f"⚡ Anthropic首chunk到达，总延迟: {total_delay:.3f}s"
+                        )
                     # Convert OpenAI-style chunk to Anthropic-style
                     if chunk.startswith("data: "):
                         chunk_data = json.loads(chunk[6:])
@@ -261,6 +273,10 @@ async def stream_anthropic_message(request: ChatRequest):
 
                 # Send message_stop event
                 yield f"event: message_stop\ndata: {json.dumps({'type': 'message_stop'})}\n\n"
+
+                # 流式响应完成日志
+                total_time = time.time() - start_time
+                logger.info(f"✅ Anthropic流式响应完成 - 总耗时: {total_time:.3f}秒")
             else:
                 # If adapter does not support stream, return error
                 error_data = {

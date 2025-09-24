@@ -224,12 +224,18 @@ class ModelAdapterManager:
             skip_version_check: Whether to skip version checking for performance
         """
         if skip_version_check:
-            # 直接使用缓存的适配器，不进行版本检查
-            adapters = self.model_adapters.get(model_name, [])
+            # 超快速路径：直接从缓存获取，无额外检查
+            adapters = self.model_adapters.get(model_name)
             if not adapters:
-                logger.warning(f"Model {model_name} has no available adapters")
                 return None
-            return self._select_best_adapter(adapters)
+
+            # 快速选择：直接返回第一个健康的适配器，避免复杂评分
+            for adapter in adapters:
+                if adapter.health_status == HealthStatus.HEALTHY:
+                    return adapter
+
+            # 如果没有健康的，返回第一个可用的
+            return adapters[0] if adapters else None
         else:
             # 使用原有的方法，包含版本检查
             return self.get_best_adapter(model_name)

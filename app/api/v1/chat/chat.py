@@ -73,14 +73,13 @@ async def chat_completions(
 ):
     """OpenAI compatible chat completion interface"""
     try:
-        # 添加请求开始计时
+        # 请求开始计时和适配器获取合并
         request_start = time.time()
         logger.info(f"📥 收到聊天请求 - 模型: {request.model}")
 
-        # 快速路径：直接尝试获取适配器，避免数据库查询
+        # 快速路径：直接获取适配器（合并导入和调用）
         from app.services import adapter_manager
 
-        # 直接获取适配器，如果不存在会返回None
         adapter = adapter_manager.get_best_adapter_fast(
             request.model, skip_version_check=True
         )
@@ -115,26 +114,18 @@ async def chat_completions(
                         detail=f"Model '{request.model}' is not available. Available models: {available_models}",
                     )
 
-        adapter_get_time = time.time() - request_start
-        logger.info(f"📡 适配器获取完成 ({adapter_get_time*1000:.1f}ms)")
-
-        # Convert message format
-        message_start = time.time()
-        messages = []
-        for msg in request.messages:
-            message = Message(
+        # 快速消息格式转换（减少中间变量）
+        messages = [
+            Message(
                 role=MessageRole(msg["role"]),
                 content=msg["content"],
                 name=msg.get("name"),
                 function_call=msg.get("function_call"),
             )
-            messages.append(message)
+            for msg in request.messages
+        ]
 
-        message_time = time.time() - message_start
-        logger.info(f"📝 消息格式转换完成 ({message_time*1000:.1f}ms)")
-
-        # Build ChatRequest
-        build_start = time.time()
+        # 快速ChatRequest构建
         chat_request = ChatRequest(
             model=request.model,
             messages=messages,
@@ -153,10 +144,7 @@ async def chat_completions(
             thinking=request.thinking,
         )
 
-        build_time = time.time() - build_start
-        logger.info(f"🔧 ChatRequest构建完成 ({build_time*1000:.1f}ms)")
-
-        # 计算请求预处理总时间
+        # 总预处理时间（减少日志I/O）
         total_prep_time = time.time() - request_start
         logger.info(f"⚡ 请求预处理完成，总耗时: {total_prep_time*1000:.1f}ms")
 
@@ -223,21 +211,12 @@ async def stream_chat_completion(request: ChatRequest):
     logger.info(f"🚀 开始流式响应处理 - 模型: {request.model}")
 
     try:
-        # 计时：适配器获取
-        adapter_start = time.time()
-
-        # Get adapter manager
+        # 快速获取适配器（减少中间变量和时间计算）
         from app.services import adapter_manager
 
-        # Get best adapter using fast method (skip version check for performance)
         adapter = adapter_manager.get_best_adapter_fast(
             request.model, skip_version_check=True
         )
-
-        adapter_time = time.time() - adapter_start
-        logger.info(f"📡 适配器获取完成 ({adapter_time*1000:.1f}ms)")
-        # 减少详细日志，仅在DEBUG模式下输出
-        # logger.info(f"📡 快速获取到适配器: {type(adapter).__name__ if adapter else 'None'}")
 
         if not adapter:
             logger.error(f"❌ 未找到模型适配器: {request.model}")
