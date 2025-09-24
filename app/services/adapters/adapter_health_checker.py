@@ -1,7 +1,7 @@
 import asyncio
 from typing import Dict, List, Optional
 from app.core.adapters.base import BaseAdapter, HealthStatus
-from app.services.database_service import db_service
+from app.services.database.database_service import db_service
 from app.models.llm_model_provider import HealthStatusEnum
 from app.utils.logging_config import get_factory_logger
 

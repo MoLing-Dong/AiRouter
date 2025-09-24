@@ -6,7 +6,10 @@ from pydantic import BaseModel
 import json
 
 from app.core.adapters import ChatRequest, Message, MessageRole
-from app.services.router import router
+from app.services.load_balancing.router import SmartRouter
+
+# Initialize router
+router = SmartRouter()
 from app.utils.logging_config import get_chat_logger
 
 # Get logger

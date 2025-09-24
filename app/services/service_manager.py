@@ -1,9 +1,9 @@
 from typing import Optional
-from .database_service import DatabaseService, db_service as global_db_service
+from .database.database_service import DatabaseService, db_service as global_db_service
 from .model_service import ModelService
 from .provider_service import ProviderService
 from .model_provider_service import ModelProviderService
-from .health_check_service import HealthCheckService
+from .monitoring.health_check_service import HealthCheckService
 from app.utils.logging_config import get_factory_logger
 
 logger = get_factory_logger()

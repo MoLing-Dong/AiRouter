@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException
-from app.services.database_service import db_service
+from app.services.database.database_service import db_service
 from app.utils.logging_config import get_factory_logger
 from app.models import (
     LLMModelCreate,

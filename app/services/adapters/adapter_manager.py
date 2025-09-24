@@ -6,9 +6,8 @@ from app.core.adapters.base import (
     ChatResponse,
     HealthStatus,
 )
-from app.services.adapter_factory import AdapterFactory
-from app.services.adapter_database_service import ModelDatabaseService
-from app.services.adapter_health_checker import HealthChecker
+from app.services.adapters.adapter_factory import AdapterFactory
+from app.services.adapters.adapter_health_checker import HealthChecker
 from config.settings import ModelConfig, ModelProvider
 
 # Get logger
@@ -30,7 +29,8 @@ class ModelAdapterManager:
         self.config_timestamps: Dict[str, float] = {}
 
         # Initialize services
-        self.db_service = ModelDatabaseService()
+        from ..database.database_service import db_service
+        self.db_service = db_service
         self.factory = AdapterFactory()
         self.health_checker = HealthChecker()
 
@@ -346,7 +346,7 @@ class ModelAdapterManager:
     def _get_model_capabilities(self, model_name: str) -> List[Dict[str, Any]]:
         """Get model capabilities from database"""
         try:
-            from .database_service import db_service
+            from ..database.database_service import db_service
 
             model = db_service.get_model_by_name(model_name)
             if model:
@@ -401,3 +401,7 @@ class ModelAdapterManager:
             logger.info("✅ Notified models cache to clear")
         except Exception as e:
             logger.warning(f"Failed to notify cache clear: {e}")
+
+
+# 创建全局适配器管理器实例
+adapter_manager = ModelAdapterManager()

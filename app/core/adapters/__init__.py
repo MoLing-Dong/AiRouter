@@ -19,7 +19,7 @@ from .zhipu import ZhipuAdapter
 from .aliqwen import AliQwenAdapter
 
 # Export adapter factory functions
-from ...services.adapter_factory import AdapterFactory
+from app.services.adapters.adapter_factory import AdapterFactory
 
 # Create global adapter factory instance
 _adapter_factory = AdapterFactory()

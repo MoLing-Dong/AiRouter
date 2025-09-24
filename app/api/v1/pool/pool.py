@@ -1,6 +1,9 @@
 from fastapi import APIRouter, HTTPException
 from typing import Dict, Any
-from app.services.adapter_pool import adapter_pool
+from app.services.adapters.adapter_pool import AdapterPool
+
+# Initialize adapter pool
+adapter_pool = AdapterPool()
 from app.utils.logging_config import get_factory_logger
 
 # Get logger

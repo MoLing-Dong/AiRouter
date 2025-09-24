@@ -1,6 +1,6 @@
 # AI路由器 - 智能LLM统一API接口
 
-[![Python](https://img.shields.io/badge/Python-3.10+-blue.svg)](https://python.org)
+[![Python](https://img.shields.io/badge/Python-3.13+-blue.svg)](https://python.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.100+-green.svg)](https://fastapi.tiangolo.com)
 [![Docker](https://img.shields.io/badge/Docker-20.10+-blue.svg)](https://docker.com)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
@@ -31,10 +31,12 @@
 - 🎯 **多模态支持**: 支持文本生成、多模态输入（图像+文本）和函数调用
 - 🚀 **帕累托最优选择**: 从多个模型中智能选择最优模型
 - 💰 **成本优化**: 健康检查屏蔽功能，避免昂贵模型的不必要检查
-- 🐳 **容器化部署**: 完整的Docker支持，开箱即用
-- 🗄️ **数据库支持**: PostgreSQL数据库，支持数据持久化
+- 🐳 **容器化部署**: Alpine Linux轻量级Docker镜像，性能优异
+- 🗄️ **高性能数据库**: PostgreSQL + 异步SQLAlchemy + SQLModel现代化ORM
+- 🚄 **Redis缓存**: 多层缓存策略，查询性能提升10-100倍
 - 🔧 **动态配置**: 支持运行时动态更新模型配置和API密钥
 - 🛡️ **故障转移**: 自动故障检测和智能切换
+- 📈 **性能监控**: 实时性能分析和批量操作优化
 
 ## 🏗️ 架构设计
 
@@ -62,12 +64,15 @@
 
 ## 🛠️ 技术栈
 
-- **Python 3.10+**: 稳定可靠的Python版本
+- **Python 3.13+**: 最新稳定的Python版本，性能更优
 - **FastAPI**: 高性能的现代Web框架
+- **SQLModel**: 现代化ORM，结合Pydantic和SQLAlchemy优势
+- **异步SQLAlchemy**: 高性能异步数据库操作
+- **Redis**: 高性能缓存和会话存储
 - **uv**: 极速Python包管理器，比pip快10-100倍
 - **PostgreSQL**: 可靠的关系型数据库
 - **httpx**: 异步HTTP客户端
-- **Docker**: 容器化部署
+- **Docker Alpine**: 轻量级容器化部署
 - **多阶段构建**: 优化的Docker镜像构建
 - **非root用户**: 安全的容器运行环境
 
@@ -133,7 +138,7 @@ curl http://localhost:8000/v1/models
 
 ### 开发环境要求
 
-- Python 3.10+
+- Python 3.13+
 - PostgreSQL 15+
 - uv (Python 包管理器)
 

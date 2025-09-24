@@ -7,7 +7,10 @@ import time
 import uuid
 
 from app.core.adapters.base import BaseAdapter
-from app.services.router import router
+from app.services.load_balancing.router import SmartRouter
+
+# Initialize router
+router = SmartRouter()
 from app.utils.logging_config import get_chat_logger
 
 # Get logger

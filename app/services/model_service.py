@@ -8,7 +8,7 @@ from ..models import (
     LLMModelCapability,
     Capability,
 )
-from .database_service import DatabaseService
+from .database.database_service import DatabaseService
 from app.utils.logging_config import get_factory_logger
 
 logger = get_factory_logger()

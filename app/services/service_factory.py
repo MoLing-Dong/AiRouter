@@ -3,15 +3,21 @@ Service Factory
 统一管理所有服务的实例化和依赖注入
 """
 
-from app.services.base.transaction_manager import DatabaseTransactionManager
-from app.services.repositories.model_repository import ModelRepository
-from app.services.repositories.provider_repository import ProviderRepository
-from app.services.repositories.model_provider_repository import ModelProviderRepository
-from app.services.repositories.api_key_repository import ApiKeyRepository
-from app.services.business.model_service import ModelService
-from app.services.business.provider_service import ProviderService
-from app.services.business.model_provider_service import ModelProviderService
-from app.services.business.api_key_service import ApiKeyService
+from app.services.database.transaction_manager import DatabaseTransactionManager
+# 注释掉已删除的repositories和business导入
+# from app.services.repositories.model_repository import ModelRepository
+# from app.services.repositories.provider_repository import ProviderRepository
+# from app.services.repositories.model_provider_repository import ModelProviderRepository
+# from app.services.repositories.api_key_repository import ApiKeyRepository
+# from app.services.business.model_service import ModelService
+# from app.services.business.provider_service import ProviderService
+# from app.services.business.model_provider_service import ModelProviderService
+# from app.services.business.api_key_service import ApiKeyService
+
+# 使用现有的服务
+from .model_service import ModelService
+from .provider_service import ProviderService
+from .model_provider_service import ModelProviderService
 from app.utils.logging_config import get_factory_logger
 
 logger = get_factory_logger()
@@ -43,39 +49,18 @@ class ServiceFactory:
         logger.info("✅ Service Factory initialization completed")
 
     def _setup_repositories(self):
-        """Setup all repository instances"""
-        self._repositories["model"] = ModelRepository(self._transaction_manager)
-        self._repositories["provider"] = ProviderRepository(self._transaction_manager)
-        self._repositories["model_provider"] = ModelProviderRepository(
-            self._transaction_manager
-        )
-        self._repositories["api_key"] = ApiKeyRepository(self._transaction_manager)
-
-        logger.debug(f"   📚 Created {len(self._repositories)} repositories")
+        """Setup all repository instances - simplified"""
+        # 使用数据库服务替代repositories
+        from .database.database_service import DatabaseService
+        self._db_service = DatabaseService()
+        logger.debug("   📚 Database service initialized")
 
     def _setup_business_services(self):
-        """Setup all business service instances"""
-        self._services["model"] = ModelService(
-            self._repositories["model"],
-            self._repositories["provider"],
-            self._repositories["model_provider"],
-        )
-
-        self._services["provider"] = ProviderService(
-            self._repositories["provider"],
-            self._repositories["model_provider"],
-            self._repositories["api_key"],
-        )
-
-        self._services["model_provider"] = ModelProviderService(
-            self._repositories["model_provider"],
-            self._repositories["model"],
-            self._repositories["provider"],
-        )
-
-        self._services["api_key"] = ApiKeyService(
-            self._repositories["api_key"], self._repositories["provider"]
-        )
+        """Setup all business service instances - simplified"""
+        # 使用数据库服务初始化现有服务
+        self._services["model"] = ModelService(self._db_service)
+        self._services["provider"] = ProviderService(self._db_service)
+        self._services["model_provider"] = ModelProviderService(self._db_service)
 
         logger.debug(f"   🚀 Created {len(self._services)} business services")
 
@@ -96,9 +81,9 @@ class ServiceFactory:
         """Get model-provider service instance"""
         return self._services["model_provider"]
 
-    def get_api_key_service(self) -> ApiKeyService:
-        """Get API key service instance"""
-        return self._services["api_key"]
+    # def get_api_key_service(self) -> ApiKeyService:
+    #     """Get API key service instance"""
+    #     return self._services["api_key"]
 
     def get_repository(self, name: str):
         """Get repository by name"""

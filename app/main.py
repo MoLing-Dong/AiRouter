@@ -2,11 +2,11 @@ import uvicorn
 from contextlib import asynccontextmanager
 from config.settings import settings
 from app.core.app import app
-from app.services import adapter_manager
+from app.services.adapters import adapter_manager
 from app.core.routes import register_routes
 from app.utils.logging_config import init_logging, get_app_logger
 from sqlalchemy import text
-from app.services.database_service import db_service
+from app.services.database.database_service import db_service
 
 # Initialize logging system
 init_logging()
@@ -40,7 +40,7 @@ async def lifespan(app):
 
     # Start adapter pool
     logger.info("🔄 Starting adapter pool...")
-    from app.services.adapter_pool import adapter_pool
+    from app.services.adapters.adapter_pool import adapter_pool
 
     await adapter_pool.start()
 

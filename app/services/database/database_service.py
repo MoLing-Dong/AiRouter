@@ -3,7 +3,7 @@ from sqlalchemy.orm import sessionmaker, Session
 from typing import List, Dict, Optional, Any
 from datetime import datetime
 import time
-from ..models import (
+from app.models import (
     LLMModel,
     LLMProvider,
     LLMModelProvider,
@@ -16,7 +16,7 @@ from ..models import (
     LLMModelParamCreate,
     LLMProviderApiKeyCreate,
 )
-from ..models.llm_model_provider import HealthStatusEnum
+from app.models.llm_model_provider import HealthStatusEnum
 from config.settings import settings
 from app.utils.logging_config import get_factory_logger
 from .transaction_manager import DatabaseTransactionManager
@@ -109,7 +109,7 @@ class DatabaseService:
 
             # Validate capabilities if specified
             if capability_ids:
-                from ..models.capability import Capability
+                from app.models.capability import Capability
 
                 for cap_id in capability_ids:
                     capability = (
@@ -145,7 +145,7 @@ class DatabaseService:
 
             # Create model-provider association if provider_id is provided
             if provider_id:
-                from ..models.llm_model_provider import LLMModelProvider
+                from app.models.llm_model_provider import LLMModelProvider
 
                 # Check if association already exists
                 self.tx_manager.check_unique_constraint(
@@ -167,7 +167,7 @@ class DatabaseService:
 
             # Create model-capability associations if capability_ids are provided
             if capability_ids:
-                from ..models.llm_model_capability import LLMModelCapability
+                from app.models.llm_model_capability import LLMModelCapability
 
                 for cap_id in capability_ids:
                     # Check if association already exists
@@ -268,8 +268,8 @@ class DatabaseService:
         try:
             with self.get_session() as session:
                 # 批量查询所有模型的capabilities - 使用单次JOIN查询
-                from ..models.llm_model_capability import LLMModelCapability
-                from ..models.capability import Capability
+                from app.models.llm_model_capability import LLMModelCapability
+                from app.models.capability import Capability
 
                 # 单次JOIN查询，避免N+1问题
                 capabilities = (
@@ -314,7 +314,7 @@ class DatabaseService:
         try:
             with self.get_session() as session:
                 # 批量查询所有模型的parameters - 使用单次查询
-                from ..models.llm_model_param import LLMModelParam
+                from app.models.llm_model_param import LLMModelParam
 
                 # 单次查询，避免N+1问题
                 params = (
@@ -355,8 +355,8 @@ class DatabaseService:
         try:
             with self.get_session() as session:
                 # 批量查询所有模型的providers - 使用单次JOIN查询
-                from ..models.llm_model_provider import LLMModelProvider
-                from ..models.llm_provider import LLMProvider
+                from app.models.llm_model_provider import LLMModelProvider
+                from app.models.llm_provider import LLMProvider
 
                 # 单次JOIN查询，避免N+1问题
                 providers = (
@@ -473,7 +473,7 @@ class DatabaseService:
     def get_model_capabilities(self, model_id: int) -> List[Dict[str, Any]]:
         """Get model capabilities by model ID"""
         try:
-            from ..models import LLMModelCapability, Capability
+            from app.models import LLMModelCapability, Capability
 
             with self.get_session() as session:
                 capabilities = (
@@ -498,7 +498,7 @@ class DatabaseService:
     def get_all_capabilities(self) -> List[Dict[str, Any]]:
         """Get all available capabilities"""
         try:
-            from ..models import Capability
+            from app.models import Capability
 
             with self.get_session() as session:
                 capabilities = session.query(Capability).all()
@@ -518,7 +518,7 @@ class DatabaseService:
     def add_model_capability(self, model_id: int, capability_name: str) -> bool:
         """Add capability to model"""
         try:
-            from ..models import LLMModelCapability, Capability
+            from app.models import LLMModelCapability, Capability
 
             with self.get_session() as session:
                 # Check if capability exists
@@ -566,7 +566,7 @@ class DatabaseService:
     def remove_model_capability(self, model_id: int, capability_name: str) -> bool:
         """Remove capability from model"""
         try:
-            from ..models import LLMModelCapability, Capability
+            from app.models import LLMModelCapability, Capability
 
             with self.get_session() as session:
                 # Find capability
@@ -1569,6 +1569,21 @@ class DatabaseService:
                 session.commit()
                 return True
             return False
+
+    def get_api_key_for_provider(self, provider_name: str) -> Optional[str]:
+        """Get API key for a specific provider by name"""
+        with self.get_session() as session:
+            # First get the provider by name
+            provider = session.query(LLMProvider).filter(
+                LLMProvider.name == provider_name
+            ).first()
+            
+            if not provider:
+                return None
+            
+            # Get the best API key for this provider
+            best_key = self.get_best_api_key(provider.id)
+            return best_key.api_key if best_key else None
 
     # ==================== Health Status and Metrics Operations ====================
 

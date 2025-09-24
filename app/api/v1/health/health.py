@@ -1,7 +1,7 @@
 import time
 import asyncio
 from fastapi import APIRouter, HTTPException, Query
-from app.services import adapter_manager
+from app.services.adapters import adapter_manager
 from app.utils.logging_config import get_factory_logger
 
 health_router = APIRouter(prefix="/v1/health", tags=["Health Check"])

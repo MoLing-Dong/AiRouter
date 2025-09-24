@@ -186,6 +186,7 @@ The core routing logic is implemented in `app/services/router.py`:
 ### Model Availability Logic
 
 The `get_available_models` method in `app/services/adapter_manager.py` has been enhanced to:
+
 - Only return models with at least one healthy provider
 - Filter out models with all providers in unhealthy/degraded states
 - Ensure `available_models` endpoint only shows healthy models
@@ -261,6 +262,7 @@ The `get_available_models` method in `app/services/adapter_manager.py` has been 
 ### Environment Configuration
 
 Key environment variables in `.env`:
+
 - `LOAD_BALANCING_STRATEGY=auto` - Global default strategy
 - `LOAD_BALANCING_HEALTH_CHECK_INTERVAL=30` - Health check frequency
 - `LOAD_BALANCING_MAX_RETRIES=3` - Maximum retry attempts

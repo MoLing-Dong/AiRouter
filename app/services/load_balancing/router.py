@@ -2,9 +2,9 @@ import asyncio
 import time
 from typing import Dict, List, Optional, Any
 from enum import Enum
-from . import adapter_manager as model_adapter_manager
-from ..core.adapters import ChatRequest, ChatResponse
-from ..core.adapters.base import HealthStatus, BaseAdapter
+# 延迟导入避免循环依赖
+from app.core.adapters import ChatRequest, ChatResponse
+from app.core.adapters.base import HealthStatus, BaseAdapter
 from fastapi import HTTPException
 from .load_balancing_strategies import strategy_manager, LoadBalancingStrategy
 from app.utils.logging_config import get_factory_logger
@@ -32,7 +32,7 @@ class SmartRouter:
 
         try:
             # Get all provider configurations for the model
-            from .database_service import db_service
+            from ..database.database_service import db_service
             model = db_service.get_model_by_name(request.model, is_enabled=True)
             if not model:
                 raise Exception(f"Model {request.model} does not exist or is not enabled")
@@ -87,7 +87,7 @@ class SmartRouter:
 
         try:
             # Get all provider configurations for the model
-            from .database_service import db_service
+            from ..database.database_service import db_service
             model = db_service.get_model_by_name(request.model, is_enabled=True)
             if not model:
                 raise Exception(f"Model {request.model} does not exist or is not enabled")
@@ -125,7 +125,7 @@ class SmartRouter:
     def get_best_provider_for_model(self, model_name: str) -> Optional[str]:
         """Get best provider for model"""
         try:
-            from .database_service import db_service
+            from ..database.database_service import db_service
             best_provider = db_service.get_best_provider_for_model(model_name)
             return best_provider.name if best_provider else None
         except Exception as e:
@@ -135,7 +135,7 @@ class SmartRouter:
     def get_available_providers_for_model(self, model_name: str) -> List[Dict[str, Any]]:
         """Get all available providers for model"""
         try:
-            from .database_service import db_service
+            from ..database.database_service import db_service
             recommendations = db_service.get_provider_recommendations(model_name)
             
             if "error" in recommendations:
@@ -163,9 +163,17 @@ class SmartRouter:
             "request_counters": self.request_counters,
             "failure_counters": self.failure_counters,
             "last_request_time": self.last_request_time,
-            "available_models": model_adapter_manager.get_available_models(),
+            "available_models": self._get_available_models(),
             "strategy_info": strategy_manager.get_strategy_info(),
         }
+
+    def _get_available_models(self):
+        """获取可用模型列表"""
+        try:
+            from ..adapters.adapter_manager import adapter_manager
+            return adapter_manager.get_available_models()
+        except ImportError:
+            return []
 
     def reset_stats(self):
         """Reset statistics"""
@@ -176,7 +184,7 @@ class SmartRouter:
     def get_routing_recommendations(self, model_name: str) -> Dict[str, Any]:
         """Get routing recommendations"""
         try:
-            from .database_service import db_service
+            from ..database.database_service import db_service
             # Get all available providers
             model = db_service.get_model_by_name(model_name, is_enabled=True)
             if not model:

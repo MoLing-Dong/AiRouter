@@ -84,18 +84,25 @@ class Settings(BaseSettings):
     PORT: int = 8000
     WORKERS: int = 1  # Disable multiprocessing to prevent double process issues
 
-    # Redis configuration
+    # Redis configuration - 增强版本支持
     REDIS_URL: str = "redis://localhost:6379"
     REDIS_DB: int = 0
+    REDIS_POOL_SIZE: int = 10
+    REDIS_TIMEOUT: int = 5
 
     # Database configuration
     DATABASE_URL: str = "postgresql://user:password@localhost:5432/database"
 
-    # Database connection pool configuration
-    DB_POOL_SIZE: int = 10
-    DB_MAX_OVERFLOW: int = 20
+    # Database connection pool configuration - 优化版本
+    DB_POOL_SIZE: int = 25  # 增加连接池大小
+    DB_MAX_OVERFLOW: int = 50  # 增加最大溢出连接
     DB_POOL_TIMEOUT: int = 30
     DB_POOL_RECYCLE: int = 3600
+    
+    # 异步数据库配置
+    ASYNC_DB_ENABLED: bool = True
+    ASYNC_DB_POOL_SIZE: int = 25
+    ASYNC_DB_MAX_OVERFLOW: int = 50
 
     # Load balancing configuration
     LOAD_BALANCING: LoadBalancingConfig = LoadBalancingConfig()

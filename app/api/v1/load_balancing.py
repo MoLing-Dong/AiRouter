@@ -1,8 +1,8 @@
 from fastapi import APIRouter, HTTPException, Depends
 from typing import Dict, List, Optional, Any
 from pydantic import BaseModel
-from app.services.database_service import db_service
-from app.services.load_balancing_strategies import LoadBalancingStrategy
+from app.services.database.database_service import db_service
+from app.services.load_balancing.load_balancing_strategies import LoadBalancingStrategy
 
 router = APIRouter(prefix="/v1/load-balancing", tags=["Load Balancing Strategy"])
 
@@ -127,7 +127,8 @@ async def get_strategy_statistics(model_name: Optional[str] = None):
 async def get_strategy_recommendations(model_name: str):
     """Get best strategy recommendations for model"""
     try:
-        from app.services.router import router as smart_router
+        from app.services.load_balancing.router import SmartRouter
+        smart_router = SmartRouter()
         recommendations = smart_router.get_routing_recommendations(model_name)
         
         if "error" in recommendations:

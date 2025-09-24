@@ -6,8 +6,8 @@ import asyncio
 import time
 from typing import Dict, Any, Optional, List
 from datetime import datetime
-from ..models.llm_model_provider import HealthStatusEnum
-from .database_service import DatabaseService
+from app.models.llm_model_provider import HealthStatusEnum
+from app.services.database.database_service import DatabaseService
 from app.utils.logging_config import get_factory_logger
 
 logger = get_factory_logger()

@@ -77,7 +77,7 @@ async def get_all_capabilities():
 async def get_all_models_details():
     """Get all models' detailed information from database (optimized version)"""
     try:
-        from app.services.database_service import db_service
+        from app.services.database.database_service import db_service
         
         # 使用批量查询优化性能
         all_models = db_service.get_all_models(is_enabled=None)
@@ -267,7 +267,7 @@ async def get_model_details(model_name: str):
         # Get model capabilities from database
         capabilities = []
         try:
-            from app.services.database_service import db_service
+            from app.services.database.database_service import db_service
 
             # Get model by name to get ID
             model = db_service.get_model_by_name(model_name)

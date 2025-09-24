@@ -6,7 +6,7 @@ from pydantic import BaseModel
 import json
 
 from app.core.adapters import ChatRequest, Message, MessageRole
-from app.services.router import router
+from app.services.load_balancing.router import router
 from app.utils.logging_config import get_chat_logger
 
 # Get logger
@@ -70,7 +70,7 @@ async def create_message(request: AnthropicMessageRequest):
     """Anthropic compatible messages endpoint"""
     try:
         # Check if model is available
-        from app.services import adapter_manager
+        from app.services.adapters import adapter_manager
 
         # Only get models that support chat functionality
         available_models = adapter_manager.get_available_models(
@@ -200,7 +200,7 @@ async def stream_anthropic_message(request: ChatRequest):
     """Stream Anthropic message response"""
     try:
         # Get adapter manager
-        from app.services import adapter_manager
+        from app.services.adapters import adapter_manager
 
         # Get best adapter
         adapter = adapter_manager.get_best_adapter(request.model)

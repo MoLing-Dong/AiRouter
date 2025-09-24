@@ -8,7 +8,7 @@ import httpx
 import json
 from app.utils.logging_config import get_factory_logger
 from app.models.llm_model_provider import HealthStatusEnum
-from app.services.database_service import db_service
+from app.services.database.database_service import db_service
 
 # Get logger
 logger = get_factory_logger()
@@ -192,8 +192,8 @@ class BaseAdapter(ABC):
             and self.provider_id
         ):
             try:
-                from app.services.health_check_service import HealthCheckService
-                from app.services.database_service import db_service
+                from app.services.monitoring.health_check_service import HealthCheckService
+                from app.services.database.database_service import db_service
 
                 health_service = HealthCheckService(db_service)
                 health_service.sync_adapter_metrics_to_database(
@@ -263,8 +263,8 @@ class BaseAdapter(ABC):
             return False
 
         try:
-            from app.services.health_check_service import HealthCheckService
-            from app.services.database_service import db_service
+            from app.services.monitoring.health_check_service import HealthCheckService
+            from app.services.database.database_service import db_service
 
             health_service = HealthCheckService(db_service)
             return health_service.sync_adapter_health_to_database(

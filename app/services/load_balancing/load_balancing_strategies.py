@@ -4,9 +4,9 @@ import random
 from typing import Dict, List, Optional, Any, Tuple
 from enum import Enum
 from dataclasses import dataclass
-from ..core.adapters import ChatRequest, ChatResponse
-from ..core.adapters.base import BaseAdapter, HealthStatus
-from .database_service import db_service
+from app.core.adapters import ChatRequest, ChatResponse
+from app.core.adapters.base import BaseAdapter, HealthStatus
+from ..database.database_service import db_service
 from app.utils.logging_config import get_factory_logger
 
 # Get logger
@@ -117,7 +117,7 @@ class LoadBalancingStrategyManager:
 
         for mp in model_providers:
             # Get provider information
-            from .database_service import db_service
+            from ..database.database_service import db_service
 
             provider = db_service.get_provider_by_id(mp.provider_id)
             if not provider:
@@ -468,7 +468,7 @@ class LoadBalancingStrategyManager:
 
             if api_key_id:
                 # Update usage count in database
-                from .database_service import db_service
+                from ..database.database_service import db_service
 
                 db_service.update_api_key_usage(api_key_id, increment=True)
                 logger.info(f"Updated API key usage count for key {api_key_id}")

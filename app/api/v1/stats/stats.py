@@ -1,6 +1,9 @@
 import time
 from fastapi import APIRouter, HTTPException
-from app.services.router import router
+from app.services.load_balancing.router import SmartRouter
+
+# Initialize router
+router = SmartRouter()
 from app.services import adapter_manager
 from .dto import StatsResponse, RefreshResponse
 
