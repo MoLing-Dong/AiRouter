@@ -298,8 +298,8 @@ class CapabilityBase(SQLModel):
     description: Optional[str] = Field(default=None)
 
 
-class Capability(CapabilityBase, TimestampMixin, table=True):
-    """能力表"""
+class Capability(CapabilityBase, table=True):
+    """能力表 - 匹配实际数据库结构（无时间戳字段）"""
     __tablename__ = "capabilities"
     
     capability_id: Optional[int] = Field(default=None, primary_key=True)
