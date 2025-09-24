@@ -93,12 +93,25 @@ class OpenAIAdapter(BaseAdapter):
                 "model": self.model_name,
                 "messages": self.format_messages(request.messages),
                 "stream": request.stream,
+                "n": request.n,
+                "stop": request.stop,
+                "logit_bias": request.logit_bias,
+                "user": request.user,
             }
+
+            # Handle thinking parameter separately (not supported by standard OpenAI)
+            thinking_param = request.thinking
+            if thinking_param:
+                logger.info(f"🧠 OpenAI Thinking参数: {thinking_param}")
+                # Note: thinking parameter is preserved for potential custom logic
 
             # Set correct token limit param
             self._set_max_tokens_param(payload, request)
             # Set sampling params depending on model support
             self._set_sampling_params(payload, request)
+
+            # Filter None values
+            payload = {k: v for k, v in payload.items() if v is not None}
 
             # Add tool configuration
             if request.tools:
@@ -167,12 +180,24 @@ class OpenAIAdapter(BaseAdapter):
                 "model": self.model_name,
                 "messages": self.format_messages(request.messages),
                 "stream": True,  # Force enable streaming
+                "n": request.n,
+                "stop": request.stop,
+                "logit_bias": request.logit_bias,
+                "user": request.user,
             }
+
+            # Handle thinking parameter separately
+            thinking_param = request.thinking
+            if thinking_param:
+                logger.info(f"🧠 OpenAI流式请求Thinking参数: {thinking_param}")
 
             # Set correct token limit param
             self._set_max_tokens_param(payload, request)
             # Set sampling params depending on model support
             self._set_sampling_params(payload, request)
+
+            # Filter None values
+            payload = {k: v for k, v in payload.items() if v is not None}
 
             # Add tool configuration
             if request.tools:
@@ -186,7 +211,10 @@ class OpenAIAdapter(BaseAdapter):
                 import openai
 
                 openai_client = openai.AsyncOpenAI(
-                    api_key=self.api_key, base_url=self.base_url
+                    api_key=self.api_key,
+                    base_url=self.base_url,
+                    timeout=10.0,  # 减少超时时间
+                    max_retries=1,  # 减少重试次数以避免延迟
                 )
 
                 # Use OpenAI library to send streaming request

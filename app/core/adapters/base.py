@@ -49,6 +49,11 @@ class ChatRequest(BaseModel):
     tools: Optional[List[Tool]] = None
     tool_choice: Optional[str] = None
     stream: Optional[bool] = False
+    n: Optional[int] = 1
+    stop: Optional[List[str]] = None
+    logit_bias: Optional[Dict[str, float]] = None
+    user: Optional[str] = None
+    thinking: Optional[Dict[str, Any]] = None
 
 
 class ChatResponse(BaseModel):
@@ -192,7 +197,9 @@ class BaseAdapter(ABC):
             and self.provider_id
         ):
             try:
-                from app.services.monitoring.health_check_service import HealthCheckService
+                from app.services.monitoring.health_check_service import (
+                    HealthCheckService,
+                )
                 from app.services.database.database_service import db_service
 
                 health_service = HealthCheckService(db_service)

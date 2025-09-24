@@ -15,8 +15,13 @@ class ZhipuAdapter(BaseAdapter):
         super().__init__(model_config, api_key)
         # Ensure base_url does not end with /, avoid OpenAI library automatically adding path
         base_url = self.base_url.rstrip("/")
-        # Initialize OpenAI client
-        self.client = openai.AsyncOpenAI(api_key=api_key, base_url=base_url)
+        # Initialize OpenAI client with optimized settings
+        self.client = openai.AsyncOpenAI(
+            api_key=api_key,
+            base_url=base_url,
+            timeout=10.0,  # 减少超时时间
+            max_retries=1,  # 减少重试次数以避免延迟
+        )
 
     def format_messages(self, messages: List[Message]) -> List[Dict]:
         """Format messages to OpenAI format"""

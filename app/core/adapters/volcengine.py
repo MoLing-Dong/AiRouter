@@ -15,8 +15,13 @@ class VolcengineAdapter(BaseAdapter):
         super().__init__(model_config, api_key)
         # Ensure base_url does not end with /, avoid OpenAI library automatically adding path
         base_url = self.base_url.rstrip("/")
-        # Initialize OpenAI client
-        self.client = openai.AsyncOpenAI(api_key=api_key, base_url=base_url)
+        # Initialize OpenAI client with optimized settings
+        self.client = openai.AsyncOpenAI(
+            api_key=api_key,
+            base_url=base_url,
+            timeout=10.0,  # 减少超时时间
+            max_retries=1,  # 减少重试次数以避免延迟
+        )
 
     def format_messages(self, messages: List[Message]) -> List[Dict]:
         """Format messages to OpenAI format"""
@@ -44,7 +49,18 @@ class VolcengineAdapter(BaseAdapter):
                 "frequency_penalty": request.frequency_penalty,
                 "presence_penalty": request.presence_penalty,
                 "stream": request.stream,
+                "n": request.n,
+                "stop": request.stop,
+                "logit_bias": request.logit_bias,
+                "user": request.user,
             }
+
+            # Handle thinking parameter separately (not supported by OpenAI library)
+            thinking_param = request.thinking
+            if thinking_param:
+                logger.info(f"🧠 Thinking参数: {thinking_param}")
+                # Note: thinking parameter is preserved for potential custom logic
+                # but not passed to OpenAI client as it doesn't support it
 
             # Filter None values
             filtered_params = {k: v for k, v in params.items() if v is not None}
@@ -98,6 +114,9 @@ class VolcengineAdapter(BaseAdapter):
         logger.info(f"🔥 Volcengine适配器开始流式请求 - 模型: {self.model_name}")
 
         try:
+            # 计时：参数构建
+            param_start = time.time()
+
             # Build request parameters
             params = {
                 "model": self.model_name,
@@ -109,15 +128,28 @@ class VolcengineAdapter(BaseAdapter):
                 "frequency_penalty": request.frequency_penalty,
                 "presence_penalty": request.presence_penalty,
                 "stream": True,  # 强制启用流式
+                "n": request.n,
+                "stop": request.stop,
+                "logit_bias": request.logit_bias,
+                "user": request.user,
             }
+
+            # Handle thinking parameter separately (not supported by OpenAI library)
+            thinking_param = request.thinking
+            if thinking_param:
+                logger.info(f"🧠 流式请求Thinking参数: {thinking_param}")
 
             # Filter None values
             filtered_params = {k: v for k, v in params.items() if v is not None}
-            logger.info(f"📤 发送流式请求到Volcengine: {filtered_params}")
 
-            # 配置OpenAI客户端以减少缓冲
+            param_time = time.time() - param_start
+            logger.info(f"📤 参数构建完成 ({param_time*1000:.1f}ms) - 发送到Volcengine")
+
+            # 计时：API调用
+            api_start = time.time()
             stream = await self.client.chat.completions.create(**filtered_params)
-            logger.info(f"🚀 建立实时chunk流式管道")
+            api_time = time.time() - api_start
+            logger.info(f"🚀 API连接建立完成 ({api_time*1000:.1f}ms)")
 
             # 实时chunk转发机制
             first_chunk_received = False

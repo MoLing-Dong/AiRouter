@@ -30,6 +30,7 @@ class ModelAdapterManager:
 
         # Initialize services
         from ..database.database_service import db_service
+
         self.db_service = db_service
         self.factory = AdapterFactory()
         self.health_checker = HealthChecker()
@@ -211,6 +212,32 @@ class ModelAdapterManager:
             logger.warning(f"Model {model_name} has no available adapters")
             return None
 
+        return self._select_best_adapter(adapters)
+
+    def get_best_adapter_fast(
+        self, model_name: str, skip_version_check: bool = True
+    ) -> Optional[BaseAdapter]:
+        """Get best adapter for the model quickly without version checking (performance optimization)
+
+        Args:
+            model_name: Model name
+            skip_version_check: Whether to skip version checking for performance
+        """
+        if skip_version_check:
+            # 直接使用缓存的适配器，不进行版本检查
+            adapters = self.model_adapters.get(model_name, [])
+            if not adapters:
+                logger.warning(f"Model {model_name} has no available adapters")
+                return None
+            return self._select_best_adapter(adapters)
+        else:
+            # 使用原有的方法，包含版本检查
+            return self.get_best_adapter(model_name)
+
+    def _select_best_adapter(
+        self, adapters: List[BaseAdapter]
+    ) -> Optional[BaseAdapter]:
+        """Select best adapter from a list based on scoring algorithm"""
         # Sort by weight and health status
         scored_adapters = []
         for adapter in adapters:
@@ -287,13 +314,12 @@ class ModelAdapterManager:
             adapters = self.get_model_adapters(model_name)
             if not adapters:
                 continue
-                
+
             # Check if model has at least one healthy adapter
             has_healthy_adapter = any(
-                adapter.health_status == HealthStatus.HEALTHY 
-                for adapter in adapters
+                adapter.health_status == HealthStatus.HEALTHY for adapter in adapters
             )
-            
+
             if has_healthy_adapter:
                 available_models.append(model_name)
 
@@ -312,13 +338,13 @@ class ModelAdapterManager:
                 adapters = self.get_model_adapters(model_name)
                 if not adapters:
                     continue
-                    
+
                 # Check if model has at least one healthy adapter
                 has_healthy_adapter = any(
-                    adapter.health_status == HealthStatus.HEALTHY 
+                    adapter.health_status == HealthStatus.HEALTHY
                     for adapter in adapters
                 )
-                
+
                 if has_healthy_adapter:
                     available_models.append(model_name)
 

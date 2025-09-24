@@ -11,12 +11,18 @@ class AnthropicAdapter(BaseAdapter):
 
     def __init__(self, model_config: Dict[str, Any], api_key: str):
         super().__init__(model_config, api_key)
-        # Anthropic specific configuration
-        self.client.headers.update(
-            {"anthropic-version": "2023-06-01", "x-api-key": api_key}
+
+        # 重新创建具有优化配置的httpx客户端
+        self.client = httpx.AsyncClient(
+            base_url=self.base_url,
+            timeout=10.0,  # 减少超时时间
+            limits=httpx.Limits(max_connections=20, max_keepalive_connections=5),
+            headers={
+                "anthropic-version": "2023-06-01",
+                "x-api-key": api_key,
+                "User-Agent": "AiRouter/1.0",
+            },
         )
-        # Remove Bearer prefix, Anthropic uses x-api-key
-        self.client.headers.pop("Authorization", None)
 
     def format_messages(self, messages: List[Message]) -> List[Dict]:
         """Format messages to Anthropic format"""

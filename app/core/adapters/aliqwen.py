@@ -15,8 +15,13 @@ class AliQwenAdapter(BaseAdapter):
         super().__init__(model_config, api_key)
         # Ensure base_url does not end with / to avoid OpenAI library automatically adding path
         base_url = self.base_url.rstrip("/")
-        # Initialize OpenAI client
-        self.client = openai.AsyncOpenAI(api_key=api_key, base_url=base_url)
+        # Initialize OpenAI client with optimized settings
+        self.client = openai.AsyncOpenAI(
+            api_key=api_key,
+            base_url=base_url,
+            timeout=10.0,  # 减少超时时间
+            max_retries=1,  # 减少重试次数以避免延迟
+        )
 
     def format_messages(self, messages: List[Message]) -> List[Dict]:
         """Format messages to OpenAI format"""
@@ -44,7 +49,16 @@ class AliQwenAdapter(BaseAdapter):
                 "frequency_penalty": request.frequency_penalty,
                 "presence_penalty": request.presence_penalty,
                 "stream": request.stream,
+                "n": request.n,
+                "stop": request.stop,
+                "logit_bias": request.logit_bias,
+                "user": request.user,
             }
+
+            # Handle thinking parameter (AliQwen支持thinking参数)
+            if request.thinking:
+                params["thinking"] = request.thinking
+                logger.info(f"🧠 AliQwen Thinking参数: {request.thinking}")
 
             # Filter None values
             filtered_params = {k: v for k, v in params.items() if v is not None}
@@ -106,7 +120,16 @@ class AliQwenAdapter(BaseAdapter):
                 "frequency_penalty": request.frequency_penalty,
                 "presence_penalty": request.presence_penalty,
                 "stream": True,  # Force enable streaming
+                "n": request.n,
+                "stop": request.stop,
+                "logit_bias": request.logit_bias,
+                "user": request.user,
             }
+
+            # Handle thinking parameter (AliQwen支持thinking参数)
+            if request.thinking:
+                params["thinking"] = request.thinking
+                logger.info(f"🧠 AliQwen流式请求Thinking参数: {request.thinking}")
 
             # Filter None values
             filtered_params = {k: v for k, v in params.items() if v is not None}

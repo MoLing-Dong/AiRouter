@@ -1,4 +1,5 @@
 import asyncio
+import time
 from fastapi import APIRouter, HTTPException, Request, Depends
 from fastapi.responses import StreamingResponse
 from typing import Optional, List, Dict, Any
@@ -39,6 +40,7 @@ class ChatCompletionRequest(BaseModel):
     stop: Optional[List[str]] = None
     logit_bias: Optional[Dict[str, float]] = None
     user: Optional[str] = None
+    thinking: Optional[Dict[str, Any]] = None
 
 
 class ChatCompletionResponse(BaseModel):
@@ -71,56 +73,53 @@ async def chat_completions(
 ):
     """OpenAI compatible chat completion interface"""
     try:
-        # Check if model is available
+        # 添加请求开始计时
+        request_start = time.time()
+        logger.info(f"📥 收到聊天请求 - 模型: {request.model}")
+
+        # 快速路径：直接尝试获取适配器，避免数据库查询
         from app.services import adapter_manager
 
-        # Only get models that support chat functionality (text processing and multimodal understanding)
-        available_models = adapter_manager.get_available_models(
-            capabilities=["TEXT", "MULTIMODAL_IMAGE_UNDERSTANDING"]
+        # 直接获取适配器，如果不存在会返回None
+        adapter = adapter_manager.get_best_adapter_fast(
+            request.model, skip_version_check=True
         )
 
-        # If model is not available, try to reload configuration from database
-        if request.model not in available_models:
-            logger.warning(
-                f"Model '{request.model}' not found in available models: {available_models}"
-            )
-            logger.info("Attempting to reload model configurations from database...")
+        # 如果没有找到适配器，尝试重新加载配置（仅在必要时）
+        if not adapter:
+            logger.info(f"⚠️ 未找到模型适配器，尝试重新加载配置: {request.model}")
 
             # Use lock to prevent multiple simultaneous reloads
             async with _config_reload_lock:
                 try:
-                    # Check again while holding the lock (in case another request already reloaded)
-                    available_models = adapter_manager.get_available_models(
-                        capabilities=["TEXT", "MULTIMODAL_IMAGE_UNDERSTANDING"]
+                    # 重新加载配置
+                    adapter_manager.load_models_from_database()
+
+                    # 再次尝试获取适配器
+                    adapter = adapter_manager.get_best_adapter_fast(
+                        request.model, skip_version_check=True
                     )
 
-                    if request.model not in available_models:
-                        # Reload configurations from database
-                        adapter_manager.load_models_from_database()
-
-                        # Check again after reload
-                        available_models = adapter_manager.get_available_models(
-                            capabilities=["TEXT", "MULTIMODAL_IMAGE_UNDERSTANDING"]
+                    if not adapter:
+                        # 获取可用模型列表用于错误消息
+                        available_models = list(adapter_manager.model_configs.keys())
+                        raise HTTPException(
+                            status_code=400,
+                            detail=f"Model '{request.model}' is not available. Available models: {available_models}",
                         )
-                        logger.info(
-                            f"After reload, available models: {available_models}"
-                        )
-
-                        if request.model not in available_models:
-                            raise HTTPException(
-                                status_code=400,
-                                detail=f"Model '{request.model}' is not available. Available models: {available_models}",
-                            )
                 except Exception as reload_error:
-                    logger.error(
-                        f"Failed to reload model configurations: {reload_error}"
-                    )
+                    logger.error(f"重新加载配置失败: {reload_error}")
+                    available_models = list(adapter_manager.model_configs.keys())
                     raise HTTPException(
                         status_code=400,
                         detail=f"Model '{request.model}' is not available. Available models: {available_models}",
                     )
 
+        adapter_get_time = time.time() - request_start
+        logger.info(f"📡 适配器获取完成 ({adapter_get_time*1000:.1f}ms)")
+
         # Convert message format
+        message_start = time.time()
         messages = []
         for msg in request.messages:
             message = Message(
@@ -131,7 +130,11 @@ async def chat_completions(
             )
             messages.append(message)
 
+        message_time = time.time() - message_start
+        logger.info(f"📝 消息格式转换完成 ({message_time*1000:.1f}ms)")
+
         # Build ChatRequest
+        build_start = time.time()
         chat_request = ChatRequest(
             model=request.model,
             messages=messages,
@@ -143,7 +146,19 @@ async def chat_completions(
             tools=request.tools,
             tool_choice=request.tool_choice,
             stream=request.stream,
+            n=request.n,
+            stop=request.stop,
+            logit_bias=request.logit_bias,
+            user=request.user,
+            thinking=request.thinking,
         )
+
+        build_time = time.time() - build_start
+        logger.info(f"🔧 ChatRequest构建完成 ({build_time*1000:.1f}ms)")
+
+        # 计算请求预处理总时间
+        total_prep_time = time.time() - request_start
+        logger.info(f"⚡ 请求预处理完成，总耗时: {total_prep_time*1000:.1f}ms")
 
         if request.stream:
             logger.info(f"🌊 启动实时流式响应管道: {chat_request.model}")
@@ -165,8 +180,21 @@ async def chat_completions(
                 background=None,  # 不使用后台任务
             )
         else:
-            # Normal response
-            response = await router.route_request(chat_request)
+            # Normal response - use fast adapter method for better performance
+            from app.services import adapter_manager
+
+            adapter = adapter_manager.get_best_adapter_fast(
+                chat_request.model, skip_version_check=True
+            )
+
+            if not adapter:
+                raise HTTPException(
+                    status_code=503,
+                    detail=f"No available adapter for model {chat_request.model}",
+                )
+
+            # Use adapter directly instead of router for better performance
+            response = await adapter.chat_completion(chat_request)
 
             # Convert to OpenAI compatible format
             return ChatCompletionResponse(
@@ -195,12 +223,21 @@ async def stream_chat_completion(request: ChatRequest):
     logger.info(f"🚀 开始流式响应处理 - 模型: {request.model}")
 
     try:
+        # 计时：适配器获取
+        adapter_start = time.time()
+
         # Get adapter manager
         from app.services import adapter_manager
 
-        # Get best adapter
-        adapter = adapter_manager.get_best_adapter(request.model)
-        logger.info(f"📡 获取到适配器: {type(adapter).__name__ if adapter else 'None'}")
+        # Get best adapter using fast method (skip version check for performance)
+        adapter = adapter_manager.get_best_adapter_fast(
+            request.model, skip_version_check=True
+        )
+
+        adapter_time = time.time() - adapter_start
+        logger.info(f"📡 适配器获取完成 ({adapter_time*1000:.1f}ms)")
+        # 减少详细日志，仅在DEBUG模式下输出
+        # logger.info(f"📡 快速获取到适配器: {type(adapter).__name__ if adapter else 'None'}")
 
         if not adapter:
             logger.error(f"❌ 未找到模型适配器: {request.model}")
@@ -212,37 +249,31 @@ async def stream_chat_completion(request: ChatRequest):
         try:
             # Check if adapter supports stream response
             if hasattr(adapter, "stream_chat_completion"):
-                logger.info(f"✅ 适配器支持流式响应，开始处理...")
+                # 开始流式处理，减少日志以提升性能
 
-                # 发送开始信号给客户端
-                start_signal = json.dumps(
-                    {
-                        "type": "stream_start",
-                        "model": request.model,
-                        "timestamp": int(time.time()),
-                    }
-                )
-                yield f"data: {start_signal}\n\n"
-
-                logger.info(f"🔄 建立实时chunk转发管道...")
+                # 计时：流式生成器创建
+                generator_start = time.time()
 
                 # 实时chunk转发管道 - 接收到就立即转发
                 try:
                     # 获取适配器的流式响应生成器
                     stream_generator = adapter.stream_chat_completion(request)
 
+                    generator_time = time.time() - generator_start
+                    logger.info(f"🔄 生成器创建完成 ({generator_time*1000:.1f}ms)")
+
                     # 性能监控标志
                     first_chunk_received = False
 
-                    # 实时转发循环 - 保持格式但零延迟转发
+                    # 实时转发循环 - 零延迟转发
                     async for chunk in stream_generator:
                         # 首个chunk性能记录
                         if not first_chunk_received:
                             first_chunk_received = True
-                            delay = time.time() - start_time
-                            logger.info(f"⚡ 实时转发管道激活，延迟: {delay:.3f}s")
+                            total_delay = time.time() - start_time
+                            logger.info(f"⚡ 首chunk到达，总延迟: {total_delay:.3f}s")
 
-                        # 立即转发chunk（已经是正确的SSE格式）
+                        # 立即转发chunk
                         yield chunk
 
                 except asyncio.CancelledError:
