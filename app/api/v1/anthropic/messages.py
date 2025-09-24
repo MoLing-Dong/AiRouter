@@ -1,5 +1,5 @@
 import asyncio
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import StreamingResponse
 from typing import Optional, List, Dict, Any
 from pydantic import BaseModel
@@ -7,6 +7,7 @@ import json
 
 from app.core.adapters import ChatRequest, Message, MessageRole
 from app.services.load_balancing.router import router
+from app.utils.simple_auth import require_api_key
 from app.utils.logging_config import get_chat_logger
 
 # Get logger
@@ -66,7 +67,9 @@ class AnthropicMessageStreamChunk(BaseModel):
 
 
 @anthropic_router.post("/messages")
-async def create_message(request: AnthropicMessageRequest):
+async def create_message(
+    request: AnthropicMessageRequest, api_key: str = Depends(require_api_key)
+):
     """Anthropic compatible messages endpoint"""
     try:
         # Check if model is available
@@ -164,8 +167,10 @@ async def create_message(request: AnthropicMessageRequest):
 
             # Convert to Anthropic compatible format
             content_text = response.choices[0]["message"]["content"]
-            logger.info(f"Content text type: {type(content_text)}, value: {content_text}")
-            
+            logger.info(
+                f"Content text type: {type(content_text)}, value: {content_text}"
+            )
+
             # Ensure content is always a list format for Anthropic
             if isinstance(content_text, str):
                 content_list = [{"type": "text", "text": content_text}]
@@ -173,9 +178,9 @@ async def create_message(request: AnthropicMessageRequest):
                 content_list = content_text
             else:
                 content_list = [{"type": "text", "text": str(content_text)}]
-            
+
             logger.info(f"Content list: {content_list}")
-            
+
             return AnthropicMessageResponse(
                 id=response.id,
                 model=response.model,
@@ -220,6 +225,7 @@ async def stream_anthropic_message(request: ChatRequest):
 
                 # Send message_start event
                 import time
+
                 message_start_data = {
                     "type": "message_start",
                     "message": {

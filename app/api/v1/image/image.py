@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import StreamingResponse
 from typing import Optional, List, Dict, Any
 from pydantic import BaseModel
@@ -8,6 +8,7 @@ import uuid
 
 from app.core.adapters.base import BaseAdapter
 from app.services.load_balancing.router import SmartRouter
+from app.utils.simple_auth import require_api_key
 
 # Initialize router
 router = SmartRouter()
@@ -63,7 +64,9 @@ class ImageResponse(BaseModel):
 
 
 @image_router.post("/images/generations")
-async def create_image(request: ImageGenerationRequest):
+async def create_image(
+    request: ImageGenerationRequest, api_key: str = Depends(require_api_key)
+):
     """Create image from text prompt"""
     try:
         # Check if model is available
@@ -121,7 +124,9 @@ async def create_image(request: ImageGenerationRequest):
 
 
 @image_router.post("/images/edits")
-async def edit_image(request: ImageEditRequest):
+async def edit_image(
+    request: ImageEditRequest, api_key: str = Depends(require_api_key)
+):
     """Edit image based on prompt and optional mask"""
     try:
         # Check if model is available
@@ -180,7 +185,9 @@ async def edit_image(request: ImageEditRequest):
 
 
 @image_router.post("/images/variations")
-async def create_image_variation(request: ImageVariationRequest):
+async def create_image_variation(
+    request: ImageVariationRequest, api_key: str = Depends(require_api_key)
+):
     """Create image variations from base image"""
     try:
         # Check if model is available

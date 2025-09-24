@@ -8,16 +8,9 @@ from config.settings import settings
 
 
 if __name__ == "__main__":
-    cpu_count = os.cpu_count() or 1
-    # Prefer settings.WORKERS if provided; otherwise min(2*CPU, 8)
-    if (
-        hasattr(settings, "WORKERS")
-        and isinstance(settings.WORKERS, int)
-        and settings.WORKERS > 0
-    ):
-        workers = settings.WORKERS
-    else:
-        workers = min(2 * cpu_count, 8)
+    # For streaming support, use single worker mode
+    # Multi-worker mode can cause issues with SSE streaming
+    workers = 1 if not settings.DEBUG else None
 
     uvicorn.run(
         "app.main:app",
@@ -29,7 +22,12 @@ if __name__ == "__main__":
         loop="uvloop",
         http="h11",
         backlog=getattr(settings, "BACKLOG", 2048),
-        timeout_keep_alive=getattr(settings, "TIMEOUT_KEEP_ALIVE", 5),
+        timeout_keep_alive=getattr(
+            settings, "TIMEOUT_KEEP_ALIVE", 30
+        ),  # 增加keep-alive时间
+        # 优化流式响应的配置
+        ws_ping_interval=20,
+        ws_ping_timeout=20,
+        limit_max_requests=None,  # 不限制请求数量
+        access_log=settings.DEBUG,  # 开发模式显示访问日志
     )
-
-

@@ -74,11 +74,18 @@ class Settings(BaseSettings):
     # Application base configuration
     APP_NAME: str = "AI Router"
     APP_VERSION: str = "1.0.0"
-    APP_DESCRIPTION: str = "AI Router is a tool that allows you to route requests to the appropriate model provider based on the request payload."
+    APP_DESCRIPTION: str = (
+        "AI Router is a tool that allows you to route requests to the appropriate model provider based on the request payload."
+    )
     DEBUG: bool = False
     RUN_ENV: str = "dev"
     LOG_LEVEL: str = "INFO"
+
+    # API Key
+    API_KEY: str = ""
     
+    SECURITY_API_KEY_REQUIRED: bool = True
+
     # Server configuration
     HOST: str = "0.0.0.0"
     PORT: int = 8000
@@ -98,7 +105,7 @@ class Settings(BaseSettings):
     DB_MAX_OVERFLOW: int = 50  # 增加最大溢出连接
     DB_POOL_TIMEOUT: int = 30
     DB_POOL_RECYCLE: int = 3600
-    
+
     # 异步数据库配置
     ASYNC_DB_ENABLED: bool = True
     ASYNC_DB_POOL_SIZE: int = 25

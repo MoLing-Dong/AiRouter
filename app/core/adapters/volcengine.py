@@ -92,7 +92,10 @@ class VolcengineAdapter(BaseAdapter):
 
     async def stream_chat_completion(self, request: ChatRequest):
         """Execute Volcengine stream chat completion request - using OpenAI library"""
+        import asyncio
+
         start_time = time.time()
+        logger.info(f"🔥 Volcengine适配器开始流式请求 - 模型: {self.model_name}")
 
         try:
             # Build request parameters
@@ -110,14 +113,29 @@ class VolcengineAdapter(BaseAdapter):
 
             # Filter None values
             filtered_params = {k: v for k, v in params.items() if v is not None}
+            logger.info(f"📤 发送流式请求到Volcengine: {filtered_params}")
 
-            # Use OpenAI library to send streaming request
+            # 配置OpenAI客户端以减少缓冲
             stream = await self.client.chat.completions.create(**filtered_params)
+            logger.info(f"🚀 建立实时chunk流式管道")
 
-            # Directly return native streaming response
+            # 实时chunk转发机制
+            first_chunk_received = False
+
+            # 使用异步迭代器实现接收到就立即转发
             async for chunk in stream:
-                # Convert JSON to SSE format
-                yield f"data: {chunk.model_dump_json()}\n\n"
+                # 首个chunk性能监控
+                if not first_chunk_received:
+                    first_chunk_received = True
+                    delay = time.time() - start_time
+                    logger.info(f"⚡ 首个chunk接收，延迟: {delay:.3f}s")
+
+                # 零延迟转换和转发 - 保持SSE格式
+                sse_chunk = f"data: {chunk.model_dump_json()}\n\n"
+                yield sse_chunk
+
+            total_time = time.time() - start_time
+            logger.info(f"✅ Volcengine实时流式响应完成 - 总耗时: {total_time:.3f}秒")
 
             # Update metrics
             response_time = time.time() - start_time
@@ -126,6 +144,8 @@ class VolcengineAdapter(BaseAdapter):
         except openai.APIError as e:
             response_time = time.time() - start_time
             self.update_metrics(response_time, False)
+
+            logger.error(f"❌ Volcengine API错误: {str(e)}")
 
             # Update health status based on error status code
             if hasattr(e, "status_code"):
@@ -140,6 +160,7 @@ class VolcengineAdapter(BaseAdapter):
             response_time = time.time() - start_time
             self.update_metrics(response_time, False)
             self.health_status = HealthStatus.UNHEALTHY
+            logger.error(f"❌ Volcengine适配器错误: {str(e)}")
             raise Exception(f"Volcengine stream adapter error: {str(e)}")
 
     async def health_check(self) -> HealthStatus:

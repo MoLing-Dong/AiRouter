@@ -1,5 +1,5 @@
 import asyncio
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request, Depends
 from fastapi.responses import StreamingResponse
 from typing import Optional, List, Dict, Any
 from pydantic import BaseModel
@@ -7,6 +7,7 @@ import json
 
 from app.core.adapters import ChatRequest, Message, MessageRole
 from app.services.load_balancing.router import SmartRouter
+from app.utils.simple_auth import require_api_key
 
 # Initialize router
 router = SmartRouter()
@@ -65,7 +66,9 @@ class ChatCompletionChunk(BaseModel):
 
 
 @chat_router.post("/chat/completions")
-async def chat_completions(request: ChatCompletionRequest):
+async def chat_completions(
+    request: ChatCompletionRequest, api_key: str = Depends(require_api_key)
+):
     """OpenAI compatible chat completion interface"""
     try:
         # Check if model is available
@@ -143,16 +146,23 @@ async def chat_completions(request: ChatCompletionRequest):
         )
 
         if request.stream:
-            logger.info(f"Stream response: {chat_request}")
-            # Stream response
+            logger.info(f"🌊 启动实时流式响应管道: {chat_request.model}")
+            # 实时流式响应，零缓冲配置
             return StreamingResponse(
                 stream_chat_completion(chat_request),
                 media_type="text/event-stream",
                 headers={
-                    "Cache-Control": "no-cache",
+                    "Cache-Control": "no-cache, no-store, must-revalidate",
                     "Connection": "keep-alive",
-                    "X-Accel-Buffering": "no",  # Disable nginx buffering
+                    "X-Accel-Buffering": "no",  # 禁用nginx缓冲
+                    "X-Content-Type-Options": "nosniff",
+                    "Access-Control-Allow-Origin": "*",
+                    "Access-Control-Allow-Headers": "*",
+                    "Transfer-Encoding": "chunked",
+                    "Content-Encoding": "identity",  # 禁用压缩
+                    "Pragma": "no-cache",  # HTTP/1.0兼容
                 },
+                background=None,  # 不使用后台任务
             )
         else:
             # Normal response
@@ -177,45 +187,105 @@ async def chat_completions(request: ChatCompletionRequest):
 
 
 async def stream_chat_completion(request: ChatRequest):
-    """Stream chat completion"""
+    """Stream chat completion with real-time forwarding"""
+    import asyncio
+    import time
+
+    start_time = time.time()
+    logger.info(f"🚀 开始流式响应处理 - 模型: {request.model}")
+
     try:
         # Get adapter manager
         from app.services import adapter_manager
 
         # Get best adapter
         adapter = adapter_manager.get_best_adapter(request.model)
-        logger.info(f"Get adapter: {adapter}")
+        logger.info(f"📡 获取到适配器: {type(adapter).__name__ if adapter else 'None'}")
+
         if not adapter:
-            logger.error(f"No adapter found for model {request.model}")
-            yield f"data: {json.dumps({'error': 'No available adapter for model'})}\n\n"
+            logger.error(f"❌ 未找到模型适配器: {request.model}")
+            error_msg = json.dumps({"error": "No available adapter for model"})
+            yield f"data: {error_msg}\n\n"
             return
 
         # Call adapter to stream response
         try:
             # Check if adapter supports stream response
             if hasattr(adapter, "stream_chat_completion"):
-                logger.info(
-                    f"Start stream response, adapter type: {type(adapter).__name__}"
+                logger.info(f"✅ 适配器支持流式响应，开始处理...")
+
+                # 发送开始信号给客户端
+                start_signal = json.dumps(
+                    {
+                        "type": "stream_start",
+                        "model": request.model,
+                        "timestamp": int(time.time()),
+                    }
                 )
-                async for chunk in adapter.stream_chat_completion(request):
-                    # Return native stream response
-                    yield chunk
+                yield f"data: {start_signal}\n\n"
+
+                logger.info(f"🔄 建立实时chunk转发管道...")
+
+                # 实时chunk转发管道 - 接收到就立即转发
+                try:
+                    # 获取适配器的流式响应生成器
+                    stream_generator = adapter.stream_chat_completion(request)
+
+                    # 性能监控标志
+                    first_chunk_received = False
+
+                    # 实时转发循环 - 保持格式但零延迟转发
+                    async for chunk in stream_generator:
+                        # 首个chunk性能记录
+                        if not first_chunk_received:
+                            first_chunk_received = True
+                            delay = time.time() - start_time
+                            logger.info(f"⚡ 实时转发管道激活，延迟: {delay:.3f}s")
+
+                        # 立即转发chunk（已经是正确的SSE格式）
+                        yield chunk
+
+                except asyncio.CancelledError:
+                    logger.info("🛑 流式传输被客户端取消")
+                    raise
+                except Exception as stream_error:
+                    logger.error(f"❌ 流式管道错误: {stream_error}")
+                    error_msg = json.dumps(
+                        {"error": f"Stream pipeline error: {str(stream_error)}"}
+                    )
+                    yield f"data: {error_msg}\n\n"
+                    return
+
+                total_time = time.time() - start_time
+                logger.info(f"✅ 实时chunk转发完成 - 总耗时: {total_time:.3f}秒")
+
+                # 发送结束标记
+                yield "data: [DONE]\n\n"
+
             else:
-                # If adapter does not support stream, return error
-                yield f"data: {json.dumps({'error': 'This model does not support streaming'})}\n\n"
+                logger.error(f"❌ 适配器不支持流式响应: {type(adapter).__name__}")
+                error_msg = json.dumps(
+                    {"error": "This model does not support streaming"}
+                )
+                yield f"data: {error_msg}\n\n"
                 return
 
         except Exception as e:
-            logger.error(f"Stream response failed: {e}")
-            yield f"data: {json.dumps({'error': f'Stream response failed: {str(e)}'})}\n\n"
+            logger.error(f"❌ 流式响应处理失败: {str(e)}")
+            error_msg = json.dumps({"error": f"Stream response failed: {str(e)}"})
+            yield f"data: {error_msg}\n\n"
             return
 
     except Exception as e:
-        yield f"data: {json.dumps({'error': str(e)})}\n\n"
+        logger.error(f"❌ 流式响应初始化失败: {str(e)}")
+        error_msg = json.dumps({"error": f"Stream initialization failed: {str(e)}"})
+        yield f"data: {error_msg}\n\n"
 
 
 @chat_router.post("/embeddings")
-async def create_embeddings(request: Dict[str, Any]):
+async def create_embeddings(
+    request: Dict[str, Any], api_key: str = Depends(require_api_key)
+):
     """Create text embedding"""
     try:
         model = request.get("model", "text-embedding-v1")

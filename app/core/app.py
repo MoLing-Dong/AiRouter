@@ -7,6 +7,7 @@ from app.utils.logging_config import get_factory_logger
 # Get logger
 logger = get_factory_logger()
 
+
 def create_app() -> FastAPI:
     """Create FastAPI application instance"""
     app = FastAPI(
