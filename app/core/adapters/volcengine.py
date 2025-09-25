@@ -55,12 +55,18 @@ class VolcengineAdapter(BaseAdapter):
                 "user": request.user,
             }
 
-            # Handle thinking parameter separately (not supported by OpenAI library)
+            # Handle thinking parameter using extra_body (Volcengine specific)
             thinking_param = request.thinking
-            if thinking_param:
-                logger.info(f"🧠 Thinking参数: {thinking_param}")
-                # Note: thinking parameter is preserved for potential custom logic
-                # but not passed to OpenAI client as it doesn't support it
+            if thinking_param and isinstance(thinking_param, dict):
+                thinking_type = thinking_param.get("type")
+                if thinking_type and thinking_type in ["enabled", "disabled", "auto"]:
+                    logger.info(f"🧠 Thinking参数: {thinking_type}")
+                    # Add thinking parameter to extra_body for Volcengine API
+                    params["extra_body"] = {
+                        "thinking": {
+                            "type": thinking_type  # "enabled", "disabled", or "auto"
+                        }
+                    }
 
             # Filter None values
             filtered_params = {k: v for k, v in params.items() if v is not None}
@@ -134,17 +140,26 @@ class VolcengineAdapter(BaseAdapter):
                 "user": request.user,
             }
 
-            # Handle thinking parameter separately (not supported by OpenAI library)
+            # Handle thinking parameter using extra_body (Volcengine specific)
             thinking_param = request.thinking
-            if thinking_param:
-                logger.info(f"🧠 流式请求Thinking参数: {thinking_param}")
+            if thinking_param and isinstance(thinking_param, dict):
+                thinking_type = thinking_param.get("type")
+                if thinking_type and thinking_type in ["enabled", "disabled", "auto"]:
+                    logger.info(f"🧠 流式请求Thinking参数: {thinking_type}")
+                    # Add thinking parameter to extra_body for Volcengine API
+                    params["extra_body"] = {
+                        "thinking": {
+                            "type": thinking_type  # "enabled", "disabled", or "auto"
+                        }
+                    }
 
             # Filter None values
             filtered_params = {k: v for k, v in params.items() if v is not None}
 
             param_time = time.time() - param_start
             logger.info(f"📤 参数构建完成 ({param_time*1000:.1f}ms) - 发送到Volcengine")
-
+            # 打印params
+            logger.debug(f"🔍 参数: {params}")
             # 计时：API调用
             api_start = time.time()
             stream = await self.client.chat.completions.create(**filtered_params)

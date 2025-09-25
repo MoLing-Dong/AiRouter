@@ -9,7 +9,10 @@ from sqlalchemy import text
 from app.services.database.database_service import db_service
 
 # Initialize logging system
-init_logging()
+init_logging({
+    "console_level": settings.LOG_LEVEL,
+    "file_level": "DEBUG",
+})
 
 # Register routes
 register_routes(app)
