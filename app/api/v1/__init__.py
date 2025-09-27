@@ -1,22 +1,16 @@
 # Export all v1 version routes
+from fastapi import APIRouter
 from .chat import chat_router
 from .image import image_router
-from .models import models_router
-from .stats import stats_router
-from .database import db_router
-from .health import health_router
-from .providers import providers_router
-from .load_balancing import router as load_balancing_router
 from .anthropic import anthropic_router
 
-__all__ = [
-    "chat_router", 
-    "image_router",
-    "models_router", 
-    "stats_router", 
-    "db_router", 
-    "health_router",
-    "providers_router",
-    "load_balancing_router",
-    "anthropic_router"
-]
+# 创建v1主路由
+v1_router = APIRouter(prefix="/v1", tags=["V1 API"])
+
+# 注册核心AI服务路由
+v1_router.include_router(chat_router, tags=["Chat"])
+v1_router.include_router(image_router, tags=["Images"])
+v1_router.include_router(anthropic_router, tags=["Anthropic"])
+
+# 导出所有路由器
+__all__ = ["v1_router", "chat_router", "image_router", "anthropic_router"]
