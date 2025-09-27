@@ -18,7 +18,7 @@ from app.utils.logging_config import get_chat_logger
 logger = get_chat_logger()
 
 
-image_router = APIRouter(prefix="/v1", tags=["Images"])
+image_router = APIRouter(tags=["Images"])
 
 
 class ImageGenerationRequest(BaseModel):

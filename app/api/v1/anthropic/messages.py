@@ -16,7 +16,7 @@ logger = get_chat_logger()
 # Global lock for configuration reloading
 _config_reload_lock = asyncio.Lock()
 
-anthropic_router = APIRouter(prefix="/v1", tags=["Anthropic"])
+anthropic_router = APIRouter(tags=["Anthropic"])
 
 
 class MessageContent(BaseModel):

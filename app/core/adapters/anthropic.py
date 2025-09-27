@@ -125,9 +125,15 @@ class AnthropicAdapter(BaseAdapter):
 
     async def stream_chat_completion(self, request: ChatRequest):
         """Execute Anthropic stream chat completion request"""
+        import asyncio
+
         start_time = time.time()
+        logger.info(f"🔥 Anthropic适配器开始流式请求 - 模型: {self.model_name}")
 
         try:
+            # 计时：参数构建
+            param_start = time.time()
+
             # Build request data
             payload = {
                 "model": self.model_name,
@@ -139,15 +145,41 @@ class AnthropicAdapter(BaseAdapter):
                 "stream": True,  # Force enable streaming
             }
 
+            param_time = time.time() - param_start
+            logger.info(f"📤 参数构建完成 ({param_time*1000:.1f}ms) - 发送到Anthropic")
+
+            # 计时：API调用
+            api_start = time.time()
+
             # Send streaming request
             async with self.client.stream(
                 "POST", f"{self.base_url}/v1/messages", json=payload
             ) as response:
                 response.raise_for_status()
 
+                api_time = time.time() - api_start
+                logger.info(f"🚀 API连接建立完成 ({api_time*1000:.1f}ms)")
+
+                # 实时chunk转发机制
+                first_chunk_received = False
+                chunk_count = 0
+
                 # Directly return the native streaming response
                 async for line in response.aiter_lines():
+                    chunk_count += 1
+
+                    # 首个chunk性能监控
+                    if not first_chunk_received:
+                        first_chunk_received = True
+                        delay = time.time() - start_time
+                        logger.info(f"⚡ 首个chunk接收，延迟: {delay:.3f}s")
+
                     yield line
+
+            total_time = time.time() - start_time
+            logger.info(
+                f"✅ Anthropic实时流式响应完成 - 总耗时: {total_time:.3f}秒，处理chunk: {chunk_count}"
+            )
 
             # Update metrics
             response_time = time.time() - start_time

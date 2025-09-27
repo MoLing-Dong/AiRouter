@@ -9,10 +9,12 @@ from sqlalchemy import text
 from app.services.database.database_service import db_service
 
 # Initialize logging system
-init_logging({
-    "console_level": settings.LOG_LEVEL,
-    "file_level": "DEBUG",
-})
+init_logging(
+    {
+        "console_level": settings.LOG_LEVEL,
+        "file_level": "DEBUG",
+    }
+)
 
 # Register routes
 register_routes(app)
@@ -53,7 +55,7 @@ async def lifespan(app):
 
     # Preload models cache for faster first request
     logger.info("🔥 Preloading models cache...")
-    from app.api.v1.models.model_service import model_service
+    from app.api.admin.models.model_service import model_service
 
     await model_service.preload_models_cache()
 

@@ -172,9 +172,15 @@ class OpenAIAdapter(BaseAdapter):
 
     async def stream_chat_completion(self, request: ChatRequest):
         """Execute OpenAI stream chat completion request"""
+        import asyncio
+
         start_time = time.time()
+        logger.info(f"🔥 OpenAI适配器开始流式请求 - 模型: {self.model_name}")
 
         try:
+            # 计时：参数构建
+            param_start = time.time()
+
             # Build request data
             payload = {
                 "model": self.model_name,
@@ -205,6 +211,9 @@ class OpenAIAdapter(BaseAdapter):
                 if request.tool_choice:
                     payload["tool_choice"] = request.tool_choice
 
+            param_time = time.time() - param_start
+            logger.info(f"📤 参数构建完成 ({param_time*1000:.1f}ms) - 发送到OpenAI")
+
             # Try using OpenAI library streaming (if available)
             try:
                 # Create OpenAI client
@@ -217,13 +226,33 @@ class OpenAIAdapter(BaseAdapter):
                     max_retries=1,  # 减少重试次数以避免延迟
                 )
 
-                # Use OpenAI library to send streaming request
+                # 计时：API调用
+                api_start = time.time()
                 stream = await openai_client.chat.completions.create(**payload)
+                api_time = time.time() - api_start
+                logger.info(f"🚀 API连接建立完成 ({api_time*1000:.1f}ms)")
+
+                # 实时chunk转发机制
+                first_chunk_received = False
+                chunk_count = 0
 
                 # Process streaming response chunk by chunk
                 async for chunk in stream:
+                    chunk_count += 1
+
+                    # 首个chunk性能监控
+                    if not first_chunk_received:
+                        first_chunk_received = True
+                        delay = time.time() - start_time
+                        logger.info(f"⚡ 首个chunk接收，延迟: {delay:.3f}s")
+
                     # Convert JSON to SSE format
                     yield f"data: {chunk.model_dump_json()}\n\n"
+
+                total_time = time.time() - start_time
+                logger.info(
+                    f"✅ OpenAI实时流式响应完成 - 总耗时: {total_time:.3f}秒，处理chunk: {chunk_count}"
+                )
 
             except Exception as openai_error:
                 logger.info(

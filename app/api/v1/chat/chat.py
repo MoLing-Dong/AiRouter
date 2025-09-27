@@ -20,7 +20,7 @@ logger = get_chat_logger()
 # Global lock for configuration reloading
 _config_reload_lock = asyncio.Lock()
 
-chat_router = APIRouter(prefix="/v1", tags=["Chat"])
+chat_router = APIRouter(tags=["Chat"])
 
 
 class ChatCompletionRequest(BaseModel):

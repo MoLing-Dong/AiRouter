@@ -1,4 +1,5 @@
 import time
+import json
 from typing import Dict, List, Any, Optional
 from .base import BaseAdapter, ChatRequest, ChatResponse, Message, HealthStatus
 import openai
@@ -32,6 +33,53 @@ class ZhipuAdapter(BaseAdapter):
                 formatted_msg["name"] = msg.name
             formatted_messages.append(formatted_msg)
         return formatted_messages
+
+    def _convert_to_openai_format(self, zhipu_chunk: Dict[str, Any]) -> Dict[str, Any]:
+        """Convert Zhipu chunk format to OpenAI standard format"""
+        openai_chunk = {
+            "id": zhipu_chunk.get("id"),
+            "object": "chat.completion.chunk",
+            "created": zhipu_chunk.get("created"),
+            "model": zhipu_chunk.get("model"),
+            "choices": [],
+        }
+
+        if zhipu_chunk.get("choices"):
+            for choice in zhipu_chunk["choices"]:
+                delta = choice.get("delta", {})
+                openai_delta = {}
+
+                # 处理常规内容
+                if delta.get("content"):
+                    openai_delta["content"] = delta["content"]
+
+                # 处理智谱特有的推理内容 - 保持为思考内容
+                elif delta.get("reasoning_content"):
+                    # 保持推理内容作为独立的思考字段
+                    openai_delta["reasoning_content"] = delta["reasoning_content"]
+                    # 或者使用更通用的思考字段名
+                    openai_delta["thinking"] = delta["reasoning_content"]
+
+                # 处理角色
+                if delta.get("role"):
+                    openai_delta["role"] = delta["role"]
+
+                # 处理工具调用
+                if delta.get("tool_calls"):
+                    openai_delta["tool_calls"] = delta["tool_calls"]
+                if delta.get("function_call"):
+                    openai_delta["function_call"] = delta["function_call"]
+
+                openai_choice = {
+                    "index": choice.get("index", 0),
+                    "delta": openai_delta,
+                    "finish_reason": choice.get("finish_reason"),
+                    "logprobs": choice.get("logprobs"),
+                }
+
+                openai_chunk["choices"].append(openai_choice)
+
+        return openai_chunk
 
     async def chat_completion(self, request: ChatRequest) -> ChatResponse:
         """Execute Zhipu chat completion request - using OpenAI library"""
@@ -97,9 +145,15 @@ class ZhipuAdapter(BaseAdapter):
 
     async def stream_chat_completion(self, request: ChatRequest):
         """Execute Zhipu stream chat completion request - using OpenAI library"""
+        import asyncio
+
         start_time = time.time()
+        logger.info(f"🔥 Zhipu适配器开始流式请求 - 模型: {self.model_name}")
 
         try:
+            # 计时：参数构建
+            param_start = time.time()
+
             # Build request parameters
             params = {
                 "model": self.model_name,
@@ -116,13 +170,77 @@ class ZhipuAdapter(BaseAdapter):
             # Filter None values
             filtered_params = {k: v for k, v in params.items() if v is not None}
 
-            # Use OpenAI library to send streaming request
-            stream = await self.client.chat.completions.create(**filtered_params)
+            param_time = time.time() - param_start
+            logger.info(f"📤 参数构建完成 ({param_time*1000:.1f}ms) - 发送到Zhipu")
 
-            # Directly return native streaming response
+            # 计时：API调用
+            api_start = time.time()
+            stream = await self.client.chat.completions.create(**filtered_params)
+            api_time = time.time() - api_start
+            logger.info(f"🚀 API连接建立完成 ({api_time*1000:.1f}ms)")
+
+            # 实时chunk转发机制
+            first_chunk_received = False
+            chunk_count = 0
+
+            # 使用异步迭代器实现接收到就立即转发
             async for chunk in stream:
-                # Convert JSON to SSE format
-                yield f"data: {chunk.model_dump_json()}\n\n"
+                chunk_count += 1
+
+                # 首个chunk性能监控
+                if not first_chunk_received:
+                    first_chunk_received = True
+                    delay = time.time() - start_time
+                    logger.info(f"⚡ 首个chunk接收，延迟: {delay:.3f}s")
+
+                # 过滤空chunk - 检查是否有实际内容
+                chunk_dict = chunk.model_dump()
+                has_content = False
+
+                if chunk_dict.get("choices"):
+                    for choice in chunk_dict["choices"]:
+                        delta = choice.get("delta", {})
+
+                        # 检查常规内容
+                        if delta.get("content") and delta["content"].strip():
+                            has_content = True
+                            break
+
+                        # 检查推理内容 (Zhipu特有)
+                        if (
+                            delta.get("reasoning_content")
+                            and delta["reasoning_content"].strip()
+                        ):
+                            has_content = True
+                            break
+
+                        # 检查角色变化或结束标志
+                        if delta.get("role") or choice.get("finish_reason"):
+                            has_content = True
+                            break
+
+                        # 检查工具调用
+                        if delta.get("tool_calls") or delta.get("function_call"):
+                            has_content = True
+                            break
+
+                # 只转发有内容的chunk
+                if has_content:
+                    # 转换为OpenAI标准格式
+                    openai_chunk = self._convert_to_openai_format(chunk_dict)
+                    # 零延迟转换和转发 - 保持SSE格式
+                    sse_chunk = (
+                        f"data: {json.dumps(openai_chunk, ensure_ascii=False)}\n\n"
+                    )
+                    yield sse_chunk
+                else:
+                    # 记录空chunk但不转发 - 显示详细信息用于调试
+                    logger.debug(f"🔇 跳过空chunk #{chunk_count}: {chunk_dict}")
+
+            total_time = time.time() - start_time
+            logger.info(
+                f"✅ Zhipu实时流式响应完成 - 总耗时: {total_time:.3f}秒，处理chunk: {chunk_count}"
+            )
 
             # Update metrics
             response_time = time.time() - start_time
