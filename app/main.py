@@ -62,10 +62,36 @@ async def lifespan(app):
     # Display load balancing strategy information
     logger.info("📊 Load balancing strategy system enabled")
 
+    # 启动配置热重载监控
+    logger.info("🔄 启动配置热重载监控...")
+    from app.core.config_hot_reload import (
+        config_hot_reload_manager,
+        add_config_reload_callback,
+    )
+    import asyncio
+
+    # 注册配置重载回调
+    def on_adapter_config_reload(changes):
+        """适配器配置重载回调"""
+        if any(
+            key.startswith(("DATABASE_", "REDIS_", "API_")) for key in changes.keys()
+        ):
+            logger.info("🔄 检测到适配器相关配置变更，重新加载适配器...")
+            adapter_manager.load_models_from_database()
+
+    add_config_reload_callback("adapter_manager", on_adapter_config_reload)
+
+    # 在后台启动配置文件监控
+    asyncio.create_task(config_hot_reload_manager.start_watching())
+
     yield
 
     # Cleanup on application shutdown
     logger.info("🛑 Shutting down application...")
+
+    # 停止配置热重载监控
+    await config_hot_reload_manager.stop_watching()
+
     await adapter_pool.stop()
     await adapter_manager.close_all()
     # Dispose DB connections

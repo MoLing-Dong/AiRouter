@@ -28,6 +28,7 @@ dependencies = [
     { name = "sqlmodel" },
     { name = "structlog" },
     { name = "uvicorn", extra = ["standard"] },
+    { name = "watchfiles" },
 ]
 
 [package.optional-dependencies]
@@ -85,6 +86,7 @@ requires-dist = [
     { name = "sqlmodel", specifier = ">=0.0.16" },
     { name = "structlog", specifier = ">=23.2.0" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.24.0" },
+    { name = "watchfiles", specifier = ">=0.21.0" },
 ]
 provides-extras = ["dev", "test"]
 

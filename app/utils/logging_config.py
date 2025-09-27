@@ -39,12 +39,8 @@ class LogConfig:
             "<level>{message}</level>"
         )
 
-        self.file_format = (
-            "{time:YYYY-MM-DD HH:mm:ss} | "
-            "{level: <5} | "
-            "{name}:{function}:{line} | "
-            "{message}"
-        )
+        # 简洁的文件日志格式（移除文件位置信息）
+        self.file_format = "{time:YYYY-MM-DD HH:mm:ss} | " "{level: <5} | " "{message}"
 
         # Log levels
         self.console_level = "INFO"
@@ -86,7 +82,9 @@ class LogConfig:
 
         # Debug information (temporary)
         print(f"Current environment: {self.run_env}")
-        print(f"Using log format: {'Development environment' if self.run_env == 'dev' else 'Production environment'}")
+        print(
+            f"Using log format: {'Development environment' if self.run_env == 'dev' else 'Production environment'}"
+        )
 
         # Console handler
         if enable_console:

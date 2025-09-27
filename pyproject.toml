@@ -37,6 +37,7 @@ dependencies = [
     "prometheus-client>=0.19.0",
     "loguru>=0.7.3",
     "psycopg2-binary>=2.9.10",
+    "watchfiles>=0.21.0",
 ]
 
 [project.optional-dependencies]

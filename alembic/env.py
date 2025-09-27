@@ -21,12 +21,15 @@ if config.config_file_name is not None:
 # add your model's MetaData object here
 # for 'autogenerate' support
 from config.settings import settings  # noqa: E402
-from app.models.base import Base  # noqa: E402
+from sqlmodel import SQLModel  # noqa: E402
+
+# 导入所有模型以确保它们被注册到metadata中
+from app.models import *  # noqa: E402, F403
 
 # Override sqlalchemy.url from settings
 config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
 
-target_metadata = Base.metadata
+target_metadata = SQLModel.metadata
 
 
 def run_migrations_offline():

@@ -8,6 +8,7 @@ from .health import health_router
 from .models import models_router
 from .stats import stats_router
 from .monitoring import monitoring_router
+from .config import config_router
 
 # 处理providers.py (单文件，不是目录)
 from .providers import providers_router
@@ -22,6 +23,7 @@ admin_router.include_router(stats_router, prefix="/stats", tags=["Stats"])
 admin_router.include_router(
     monitoring_router, prefix="/monitoring", tags=["Monitoring"]
 )
+admin_router.include_router(config_router, prefix="/config", tags=["Config"])
 admin_router.include_router(providers_router, prefix="/providers", tags=["Providers"])
 
 # 导出
