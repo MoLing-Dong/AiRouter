@@ -1,9 +1,7 @@
-version: '3.8'
-
 services:
   # PostgreSQL database
   postgres:
-    image: postgres:15-alpine
+    image: postgres:16-alpine
     container_name: ai-router-db
     environment:
       - POSTGRES_DB=ai_router
@@ -15,7 +13,7 @@ services:
       - "5432:5432"
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ai_router -d ai_router"]
+      test: [ "CMD-SHELL", "pg_isready -U ai_router -d ai_router" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -33,23 +31,30 @@ services:
       - HOST=0.0.0.0
       - PORT=8000
       - DEBUG=false
-      
+      - RUN_ENV=prod
+      - LOG_LEVEL=INFO
+
+      # Security configuration
+      - API_KEY=your_production_api_key_here
+      - SECURITY_API_KEY_REQUIRED=true
+
       # Database configuration
       - DATABASE_URL=postgresql://ai_router:ai_router_password@postgres:5432/ai_router
-      
-    volumes:
-      - ./logs:/app/logs
-      - ./data:/app/data
+
+      # Redis configuration (if you add Redis service)
+      - REDIS_URL=redis://redis:6379
+    # volumes:
+      # - ./logs:/app/logs
     restart: unless-stopped
     depends_on:
       postgres:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      test: [ "CMD", "curl", "-f", "http://localhost:8000/health" ]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 40s
 
 volumes:
-  postgres_data: 
+  postgres_data:

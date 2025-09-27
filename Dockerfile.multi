@@ -1,5 +1,5 @@
 # Multi-stage build - Builder stage
-FROM python:3.13-alpine as builder
+FROM python:3.13-alpine AS builder
 
 # Set environment variables
 ENV PYTHONUNBUFFERED=1 \
@@ -27,14 +27,11 @@ COPY pyproject.toml uv.lock /app/
 RUN uv pip install --system -r <(uv pip compile pyproject.toml)
 
 # Production stage
-FROM python:3.13-alpine as production
+FROM python:3.13-alpine AS production
 
 # Set environment variables
 ENV PYTHONUNBUFFERED=1 \
-    PYTHONDONTWRITEBYTECODE=1 \
-    HOST=0.0.0.0 \
-    PORT=8000 \
-    DEBUG=false
+    PYTHONDONTWRITEBYTECODE=1
 
 # Set working directory
 WORKDIR /app
@@ -57,6 +54,9 @@ COPY --from=builder /usr/local/bin/uv /usr/local/bin/uv
 # Copy application code
 COPY --chown=app:app . .
 
+# Make start.sh executable
+RUN chmod +x start.sh
+
 # Switch to non-root user
 USER app
 
@@ -71,4 +71,5 @@ HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1
 
 # Start command
-CMD ["python", "run.py"] 
+# CMD ["sh", "-c", "cd /app && ./start.sh"] 
+CMD ["sh", "-c", "cd /app && python run.py"] 

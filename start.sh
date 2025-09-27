@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 
 # AI Router 启动脚本
 # 确保应用只启动一次，避免双进程问题
@@ -6,7 +6,7 @@
 echo "🚀 启动 AI Router..."
 
 # 获取脚本所在目录
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$SCRIPT_DIR"
 
 # 检查是否已经有进程在运行
@@ -49,8 +49,8 @@ fi
 PYTHON_VERSION=$($PYTHON_CMD -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
 echo "🐍 Python版本: $PYTHON_VERSION"
 
-if [ "$(echo "$PYTHON_VERSION 3.8" | awk '{print ($1 >= $2)}')" -eq 0 ]; then
-    echo "❌ Python版本过低，需要Python 3.8+，当前版本: $PYTHON_VERSION"
+if [ "$(echo "$PYTHON_VERSION 3.13" | awk '{print ($1 >= $2)}')" -eq 0 ]; then
+    echo "❌ Python版本过低，需要Python 3.13+，当前版本: $PYTHON_VERSION"
     exit 1
 fi
 
