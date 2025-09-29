@@ -779,6 +779,13 @@ class DatabaseService:
                 for mp in model_providers
             ],
         }
+    def get_all_providers(self) -> List[Dict[str, Any]]:
+        """Get all providers"""
+        providers = self.get_all_providers(is_enabled=True)
+        result = []
+        for provider in providers:
+            result.append({"provider": provider})
+        return result
 
     def get_all_providers_with_health(self) -> List[Dict[str, Any]]:
         """Get all providers and their health status"""

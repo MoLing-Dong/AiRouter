@@ -10,20 +10,19 @@ providers_router = APIRouter(tags=["Provider Management"])
 
 
 @providers_router.get("/")
-async def get_all_providers_with_health():
+async def get_all_providers():
     """Get all providers and their health status"""
     try:
-        providers = db_service.get_all_providers_with_health()
+        providers = db_service.get_all_providers()
         return {
             "providers": [
                 {
-                    "id": provider["provider"].id,
-                    "name": provider["provider"].name,
-                    "provider_type": provider["provider"].provider_type,
-                    "official_endpoint": provider["provider"].official_endpoint,
-                    "third_party_endpoint": provider["provider"].third_party_endpoint,
-                    "is_enabled": provider["provider"].is_enabled,
-                    "health_info": provider["health_info"],
+                    "id": provider.id,
+                    "name": provider.name,
+                    "provider_type": provider.provider_type,
+                    "official_endpoint": provider.official_endpoint,
+                    "third_party_endpoint": provider.third_party_endpoint,
+                    "is_enabled": provider.is_enabled,
                 }
                 for provider in providers
             ]
