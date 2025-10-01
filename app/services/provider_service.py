@@ -85,10 +85,6 @@ class ProviderService:
         """Get provider performance statistics"""
         return self.db_service.get_provider_performance_stats(provider_name)
 
-    def get_top_providers(self, limit: int = 5) -> List[Dict[str, Any]]:
-        """Get top providers"""
-        return self.db_service.get_top_providers(limit)
-
     def get_provider_recommendations(
         self, model_name: str = None
     ) -> List[Dict[str, Any]]:

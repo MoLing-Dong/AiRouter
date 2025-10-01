@@ -374,7 +374,6 @@ class DatabaseService:
                         LLMProvider.name,
                         LLMProvider.provider_type,
                         LLMProvider.official_endpoint,
-                        LLMProvider.third_party_endpoint,
                     )
                     .join(LLMProvider, LLMModelProvider.provider_id == LLMProvider.id)
                     .filter(LLMModelProvider.llm_id.in_(model_ids))
@@ -391,8 +390,7 @@ class DatabaseService:
                             "provider_id": prov.provider_id,
                             "name": prov.name,
                             "provider_type": prov.provider_type,
-                            "base_url": prov.official_endpoint
-                            or prov.third_party_endpoint,
+                            "base_url": prov.official_endpoint,
                             "weight": prov.weight,
                             "priority": prov.priority,
                             "health_status": prov.health_status,
@@ -432,7 +430,6 @@ class DatabaseService:
                         p.name,
                         p.provider_type,
                         p.official_endpoint,
-                        p.third_party_endpoint
                     FROM llm_model_providers mp
                     JOIN llm_providers p ON mp.provider_id = p.id
                     WHERE mp.llm_id = ANY(:model_ids)
@@ -453,8 +450,7 @@ class DatabaseService:
                             "provider_id": row.provider_id,
                             "name": row.name,
                             "provider_type": row.provider_type,
-                            "base_url": row.official_endpoint
-                            or row.third_party_endpoint,
+                            "base_url": row.official_endpoint,
                             "weight": row.weight,
                             "priority": row.priority,
                             "health_status": row.health_status,
@@ -655,7 +651,7 @@ class DatabaseService:
             # Build provider configuration
             provider_config = {
                 "name": provider.name,
-                "base_url": provider.official_endpoint or provider.third_party_endpoint,
+                "base_url": provider.official_endpoint,
                 "api_key": api_key_obj.api_key,
                 "model": model.name,  # Use model name
                 "model_id": model.id,  # 添加模型ID
@@ -779,6 +775,7 @@ class DatabaseService:
                 for mp in model_providers
             ],
         }
+
     def get_all_providers(self) -> List[Dict[str, Any]]:
         """Get all providers"""
         providers = self.get_all_providers(is_enabled=True)
@@ -890,11 +887,6 @@ class DatabaseService:
             ),
         }
 
-    def get_top_providers(self, limit: int = 5) -> List[Dict[str, Any]]:
-        """Get top providers"""
-        providers_with_health = self.get_all_providers_with_health()
-        return providers_with_health[:limit]
-
     def get_provider_recommendations(
         self, model_name: str = None
     ) -> List[Dict[str, Any]]:
@@ -928,7 +920,8 @@ class DatabaseService:
             return recommendations
         else:
             # Global provider recommendations
-            return self.get_top_providers(10)
+            providers_with_health = self.get_all_providers_with_health()
+            return providers_with_health[:10]
 
     def _get_recommendation_reason(self, model_provider: LLMModelProvider) -> str:
         """Get recommendation reasons"""
@@ -1582,13 +1575,15 @@ class DatabaseService:
         """Get API key for a specific provider by name"""
         with self.get_session() as session:
             # First get the provider by name
-            provider = session.query(LLMProvider).filter(
-                LLMProvider.name == provider_name
-            ).first()
-            
+            provider = (
+                session.query(LLMProvider)
+                .filter(LLMProvider.name == provider_name)
+                .first()
+            )
+
             if not provider:
                 return None
-            
+
             # Get the best API key for this provider
             best_key = self.get_best_api_key(provider.id)
             return best_key.api_key if best_key else None

@@ -252,7 +252,7 @@ class AdapterPool:
             config = {
                 "name": model.name,
                 "provider": provider.name,
-                "base_url": provider.official_endpoint or provider.third_party_endpoint,
+                "base_url": provider.official_endpoint,
                 "api_key": api_key_obj.api_key,
                 "api_key_id": api_key_obj.id,  # 添加API key ID用于用量追踪
                 "model": model.name,

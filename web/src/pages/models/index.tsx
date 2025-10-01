@@ -90,13 +90,13 @@ const ModelsPage: React.FC = () => {
                 // 转换数据格式以匹配后端 API
                 const payload = {
                     name: values.name,
-                    llm_type: values.llm_type || 'chat',
+                    llm_type: values.llm_type || 'PUBLIC',
                     description: values.description || null,
                     is_enabled: values.status === 'active',
                     provider_id: null, // 暂时不关联供应商
                     provider_weight: 10,
                     is_provider_preferred: false,
-                    capability_ids: null // 暂时不关联能力
+                    capability_ids: values.capabilities || null // 关联能力
                 }
                 await modelsApi.createModel(payload)
                 message.success('创建成功')
@@ -236,17 +236,27 @@ const ModelsPage: React.FC = () => {
 
                     <Form.Item
                         name="llm_type"
-                        label="模型类型"
-                        rules={[{ required: true, message: '请选择模型类型' }]}
-                        initialValue="chat"
+                        label="访问类型"
+                        rules={[{ required: true, message: '请选择访问类型' }]}
+                        initialValue="PUBLIC"
+                        tooltip="模型的具体能力(对话、补全、嵌入、图像)通过下方的能力设置"
                     >
-                        <Select placeholder="选择模型类型">
-                            <Select.Option value="chat">对话模型</Select.Option>
-                            <Select.Option value="completion">补全模型</Select.Option>
-                            <Select.Option value="embedding">嵌入模型</Select.Option>
-                            <Select.Option value="image">图像模型</Select.Option>
-                            <Select.Option value="PUBLIC">公共模型</Select.Option>
+                        <Select placeholder="选择访问类型">
+                            <Select.Option value="PUBLIC">公开模型</Select.Option>
                             <Select.Option value="PRIVATE">私有模型</Select.Option>
+                        </Select>
+                    </Form.Item>
+
+                    <Form.Item
+                        name="capabilities"
+                        label="模型能力"
+                        tooltip="选择模型支持的功能,可多选"
+                    >
+                        <Select mode="multiple" placeholder="选择模型能力">
+                            <Select.Option value={1}>对话(Chat)</Select.Option>
+                            <Select.Option value={2}>补全(Completion)</Select.Option>
+                            <Select.Option value={3}>嵌入(Embedding)</Select.Option>
+                            <Select.Option value={4}>图像生成(Image)</Select.Option>
                         </Select>
                     </Form.Item>
 

@@ -316,7 +316,7 @@ class HealthChecker:
             config = {
                 "name": model.name,
                 "provider": provider.name,
-                "base_url": provider.official_endpoint or provider.third_party_endpoint,
+                "base_url": provider.official_endpoint,
                 "api_key": api_key_obj.api_key,
                 "weight": best_model_provider.weight,
                 "cost_per_1k_tokens": best_model_provider.cost_per_1k_tokens,

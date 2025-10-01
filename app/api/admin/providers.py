@@ -21,8 +21,8 @@ async def get_all_providers():
                     "name": provider.name,
                     "provider_type": provider.provider_type,
                     "official_endpoint": provider.official_endpoint,
-                    "third_party_endpoint": provider.third_party_endpoint,
                     "is_enabled": provider.is_enabled,
+                    "description": provider.description,
                 }
                 for provider in providers
             ]
@@ -30,30 +30,6 @@ async def get_all_providers():
     except Exception as e:
         raise HTTPException(
             status_code=500, detail=f"Get provider list failed: {str(e)}"
-        )
-
-
-@providers_router.get("/top")
-async def get_top_providers(limit: int = Query(5, ge=1, le=20)):
-    """Get top providers"""
-    try:
-        top_providers = db_service.get_top_providers(limit)
-        return {
-            "top_providers": [
-                {
-                    "rank": i + 1,
-                    "provider_name": provider["provider"].name,
-                    "average_score": provider["health_info"]["average_score"],
-                    "overall_health": provider["health_info"]["overall_health"],
-                    "total_models": provider["health_info"]["total_models"],
-                    "healthy_models": provider["health_info"]["healthy_models"],
-                }
-                for i, provider in enumerate(top_providers)
-            ]
-        }
-    except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Get top providers failed: {str(e)}"
         )
 
 
@@ -140,7 +116,6 @@ async def get_best_provider_for_model(model_name: str):
                 "name": best_provider.name,
                 "provider_type": best_provider.provider_type,
                 "official_endpoint": best_provider.official_endpoint,
-                "third_party_endpoint": best_provider.third_party_endpoint,
             },
         }
     except HTTPException:
