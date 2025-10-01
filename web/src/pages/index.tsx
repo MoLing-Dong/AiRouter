@@ -6,7 +6,6 @@ import {
     Statistic,
     Table,
     Progress,
-    Space,
     Tag,
     Badge,
     Alert,
@@ -44,13 +43,13 @@ const Dashboard: React.FC = () => {
             const [routingStats, systemMetrics, models, providers] = await Promise.all([
                 statsApi.getRoutingStats().catch(() => ({})),
                 statsApi.getSystemMetrics().catch(() => ({})),
-                modelsApi.getDbModels().catch(() => []),
-                providersApi.getProviders().catch(() => [])
+                modelsApi.getDbModels().catch(() => ({ models: [] })),
+                providersApi.getProviders().catch(() => ({ providers: [] }))
             ])
 
             // 计算统计数据
-            const modelsData = models?.models || []
-            const providersData = providers?.providers || []
+            const modelsData = (models as any)?.models || []
+            const providersData = (providers as any)?.providers || []
 
             // 转换模型数据格式
             const formattedModels = modelsData.map((model: any) => ({
@@ -137,9 +136,6 @@ const Dashboard: React.FC = () => {
 
     useEffect(() => {
         fetchDashboardData()
-        // 每30秒刷新一次数据
-        const interval = setInterval(fetchDashboardData, 30000)
-        return () => clearInterval(interval)
     }, [])
 
     if (loading) {
@@ -157,6 +153,7 @@ const Dashboard: React.FC = () => {
                 description="这里展示系统运行状态和关键指标，您可以通过侧边栏管理模型和供应商。"
                 type="info"
                 showIcon
+                closable
                 style={{ marginBottom: 24 }}
             />
 

@@ -35,12 +35,18 @@ const AppLayout = () => {
         padding: 24,
         background: token.colorBgLayout,
         minHeight: 0,
+        overflow: 'auto',
     }
 
     const footerStyle: CSSProperties = {
         textAlign: 'center',
         color: token.colorTextTertiary,
         background: token.colorBgLayout,
+    }
+
+    const siderStyle: CSSProperties = {
+        height: '100vh',
+        overflow: 'auto',
     }
 
     const logoStyle: CSSProperties = {
@@ -61,8 +67,8 @@ const AppLayout = () => {
     })?.key
 
     return (
-        <Layout style={{ minHeight: '100vh' }}>
-            <Sider collapsible width={220} theme="dark">
+        <Layout style={{ height: '100vh' }}>
+            <Sider style={siderStyle} collapsible width={220} theme="dark">
                 <div style={logoStyle}>AiRouter</div>
                 <Menu
                     theme="dark"
