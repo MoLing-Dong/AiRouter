@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Path
 from app.services.database.database_service import db_service
 from app.utils.logging_config import get_factory_logger
 from app.models import (
@@ -34,6 +34,41 @@ async def get_db_models():
         raise HTTPException(
             status_code=500, detail=f"Get database models failed: {str(e)}"
         )
+
+
+@db_router.delete("/models/{model_id}")
+async def delete_db_model(
+    model_id: int = Path(..., gt=0, description="模型ID", example=1, title="Model ID")
+):
+    """
+    删除指定的模型
+
+    - **model_id**: 要删除的模型ID（必须大于0）
+    """
+    try:
+        # 检查模型是否存在
+        model = db_service.get_model_by_id(model_id)
+        if not model:
+            raise HTTPException(status_code=404, detail=f"模型不存在：ID {model_id}")
+
+        # 执行删除
+        result = db_service.delete_model(model_id)
+
+        if result:
+            return {
+                "success": True,
+                "message": f"模型 '{model.name}' 已成功删除",
+                "model_id": model_id,
+                "model_name": model.name,
+            }
+        else:
+            raise HTTPException(status_code=500, detail="删除模型失败")
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"删除模型失败 (ID: {model_id}): {str(e)}")
+        raise HTTPException(status_code=500, detail=f"删除模型时发生错误：{str(e)}")
 
 
 @db_router.get("/capabilities")

@@ -12,6 +12,22 @@ export default defineConfig({
       "@": fileURLToPath(new URL("./src", import.meta.url)),
     },
   },
+  server: {
+    proxy: {
+      // 代理 API 请求到后端服务器，解决开发环境跨域问题
+      "/api": {
+        target: process.env.VITE_API_BASE_URL || "http://localhost:8000",
+        changeOrigin: true,
+        rewrite: (path) => path,
+      },
+      // 代理管理后台 API 请求
+      "/admin": {
+        target: process.env.VITE_API_BASE_URL || "http://localhost:8000",
+        changeOrigin: true,
+        rewrite: (path) => path,
+      },
+    },
+  },
   plugins: [
     react(),
     Pages({

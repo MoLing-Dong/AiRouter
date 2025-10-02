@@ -35,12 +35,11 @@ const ModelsPage: React.FC = () => {
     const fetchModels = async () => {
         setLoading(true)
         try {
-            const [adminModels, dbModels] = await Promise.all([
+            const [adminModels] = await Promise.all([
                 modelsApi.getModels(),
-                modelsApi.getDbModels()
             ])
             // 合并数据，优先显示数据库中的模型配置
-            const modelsData = dbModels?.models || []
+            const modelsData = adminModels?.models || []
             // 转换数据格式以匹配前端接口
             const formattedModels = modelsData.map((model: any) => ({
                 id: model.id,
@@ -74,6 +73,7 @@ const ModelsPage: React.FC = () => {
     const handleDelete = async (model: Model) => {
         try {
             // 注意：API 中没有删除接口，这里仅作示例
+            await modelsApi.deleteModel(model.name)
             message.success('删除成功')
             fetchModels()
         } catch (error) {

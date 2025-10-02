@@ -32,6 +32,10 @@ class ModelService:
         """Create model"""
         return self.db_service.create_model(model_data)
 
+    def delete_model(self, model_id: str) -> bool:
+        """Delete model"""
+        return self.db_service.delete_model(model_id)
+
     def update_model_enabled_status(self, model_name: str, enabled: bool) -> bool:
         """Update model enabled status"""
         return self.db_service.update_model_enabled_status(model_name, enabled)

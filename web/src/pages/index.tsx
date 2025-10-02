@@ -20,7 +20,6 @@ import {
 import { statsApi, modelsApi, providersApi } from '@/services/api'
 
 interface SystemStats {
-    totalRequests: number
     activeModels: number
     healthyProviders: number
     averageResponseTime: number
@@ -28,7 +27,6 @@ interface SystemStats {
 
 const Dashboard: React.FC = () => {
     const [stats, setStats] = useState<SystemStats>({
-        totalRequests: 0,
         activeModels: 0,
         healthyProviders: 0,
         averageResponseTime: 0
@@ -63,7 +61,6 @@ const Dashboard: React.FC = () => {
             const healthyProviders = providersData.filter((p: any) => p.is_enabled)?.length || 0
 
             setStats({
-                totalRequests: (routingStats as any)?.total_requests || 1234,
                 activeModels,
                 healthyProviders,
                 averageResponseTime: (systemMetrics as any)?.avg_response_time || 245
@@ -162,16 +159,6 @@ const Dashboard: React.FC = () => {
                 <Col xs={24} sm={12} md={6}>
                     <Card>
                         <Statistic
-                            title="总请求数"
-                            value={stats.totalRequests}
-                            prefix={<ApiOutlined />}
-                            valueStyle={{ color: '#1890ff' }}
-                        />
-                    </Card>
-                </Col>
-                <Col xs={24} sm={12} md={6}>
-                    <Card>
-                        <Statistic
                             title="活跃模型"
                             value={stats.activeModels}
                             prefix={<DatabaseOutlined />}
@@ -186,17 +173,6 @@ const Dashboard: React.FC = () => {
                             value={stats.healthyProviders}
                             prefix={<CloudServerOutlined />}
                             valueStyle={{ color: '#52c41a' }}
-                        />
-                    </Card>
-                </Col>
-                <Col xs={24} sm={12} md={6}>
-                    <Card>
-                        <Statistic
-                            title="平均响应时间"
-                            value={stats.averageResponseTime}
-                            suffix="ms"
-                            prefix={<CheckCircleOutlined />}
-                            valueStyle={{ color: '#faad14' }}
                         />
                     </Card>
                 </Col>
@@ -228,7 +204,7 @@ const Dashboard: React.FC = () => {
                 </Col>
             </Row>
 
-            {/* 系统性能 */}
+            {/* 系统性能
             <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
                 <Col xs={24}>
                     <Card title="系统性能概览" size="small">
@@ -254,7 +230,7 @@ const Dashboard: React.FC = () => {
                         </Row>
                     </Card>
                 </Col>
-            </Row>
+            </Row> */}
         </div>
     )
 }

@@ -80,6 +80,11 @@ class DatabaseService:
             logger.warning(f"Failed to get all models: {e}")
             return []
 
+    def get_model_by_id(self, model_id: int) -> Optional[LLMModel]:
+        """Get model by ID"""
+        with self.get_session() as session:
+            return session.query(LLMModel).filter(LLMModel.id == model_id).first()
+
     def get_model_by_name(
         self, model_name: str, is_enabled: bool = None
     ) -> Optional[LLMModel]:
@@ -240,6 +245,16 @@ class DatabaseService:
             logger.error(f"   📚 Stack trace:\n{traceback.format_exc()}")
 
             raise
+
+    def delete_model(self, model_id: str) -> bool:
+        """Delete model"""
+        with self.get_session() as session:
+            model = session.query(LLMModel).filter(LLMModel.id == model_id).first()
+            if model:
+                session.delete(model)
+                session.commit()
+                return True
+            return False
 
     def update_model_enabled_status(self, model_name: str, enabled: bool) -> bool:
         """Update model enabled status"""
