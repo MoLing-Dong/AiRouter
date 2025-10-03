@@ -152,8 +152,6 @@ class DatabaseService:
 
             # Create model-provider association if provider_id is provided
             if provider_id:
-                from app.models.llm_model_provider import LLMModelProvider
-
                 # Check if association already exists
                 self.tx_manager.check_unique_constraint(
                     session,
@@ -247,7 +245,7 @@ class DatabaseService:
             raise
 
     def delete_model(self, model_id: str) -> bool:
-        """Delete model"""
+        """Delete model (related records will be cascade deleted by database)"""
         with self.get_session() as session:
             model = session.query(LLMModel).filter(LLMModel.id == model_id).first()
             if model:
@@ -371,8 +369,7 @@ class DatabaseService:
         try:
             with self.get_session() as session:
                 # 批量查询所有模型的providers - 使用单次JOIN查询
-                from app.models.llm_model_provider import LLMModelProvider
-                from app.models.llm_provider import LLMProvider
+                # LLMModelProvider and LLMProvider are already imported at the top of the file
 
                 # 单次JOIN查询，避免N+1问题
                 providers = (
@@ -709,14 +706,108 @@ class DatabaseService:
         return self.get_model_config_from_db(model_name)
 
     def get_all_model_configs_from_db(self) -> Dict[str, Dict[str, Any]]:
-        """Get all model configurations from database"""
+        """Get all model configurations from database (optimized with batch queries)"""
+        # 1. 获取所有启用的模型（1次查询）
         models = self.get_all_models(is_enabled=True)
-        configs = {}
+        if not models:
+            return {}
 
-        for model in models:
-            config = self.get_model_config_from_db(model.name)
-            if config:
-                configs[model.name] = config
+        model_ids = [model.id for model in models]
+        model_map = {model.id: model for model in models}
+
+        # 2. 批量获取所有模型的providers（1次JOIN查询）
+        providers_by_model = self.get_all_models_providers_batch(model_ids)
+
+        # 3. 收集所有唯一的provider_ids
+        provider_ids = set()
+        for providers in providers_by_model.values():
+            for provider in providers:
+                provider_ids.add(provider["provider_id"])
+
+        # 4. 批量获取所有provider的API keys（1次查询）
+        api_keys_by_provider = self.get_best_api_keys_batch(list(provider_ids))
+
+        # 5. 批量获取所有模型的参数（1次查询）
+        params_by_model = self.get_all_models_params_batch(model_ids)
+
+        # 6. 组装配置
+        configs = {}
+        for model_id, model in model_map.items():
+            providers_data = providers_by_model.get(model_id, [])
+            if not providers_data:
+                continue
+
+            # 构建provider配置列表
+            providers = []
+            for provider_dict in providers_data:
+                if not provider_dict.get("is_enabled", True):
+                    continue
+
+                provider_id = provider_dict["provider_id"]
+
+                # 获取API key
+                api_key_obj = api_keys_by_provider.get(provider_id)
+                if not api_key_obj:
+                    logger.info(
+                        f"Warning: Provider {provider_dict['name']} has no available API keys"
+                    )
+                    continue
+
+                # 获取参数（provider特定参数 + 通用参数）
+                model_params = params_by_model.get(model_id, [])
+                params = {}
+                for param in model_params:
+                    if isinstance(param.get("value"), dict):
+                        params[param["key"]] = param["value"]
+                    else:
+                        params[param["key"]] = param["value"]
+
+                # 构建provider配置
+                provider_config = {
+                    "name": provider_dict["name"],
+                    "base_url": provider_dict["base_url"],
+                    "api_key": api_key_obj.api_key,
+                    "model": model.name,
+                    "model_id": model.id,
+                    "provider_id": provider_id,
+                    "weight": provider_dict.get("weight", 1.0),
+                    "max_tokens": int(params.get("max_tokens", 4096)),
+                    "temperature": float(params.get("temperature", 0.7)),
+                    "cost_per_1k_tokens": float(
+                        provider_dict.get("cost_per_1k_tokens", 0.0)
+                    ),
+                    "timeout": int(params.get("timeout", 30)),
+                    "retry_count": int(params.get("retry_count", 3)),
+                    "enabled": provider_dict.get("is_enabled", True),
+                    "is_preferred": provider_dict.get("is_preferred", False),
+                    "api_key_name": api_key_obj.name,
+                    "api_key_weight": api_key_obj.weight,
+                }
+
+                providers.append(provider_config)
+
+            # 如果没有可用的provider，跳过这个模型
+            if not providers:
+                continue
+
+            # 构建模型配置
+            model_config = {
+                "name": model.name,
+                "providers": providers,
+                "model_type": "chat",  # Default type
+                "max_tokens": 4096,
+                "temperature": 0.7,
+                "top_p": 1.0,
+                "frequency_penalty": 0.0,
+                "presence_penalty": 0.0,
+                "enabled": model.is_enabled,
+                "priority": 0,
+                "updated_at": (
+                    model.updated_at.timestamp() if model.updated_at else time.time()
+                ),
+            }
+
+            configs[model.name] = model_config
 
         return configs
 
@@ -1602,6 +1693,38 @@ class DatabaseService:
             # Get the best API key for this provider
             best_key = self.get_best_api_key(provider.id)
             return best_key.api_key if best_key else None
+
+    def get_best_api_keys_batch(
+        self, provider_ids: List[int]
+    ) -> Dict[int, LLMProviderApiKey]:
+        """Get best API keys for multiple providers in batch (performance optimization)"""
+        try:
+            with self.get_session() as session:
+                # 批量查询所有provider的API keys
+                api_keys = (
+                    session.query(LLMProviderApiKey)
+                    .filter(
+                        LLMProviderApiKey.provider_id.in_(provider_ids),
+                        LLMProviderApiKey.is_enabled == True,
+                    )
+                    .order_by(
+                        LLMProviderApiKey.provider_id,
+                        LLMProviderApiKey.is_preferred.desc(),
+                        LLMProviderApiKey.weight.desc(),
+                    )
+                    .all()
+                )
+
+                # 按provider_id分组，取每个provider的第一个（最优）key
+                result = {}
+                for key in api_keys:
+                    if key.provider_id not in result:
+                        result[key.provider_id] = key
+
+                return result
+        except Exception as e:
+            logger.warning(f"Failed to get batch API keys: {e}")
+            return {}
 
     # ==================== Health Status and Metrics Operations ====================
 

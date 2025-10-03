@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Path
+from fastapi import APIRouter, Path
 from app.services.database.database_service import db_service
 from app.utils.logging_config import get_factory_logger
 from app.models import (
@@ -17,6 +17,7 @@ async def get_db_models():
     try:
         models = db_service.get_all_models()
         return {
+            "success": True,
             "models": [
                 {
                     "id": model.id,
@@ -28,12 +29,11 @@ async def get_db_models():
                     "updated_at": model.updated_at,
                 }
                 for model in models
-            ]
+            ],
         }
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Get database models failed: {str(e)}"
-        )
+        logger.error(f"Get database models failed: {str(e)}")
+        return {"success": False, "message": f"Get database models failed: {str(e)}"}
 
 
 @db_router.delete("/models/{model_id}")
@@ -49,8 +49,10 @@ async def delete_db_model(
         # 检查模型是否存在
         model = db_service.get_model_by_id(model_id)
         if not model:
-            raise HTTPException(status_code=404, detail=f"模型不存在：ID {model_id}")
-
+            return {
+                "success": False,
+                "message": f"模型不存在：ID {model_id}",
+            }
         # 执行删除
         result = db_service.delete_model(model_id)
 
@@ -62,13 +64,17 @@ async def delete_db_model(
                 "model_name": model.name,
             }
         else:
-            raise HTTPException(status_code=500, detail="删除模型失败")
+            return {
+                "success": False,
+                "message": "删除模型失败",
+            }
 
-    except HTTPException:
-        raise
     except Exception as e:
         logger.error(f"删除模型失败 (ID: {model_id}): {str(e)}")
-        raise HTTPException(status_code=500, detail=f"删除模型时发生错误：{str(e)}")
+        return {
+            "success": False,
+            "message": f"删除模型时发生错误：{str(e)}",
+        }
 
 
 @db_router.get("/capabilities")
@@ -91,12 +97,10 @@ async def get_capabilities():
             )
 
         session.close()
-        return result
+        return {"success": True, "capabilities": result}
     except Exception as e:
         logger.error(f"Get capabilities failed: {str(e)}")
-        raise HTTPException(
-            status_code=500, detail=f"Get capabilities failed: {str(e)}"
-        )
+        return {"success": False, "message": f"Get capabilities failed: {str(e)}"}
 
 
 @db_router.post("/capabilities")
@@ -115,9 +119,10 @@ async def create_capability(capability_name: str, description: str = None):
         )
         if existing:
             session.close()
-            raise HTTPException(
-                status_code=400, detail=f"Capability already exists: {capability_name}"
-            )
+            return {
+                "success": False,
+                "message": f"Capability already exists: {capability_name}",
+            }
 
         # Create new capability
         capability = Capability(
@@ -127,6 +132,7 @@ async def create_capability(capability_name: str, description: str = None):
         session.commit()
 
         result = {
+            "success": True,
             "message": "Capability created successfully",
             "capability_id": capability.capability_id,
             "capability_name": capability.capability_name,
@@ -135,83 +141,65 @@ async def create_capability(capability_name: str, description: str = None):
 
         session.close()
         return result
-    except HTTPException:
-        raise
     except Exception as e:
         logger.error(f"Create capability failed: {str(e)}")
-        raise HTTPException(
-            status_code=500, detail=f"Create capability failed: {str(e)}"
-        )
+        return {"success": False, "message": f"Create capability failed: {str(e)}"}
 
 
 @db_router.post("/models")
 async def create_db_model(model_data: LLMModelCreate):
-    """Create model"""
-    try:
-        # Check if model already exists
-        existing_model = db_service.get_model_by_name(model_data.name)
+    """Create model - 使用全局异常处理器，代码更简洁"""
+    # Check if model already exists
+    existing_model = db_service.get_model_by_name(model_data.name)
 
-        if existing_model:
-            raise HTTPException(
-                status_code=400, detail=f"Model already exists: {model_data.name}"
+    if existing_model:
+        # 直接抛出异常，全局异常处理器会捕获并返回统一格式
+        raise ValueError(f"Model already exists: {model_data.name}")
+
+    model = db_service.create_model(model_data)
+
+    # Prepare response
+    response = {
+        "success": True,
+        "message": "Model created successfully",
+        "id": model.id,
+        "name": model.name,
+    }
+
+    # If provider association was created, add provider info to response
+    if model_data.provider_id:
+        provider = db_service.get_provider_by_id(model_data.provider_id)
+        if provider:
+            response["provider_info"] = {
+                "provider_id": model_data.provider_id,
+                "provider_name": provider.name,
+                "weight": model_data.provider_weight or 10,
+                "is_preferred": model_data.is_provider_preferred or False,
+            }
+
+    # If capabilities associations were created, add capabilities info to response
+    if model_data.capability_ids:
+        from app.models import Capability
+
+        session = db_service.get_session()
+        capabilities = []
+        for cap_id in model_data.capability_ids:
+            capability = (
+                session.query(Capability).filter_by(capability_id=cap_id).first()
             )
-
-        model = db_service.create_model(model_data)
-
-        # Prepare response
-        response = {
-            "message": "Model created successfully",
-            "id": model.id,
-            "name": model.name,
-        }
-
-        # If provider association was created, add provider info to response
-        if model_data.provider_id:
-            try:
-                provider = db_service.get_provider_by_id(model_data.provider_id)
-                if provider:
-                    response["provider_info"] = {
-                        "provider_id": model_data.provider_id,
-                        "provider_name": provider.name,
-                        "weight": model_data.provider_weight or 10,
-                        "is_preferred": model_data.is_provider_preferred or False,
+            if capability:
+                capabilities.append(
+                    {
+                        "capability_id": capability.capability_id,
+                        "capability_name": capability.capability_name,
+                        "description": capability.description,
                     }
-            except Exception as e:
-                logger.warning(f"Failed to get provider info for response: {e}")
+                )
+        session.close()
+        if capabilities:
+            response["capabilities"] = capabilities
 
-        # If capabilities associations were created, add capabilities info to response
-        if model_data.capability_ids:
-            try:
-                from app.models import Capability
-
-                session = db_service.get_session()
-                capabilities = []
-                for cap_id in model_data.capability_ids:
-                    capability = (
-                        session.query(Capability)
-                        .filter_by(capability_id=cap_id)
-                        .first()
-                    )
-                    if capability:
-                        capabilities.append(
-                            {
-                                "capability_id": capability.capability_id,
-                                "capability_name": capability.capability_name,
-                                "description": capability.description,
-                            }
-                        )
-                session.close()
-                if capabilities:
-                    response["capabilities"] = capabilities
-            except Exception as e:
-                logger.warning(f"Failed to get capabilities info for response: {e}")
-
-        return response
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Create model failed: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Create model failed: {str(e)}")
+    return response
 
 
 @db_router.get("/providers")
@@ -220,6 +208,7 @@ async def get_db_providers():
     try:
         providers = db_service.get_all_providers()
         return {
+            "success": True,
             "providers": [
                 {
                     "id": provider.id,
@@ -231,12 +220,11 @@ async def get_db_providers():
                     "updated_at": provider.updated_at,
                 }
                 for provider in providers
-            ]
+            ],
         }
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Get providers list failed: {str(e)}"
-        )
+        logger.error(f"Get providers list failed: {str(e)}")
+        return {"success": False, "message": f"Get providers list failed: {str(e)}"}
 
 
 @db_router.post("/providers")
@@ -249,18 +237,18 @@ async def create_db_provider(provider_data: LLMProviderCreate):
         )
 
         if existing_provider:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Provider already exists: {provider_data.name} ({provider_data.provider_type})",
-            )
+            return {
+                "success": False,
+                "message": f"Provider already exists: {provider_data.name} ({provider_data.provider_type})",
+            }
 
         provider = db_service.create_provider(provider_data)
         return {
+            "success": True,
             "message": "Provider created successfully",
             "provider_id": provider.id,
             "provider_name": provider.name,
         }
-    except HTTPException:
-        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Create provider failed: {str(e)}")
+        logger.error(f"Create provider failed: {str(e)}")
+        return {"success": False, "message": f"Create provider failed: {str(e)}"}

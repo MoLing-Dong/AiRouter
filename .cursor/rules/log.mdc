@@ -1,0 +1,19 @@
+---
+alwaysApply: true
+---
+
+# LOG
+
+## log
+
+log 文字使用英文
+
+```code
+log(This is a log)
+```
+
+debug使用===> 中文
+
+```code
+debug(===>这是一个debug)
+```

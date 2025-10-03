@@ -382,7 +382,7 @@ class LoadBalancingStrategyManager:
             )
 
             # Get adapter from adapter pool
-            from .adapter_pool import adapter_pool
+            from ..adapters.adapter_pool import adapter_pool
 
             adapter = await adapter_pool.get_adapter(request.model, provider.name)
             if not adapter:
@@ -416,7 +416,7 @@ class LoadBalancingStrategyManager:
 
             # Update API key usage count in database (even for failed requests)
             try:
-                from .adapter_pool import adapter_pool
+                from ..adapters.adapter_pool import adapter_pool
 
                 adapter = await adapter_pool.get_adapter(request.model, provider.name)
                 if adapter:
@@ -438,7 +438,7 @@ class LoadBalancingStrategyManager:
     ) -> Optional[BaseAdapter]:
         """Get provider adapter"""
         try:
-            from .adapter_pool import adapter_pool
+            from ..adapters.adapter_pool import adapter_pool
 
             # Get adapter from adapter pool
             adapter = await adapter_pool.get_adapter(model_name, provider_name)

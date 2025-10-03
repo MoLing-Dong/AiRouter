@@ -63,7 +63,7 @@ async def lifespan(app):
     logger.info("📊 Load balancing strategy system enabled")
 
     # 启动配置热重载监控
-    logger.info("🔄 启动配置热重载监控...")
+    logger.info("🔄 Starting configuration hot reload monitoring...")
     from app.core.config_hot_reload import (
         config_hot_reload_manager,
         add_config_reload_callback,
@@ -72,16 +72,18 @@ async def lifespan(app):
 
     # 注册配置重载回调
     def on_adapter_config_reload(changes):
-        """适配器配置重载回调"""
+        """Adapter configuration reload callback"""
         if any(
             key.startswith(("DATABASE_", "REDIS_", "API_")) for key in changes.keys()
         ):
-            logger.info("🔄 检测到适配器相关配置变更，重新加载适配器...")
+            logger.info(
+                "🔄 Detected adapter related configuration changes, reload adapter..."
+            )
             adapter_manager.load_models_from_database()
 
     add_config_reload_callback("adapter_manager", on_adapter_config_reload)
 
-    # 在后台启动配置文件监控
+    # Start configuration file monitoring in the background
     asyncio.create_task(config_hot_reload_manager.start_watching())
 
     yield
@@ -89,7 +91,7 @@ async def lifespan(app):
     # Cleanup on application shutdown
     logger.info("🛑 Shutting down application...")
 
-    # 停止配置热重载监控
+    # Stop configuration hot reload monitoring
     await config_hot_reload_manager.stop_watching()
 
     await adapter_pool.stop()
@@ -126,16 +128,16 @@ async def root():
 
 # If running this file directly
 if __name__ == "__main__":
-    # 避免双重启动，只在直接运行main.py时启动
-    # 正常情况下应该通过run.py启动
-    print("⚠️  警告: 请使用 run.py 启动应用，而不是直接运行 main.py")
-    print("💡 建议: python run.py")
+    # Avoid double startup, only start when running main.py directly
+    # Normally it should be started through run.py
+    print("⚠️  Warning: Please use run.py to start the application, not main.py")
+    print("💡 Suggestion: python run.py")
 
-    # 如果一定要直接运行，也禁用reload避免双进程
+    # If you must run directly, also disable reload to avoid double processes
     uvicorn.run(
         "app.main:app",
         host=settings.HOST,
         port=settings.PORT,
-        reload=False,  # 禁用reload避免双进程
+        reload=False,  # Disable reload to avoid double processes
         log_level=settings.LOG_LEVEL.lower(),
     )

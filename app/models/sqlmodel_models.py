@@ -4,7 +4,7 @@ SQLModel模型定义 - 现代化的ORM模型
 """
 
 from sqlmodel import SQLModel, Field, Relationship, select
-from sqlalchemy import Column, JSON
+from sqlalchemy import Column, JSON, ForeignKey, Integer
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 from enum import Enum
@@ -90,10 +90,17 @@ class LLMModel(LLMModelBase, TimestampMixin, table=True):
 
     id: Optional[int] = Field(default=None, primary_key=True, index=True)
 
-    # 关系定义
-    providers: List["LLMModelProvider"] = Relationship(back_populates="model")
-    parameters: List["LLMModelParam"] = Relationship(back_populates="model")
-    capabilities: List["LLMModelCapability"] = Relationship(back_populates="llm_model")
+    # 关系定义 - 配置 ORM 级联删除
+    providers: List["LLMModelProvider"] = Relationship(
+        back_populates="model", sa_relationship_kwargs={"cascade": "all, delete-orphan"}
+    )
+    parameters: List["LLMModelParam"] = Relationship(
+        back_populates="model", sa_relationship_kwargs={"cascade": "all, delete-orphan"}
+    )
+    capabilities: List["LLMModelCapability"] = Relationship(
+        back_populates="llm_model",
+        sa_relationship_kwargs={"cascade": "all, delete-orphan"},
+    )
 
 
 class LLMProviderBase(SQLModel):
@@ -122,8 +129,16 @@ class LLMProvider(LLMProviderBase, TimestampMixin, table=True):
 class LLMModelProviderBase(SQLModel):
     """模型-提供商关联基础类"""
 
-    llm_id: int = Field(foreign_key="llm_models.id", index=True)
-    provider_id: int = Field(foreign_key="llm_providers.id", index=True)
+    llm_id: int = Field(
+        sa_column=Column(
+            Integer, ForeignKey("llm_models.id", ondelete="CASCADE"), index=True
+        )
+    )
+    provider_id: int = Field(
+        sa_column=Column(
+            Integer, ForeignKey("llm_providers.id", ondelete="CASCADE"), index=True
+        )
+    )
     weight: int = Field(default=10, ge=1, le=100)
     priority: int = Field(default=0, ge=0, le=100)
     is_enabled: bool = Field(default=True, index=True)
@@ -175,8 +190,17 @@ class LLMModelProvider(LLMModelProviderBase, TimestampMixin, table=True):
 class LLMModelParamBase(SQLModel):
     """模型参数基础类"""
 
-    llm_id: int = Field(foreign_key="llm_models.id", index=True)
-    provider_id: Optional[int] = Field(default=None, foreign_key="llm_providers.id")
+    llm_id: int = Field(
+        sa_column=Column(
+            Integer, ForeignKey("llm_models.id", ondelete="CASCADE"), index=True
+        )
+    )
+    provider_id: Optional[int] = Field(
+        default=None,
+        sa_column=Column(
+            Integer, ForeignKey("llm_providers.id", ondelete="CASCADE"), nullable=True
+        ),
+    )
     param_key: str = Field(max_length=100, index=True)
     param_value: Any = Field(sa_column=Column(JSON))
     is_enabled: bool = Field(default=True, index=True)
@@ -345,9 +369,17 @@ class Capability(CapabilityBase, table=True):
 class LLMModelCapabilityBase(SQLModel):
     """模型-能力关联基础类"""
 
-    model_id: int = Field(foreign_key="llm_models.id", primary_key=True)
+    model_id: int = Field(
+        sa_column=Column(
+            Integer, ForeignKey("llm_models.id", ondelete="CASCADE"), primary_key=True
+        )
+    )
     capability_id: int = Field(
-        foreign_key="capabilities.capability_id", primary_key=True
+        sa_column=Column(
+            Integer,
+            ForeignKey("capabilities.capability_id", ondelete="CASCADE"),
+            primary_key=True,
+        )
     )
 
     class Config:

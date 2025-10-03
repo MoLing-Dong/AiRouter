@@ -24,10 +24,10 @@ if __name__ == "__main__":
         backlog=getattr(settings, "BACKLOG", 2048),
         timeout_keep_alive=getattr(
             settings, "TIMEOUT_KEEP_ALIVE", 30
-        ),  # 增加keep-alive时间
-        # 优化流式响应的配置
+        ),  # Increase keep-alive time
+        # Optimize streaming response configuration
         ws_ping_interval=20,
         ws_ping_timeout=20,
-        limit_max_requests=None,  # 不限制请求数量
-        access_log=settings.DEBUG,  # 开发模式显示访问日志
+        limit_max_requests=None,  # Do not limit request count
+        access_log=settings.DEBUG,  # Development mode display access log
     )

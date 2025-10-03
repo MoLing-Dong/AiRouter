@@ -15,6 +15,15 @@ logger = get_factory_logger()
 class AdapterFactory:
     """Adapter factory - responsible for creating different types of adapters"""
 
+    # Adapter mapping: provider name -> adapter class
+    ADAPTER_MAP = {
+        "anthropic": AnthropicAdapter,
+        "volcengine": VolcengineAdapter,
+        "zhipu": ZhipuAdapter,
+        "aliqwen": AliQwenAdapter,
+        "private-server": OpenAIAdapter,
+    }
+
     def create_adapter(
         self,
         provider_config: ModelProvider,
@@ -50,34 +59,30 @@ class AdapterFactory:
             # Create adapter based on provider type (case-insensitive)
             provider_name_lower = provider_config.name.lower()
 
+            # Handle special cases first
             if (
                 provider_name_lower.startswith("openai")
                 or provider_name_lower == "azure-openai"
             ):
                 return OpenAIAdapter(adapter_config, provider_config.api_key)
-            elif provider_name_lower == "anthropic":
-                return AnthropicAdapter(adapter_config, provider_config.api_key)
-            elif provider_name_lower == "volcengine":
-                return VolcengineAdapter(adapter_config, provider_config.api_key)
-            elif provider_name_lower == "zhipu":
-                return ZhipuAdapter(adapter_config, provider_config.api_key)
-            elif provider_name_lower == "aliqwen":
-                return AliQwenAdapter(adapter_config, provider_config.api_key)
-            elif provider_name_lower == "google":
+
+            if provider_name_lower == "google":
                 # TODO: Implement Google adapter
                 logger.info(
                     f"Warning: Google adapter not implemented: {provider_config.name}"
                 )
                 return None
-            elif provider_name_lower == "private-server":
-                # Private server adapter
-                return OpenAIAdapter(adapter_config, provider_config.api_key)
-            else:
-                # Use OpenAI adapter as default (compatible with third-party OpenAI API)
-                logger.info(
-                    f"Using OpenAI adapter as default adapter: {provider_config.name}"
-                )
-                return OpenAIAdapter(adapter_config, provider_config.api_key)
+
+            # Use adapter mapping for standard providers
+            adapter_class = self.ADAPTER_MAP.get(provider_name_lower)
+            if adapter_class:
+                return adapter_class(adapter_config, provider_config.api_key)
+
+            # Use OpenAI adapter as default (compatible with third-party OpenAI API)
+            logger.info(
+                f"Using OpenAI adapter as default adapter: {provider_config.name}"
+            )
+            return OpenAIAdapter(adapter_config, provider_config.api_key)
 
         except Exception as e:
             logger.info(f"Failed to create adapter: {provider_config.name} - {e}")

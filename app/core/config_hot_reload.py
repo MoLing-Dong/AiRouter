@@ -43,83 +43,83 @@ class ConfigHotReloadManager:
         for file_path in config_files:
             if file_path.exists():
                 self.watched_files.add(file_path.absolute())
-                logger.info(f"📁 添加配置文件监控: {file_path}")
+                logger.info(f"📁 Add configuration file monitoring: {file_path}")
 
     def add_watched_file(self, file_path: str | Path):
-        """添加需要监控的配置文件"""
+        """Add configuration files to watch"""
         path = Path(file_path).absolute()
         if path.exists():
             self.watched_files.add(path)
-            logger.info(f"📁 添加配置文件监控: {path}")
+            logger.info(f"📁 Add configuration file monitoring: {path}")
         else:
-            logger.warning(f"⚠️ 配置文件不存在: {path}")
+            logger.warning(f"⚠️ Configuration file does not exist: {path}")
 
     def add_reload_callback(self, name: str, callback: Callable):
-        """添加配置重载回调函数"""
+        """Add configuration reload callback function"""
         self.reload_callbacks[name] = callback
-        logger.info(f"🔄 注册配置重载回调: {name}")
+        logger.info(f"🔄 Register configuration reload callback: {name}")
 
     async def reload_settings(self) -> bool:
-        """重新加载设置"""
+        """Reload settings"""
         try:
-            logger.info("🔄 开始重新加载配置...")
+            logger.info("🔄 Start reloading configuration...")
 
-            # 重新加载环境变量
+            # Reload environment variables
             if Path(".env").exists():
                 from dotenv import load_dotenv
 
                 load_dotenv(override=True)
-                logger.info("📄 重新加载 .env 文件")
+                logger.info("📄 Reload .env file")
 
-            # 创建新的设置实例
+            # Create new settings instance
             new_settings = Settings()
 
-            # 验证新配置
+            # Validate new configuration
             await self._validate_new_settings(new_settings)
 
-            # 更新全局设置
+            # Update global settings
             old_settings = dict(self.settings)
             self.settings.__dict__.update(new_settings.__dict__)
 
-            # 记录配置变更
+            # Record configuration changes
             changes = self._detect_changes(old_settings, new_settings.__dict__)
             if changes:
-                logger.info(f"📊 检测到配置变更: {changes}")
+                logger.info(f"📊 Detected configuration changes: {changes}")
 
-            # 执行回调函数
+            # Execute callback function
             await self._execute_reload_callbacks(changes)
 
             self.last_reload_time = time.time()
-            logger.info("✅ 配置重载完成")
+            logger.info("✅ Configuration reload completed")
             return True
 
         except ValidationError as e:
-            logger.error(f"❌ 配置验证失败: {e}")
+            logger.error(f"❌ Configuration validation failed: {e}")
             return False
         except Exception as e:
-            logger.error(f"❌ 配置重载失败: {e}")
+            logger.error(f"❌ Configuration reload failed: {e}")
             return False
 
     async def _validate_new_settings(self, new_settings: Settings):
-        """验证新配置的有效性"""
-        # 验证数据库连接
+        """Validate the validity of the new configuration"""
+        # Validate database connection
         if new_settings.DATABASE_URL != self.settings.DATABASE_URL:
-            logger.info("🔍 验证新的数据库连接...")
-            # 这里可以添加数据库连接测试
+            logger.info("🔍 Validate new database connection...")
+            # Here you can add database connection test
 
         # 验证Redis连接
         if new_settings.REDIS_URL != self.settings.REDIS_URL:
-            logger.info("🔍 验证新的Redis连接...")
-            # 这里可以添加Redis连接测试
+            logger.info("🔍 Validate new Redis connection...")
+            # Here you can add Redis connection test
 
         # 验证API密钥
         if new_settings.API_KEY != self.settings.API_KEY:
-            logger.info("🔍 验证新的API密钥配置...")
+            logger.info("🔍 Validate new API key configuration...")
 
     def _detect_changes(
         self, old_config: Dict[str, Any], new_config: Dict[str, Any]
     ) -> Dict[str, Any]:
-        """检测配置变更"""
+        """Detect configuration changes"""
         changes = {}
 
         for key, new_value in new_config.items():
@@ -130,25 +130,25 @@ class ConfigHotReloadManager:
         return changes
 
     async def _execute_reload_callbacks(self, changes: Dict[str, Any]):
-        """执行配置重载回调函数"""
+        """Execute configuration reload callback function"""
         for name, callback in self.reload_callbacks.items():
             try:
-                logger.info(f"🔄 执行重载回调: {name}")
+                logger.info(f"🔄 Execute reload callback: {name}")
                 if asyncio.iscoroutinefunction(callback):
                     await callback(changes)
                 else:
                     callback(changes)
             except Exception as e:
-                logger.error(f"❌ 回调执行失败 {name}: {e}")
+                logger.error(f"❌ Callback execution failed {name}: {e}")
 
     async def start_watching(self):
-        """开始监控配置文件变化"""
+        """Start monitoring configuration file changes"""
         if self.is_watching:
-            logger.warning("⚠️ 配置文件监控已经在运行")
+            logger.warning("⚠️ Configuration file monitoring is already running")
             return
 
         self.is_watching = True
-        logger.info("🔍 启动配置文件热重载监控...")
+        logger.info("🔍 Start configuration file hot reload monitoring...")
 
         try:
             async for changes in awatch(
@@ -156,38 +156,38 @@ class ConfigHotReloadManager:
             ):
                 if changes:
                     logger.info(
-                        f"📝 检测到文件变化: {[str(change[1]) for change in changes]}"
+                        f"📝 Detected file changes: {[str(change[1]) for change in changes]}"
                     )
 
-                    # 防抖动：避免频繁重载
+                    # Anti-shake: avoid frequent reloads
                     await asyncio.sleep(0.5)
 
-                    # 重新加载配置
+                    # Reload configuration
                     await self.reload_settings()
 
         except Exception as e:
-            logger.error(f"❌ 配置文件监控异常: {e}")
+            logger.error(f"❌ Configuration file monitoring exception: {e}")
         finally:
             self.is_watching = False
 
     def _should_reload(self, change, path: str) -> bool:
-        """判断是否应该重载配置"""
-        # 忽略临时文件和备份文件
+        """Determine whether to reload configuration"""
+        # Ignore temporary files and backup files
         if path.endswith((".tmp", ".bak", ".swp", "~")):
             return False
 
-        # 忽略隐藏文件
+        # Ignore hidden files
         if Path(path).name.startswith(".") and not Path(path).name == ".env":
             return False
 
-        # 防止过于频繁的重载
+        # Prevent frequent reloads
         if time.time() - self.last_reload_time < 2.0:
             return False
 
         return True
 
     async def stop_watching(self):
-        """停止监控配置文件"""
+        """Stop monitoring configuration files"""
         self.is_watching = False
         if self.watch_task:
             self.watch_task.cancel()
@@ -195,11 +195,11 @@ class ConfigHotReloadManager:
                 await self.watch_task
             except asyncio.CancelledError:
                 pass
-        logger.info("🛑 配置文件监控已停止")
+        logger.info("🛑 Configuration file monitoring stopped")
 
     async def manual_reload(self) -> Dict[str, Any]:
-        """手动触发配置重载"""
-        logger.info("🔄 手动触发配置重载...")
+        """Manually trigger configuration reload"""
+        logger.info("🔄 Manually trigger configuration reload...")
         success = await self.reload_settings()
 
         return {
@@ -211,7 +211,7 @@ class ConfigHotReloadManager:
         }
 
     def get_status(self) -> Dict[str, Any]:
-        """获取热重载状态"""
+        """Get hot reload status"""
         return {
             "is_watching": self.is_watching,
             "last_reload_time": self.last_reload_time,
@@ -221,21 +221,21 @@ class ConfigHotReloadManager:
         }
 
 
-# 全局配置热重载管理器实例
+# Global configuration hot reload manager instance
 config_hot_reload_manager = ConfigHotReloadManager()
 
 
-# 便捷函数
+# Convenient function
 async def reload_config() -> Dict[str, Any]:
-    """手动重载配置"""
+    """Manually reload configuration"""
     return await config_hot_reload_manager.manual_reload()
 
 
 def add_config_reload_callback(name: str, callback: Callable):
-    """添加配置重载回调"""
+    """Add configuration reload callback"""
     config_hot_reload_manager.add_reload_callback(name, callback)
 
 
 def add_watched_config_file(file_path: str | Path):
-    """添加监控的配置文件"""
+    """Add watched configuration files"""
     config_hot_reload_manager.add_watched_file(file_path)
