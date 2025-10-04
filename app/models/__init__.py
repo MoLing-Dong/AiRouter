@@ -4,10 +4,9 @@ from .sqlmodel_models import (
     HealthStatus,
     HealthStatusEnum,  # backward compatibility
     LLMType,
-    LLMTypeEnum,      # backward compatibility  
+    LLMTypeEnum,  # backward compatibility
     ProviderType,
-    ProviderTypeEnum, # backward compatibility
-    
+    ProviderTypeEnum,  # backward compatibility
     # Table models
     LLMModel,
     LLMProvider,
@@ -16,10 +15,11 @@ from .sqlmodel_models import (
     LLMModelParam,
     Capability,
     LLMModelCapability,
-    
     # Request/Response models
     ModelCreateRequest as LLMModelCreate,
+    ModelUpdateRequest as LLMModelUpdate,
     ProviderCreateRequest as LLMProviderCreate,
+    ProviderUpdateRequest as LLMProviderUpdate,
     ModelProviderCreateRequest as LLMModelProviderCreate,
     ModelProviderUpdateRequest as LLMModelProviderUpdate,
     LLMModelParamCreateRequest as LLMModelParamCreate,
@@ -27,12 +27,22 @@ from .sqlmodel_models import (
     ModelResponse,
     ProviderResponse,
     ModelProviderResponse,
-    
     # Utility classes
     QueryBuilder,
     PerformanceMetrics,
     HealthCheckResult,
-    TimestampMixin
+    TimestampMixin,
+)
+
+# Import unified API response models
+from .response import (
+    # 统一响应模型
+    ApiResponse,
+    ApiResponseType,
+    SuccessResponse,
+    # 工厂函数
+    create_success_response,
+    create_fail_response,
 )
 
 # Export all models
@@ -40,11 +50,10 @@ __all__ = [
     # Enums
     "HealthStatus",
     "HealthStatusEnum",  # backward compatibility
-    "LLMType", 
-    "LLMTypeEnum",      # backward compatibility
+    "LLMType",
+    "LLMTypeEnum",  # backward compatibility
     "ProviderType",
-    "ProviderTypeEnum", # backward compatibility
-    
+    "ProviderTypeEnum",  # backward compatibility
     # Table models
     "LLMModel",
     "LLMProvider",
@@ -53,23 +62,28 @@ __all__ = [
     "LLMModelParam",
     "Capability",
     "LLMModelCapability",
-    
     # Request models (for backward compatibility)
     "LLMModelCreate",
-    "LLMProviderCreate", 
+    "LLMModelUpdate",
+    "LLMProviderCreate",
+    "LLMProviderUpdate",
     "LLMModelProviderCreate",
     "LLMModelProviderUpdate",
     "LLMModelParamCreate",
     "LLMProviderApiKeyCreate",
-    
-    # Response models
+    # Response models (SQLModel)
     "ModelResponse",
     "ProviderResponse",
     "ModelProviderResponse",
-    
+    # Unified API Response models
+    "ApiResponse",
+    "ApiResponseType",
+    "SuccessResponse",
+    "create_success_response",
+    "create_fail_response",
     # Utility classes
     "QueryBuilder",
     "PerformanceMetrics",
     "HealthCheckResult",
-    "TimestampMixin"
+    "TimestampMixin",
 ]

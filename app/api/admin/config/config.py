@@ -10,6 +10,7 @@ from pydantic import BaseModel
 from app.core.config_hot_reload import config_hot_reload_manager, reload_config
 from app.utils.simple_auth import require_api_key
 from app.utils.logging_config import get_factory_logger
+from app.models import ApiResponse
 
 logger = get_factory_logger()
 
@@ -73,39 +74,51 @@ async def get_config_status(api_key: str = Depends(require_api_key)):
         raise HTTPException(status_code=500, detail=f"获取配置状态失败: {str(e)}")
 
 
-@config_router.post("/watch/start")
-async def start_config_watching(api_key: str = Depends(require_api_key)):
+@config_router.post("/watch/start", response_model=ApiResponse[dict])
+async def start_config_watching(
+    api_key: str = Depends(require_api_key),
+) -> ApiResponse[dict]:
     """启动配置文件监控"""
     try:
         if config_hot_reload_manager.is_watching:
-            return {"message": "配置文件监控已在运行", "status": "already_running"}
+            return ApiResponse.success(
+                data={"status": "already_running"}, message="配置文件监控已在运行"
+            )
 
         # 在后台启动监控
         import asyncio
 
         asyncio.create_task(config_hot_reload_manager.start_watching())
 
-        return {"message": "配置文件监控已启动", "status": "started"}
+        return ApiResponse.success(
+            data={"status": "started"}, message="配置文件监控已启动"
+        )
 
     except Exception as e:
         logger.error(f"❌ 启动配置监控异常: {e}")
         raise HTTPException(status_code=500, detail=f"启动配置监控失败: {str(e)}")
 
 
-@config_router.post("/watch/stop")
-async def stop_config_watching(api_key: str = Depends(require_api_key)):
+@config_router.post("/watch/stop", response_model=ApiResponse[dict])
+async def stop_config_watching(
+    api_key: str = Depends(require_api_key),
+) -> ApiResponse[dict]:
     """停止配置文件监控"""
     try:
         await config_hot_reload_manager.stop_watching()
-        return {"message": "配置文件监控已停止", "status": "stopped"}
+        return ApiResponse.success(
+            data={"status": "stopped"}, message="配置文件监控已停止"
+        )
 
     except Exception as e:
         logger.error(f"❌ 停止配置监控异常: {e}")
         raise HTTPException(status_code=500, detail=f"停止配置监控失败: {str(e)}")
 
 
-@config_router.get("/current")
-async def get_current_config(api_key: str = Depends(require_api_key)):
+@config_router.get("/current", response_model=ApiResponse[dict])
+async def get_current_config(
+    api_key: str = Depends(require_api_key),
+) -> ApiResponse[dict]:
     """获取当前配置（脱敏）"""
     try:
         from config.settings import settings
@@ -123,18 +136,19 @@ async def get_current_config(api_key: str = Depends(require_api_key)):
                 else:
                     config_dict[key] = "***"
 
-        return {
+        data = {
             "config": config_dict,
             "timestamp": config_hot_reload_manager.last_reload_time,
         }
+        return ApiResponse.success(data=data, message="获取当前配置成功")
 
     except Exception as e:
         logger.error(f"❌ 获取当前配置异常: {e}")
         raise HTTPException(status_code=500, detail=f"获取当前配置失败: {str(e)}")
 
 
-@config_router.post("/validate")
-async def validate_config(api_key: str = Depends(require_api_key)):
+@config_router.post("/validate", response_model=ApiResponse[dict])
+async def validate_config(api_key: str = Depends(require_api_key)) -> ApiResponse[dict]:
     """验证当前配置的有效性"""
     try:
         from config.settings import Settings
@@ -153,12 +167,15 @@ async def validate_config(api_key: str = Depends(require_api_key)):
 
         all_valid = all(validation_results.values())
 
-        return {
+        data = {
             "valid": all_valid,
             "details": validation_results,
-            "message": "配置验证通过" if all_valid else "配置验证存在问题",
         }
+        message = "配置验证通过" if all_valid else "配置验证存在问题"
+        return ApiResponse.success(data=data, message=message)
 
     except Exception as e:
         logger.error(f"❌ 配置验证异常: {e}")
-        return {"valid": False, "error": str(e), "message": "配置验证失败"}
+        return ApiResponse.fail(
+            data={"valid": False, "error": str(e)}, message="配置验证失败"
+        )

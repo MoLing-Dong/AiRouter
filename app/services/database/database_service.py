@@ -63,7 +63,7 @@ class DatabaseService:
 
     # ==================== Core Model Operations ====================
 
-    def get_all_models(self, is_enabled: Optional[bool] = None) -> List[Any]:
+    def get_all_models(self, is_enabled: Optional[bool] = None) -> List[LLMModel]:
         """Get all models from database with optional filtering"""
         try:
             with self.get_session() as session:
@@ -253,6 +253,33 @@ class DatabaseService:
                 session.commit()
                 return True
             return False
+
+    def update_model(self, model_id: int, model_data) -> Optional[LLMModel]:
+        """Update model with provided data"""
+        from app.models import LLMModelUpdate
+
+        with self.get_session() as session:
+            model = session.query(LLMModel).filter(LLMModel.id == model_id).first()
+            if not model:
+                return None
+
+            # Convert Pydantic model to dict, excluding unset fields
+            if hasattr(model_data, "model_dump"):
+                update_dict = model_data.model_dump(exclude_unset=True)
+            else:
+                update_dict = model_data if isinstance(model_data, dict) else {}
+
+            # Update fields
+            for field, value in update_dict.items():
+                if hasattr(model, field) and value is not None:
+                    setattr(model, field, value)
+
+            model.updated_at = datetime.utcnow()
+            session.commit()
+            session.refresh(model)
+
+            logger.info(f"Updated model: {model.name} (ID: {model_id})")
+            return model
 
     def update_model_enabled_status(self, model_name: str, enabled: bool) -> bool:
         """Update model enabled status"""
@@ -1199,10 +1226,10 @@ class DatabaseService:
             logger.info(f"Get load balancing strategy failed: {e}")
             return None
 
-    def get_model_strategies(self, model_name: str) -> List[Dict[str, Any]]:
+    def get_model_strategies(self, model_id: int) -> List[Dict[str, Any]]:
         """Get all provider strategies of the model"""
         try:
-            model = self.get_model_by_name(model_name, is_enabled=True)
+            model = self.get_model_by_id(model_id, is_enabled=True)
             if not model:
                 return []
 
@@ -1276,7 +1303,9 @@ class DatabaseService:
 
     def get_available_strategies(self) -> List[str]:
         """Get all available load balancing strategies"""
-        from .load_balancing_strategies import LoadBalancingStrategy
+        from app.services.load_balancing.load_balancing_strategies import (
+            LoadBalancingStrategy,
+        )
 
         return [strategy.value for strategy in LoadBalancingStrategy]
 

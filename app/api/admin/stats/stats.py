@@ -26,12 +26,15 @@ async def get_routing_stats():
         )
 
 
-@stats_router.post("/reset")
+@stats_router.post("/reset", response_model=StatsResponse)
 async def reset_stats():
     """Reset routing statistics"""
     try:
         router.reset_stats()
-        return {"message": "Statistics information has been reset"}
+        # 返回重置后的空统计
+        from app.models import ApiResponse
+
+        return ApiResponse.success(message="Statistics information has been reset")
     except Exception as e:
         raise HTTPException(
             status_code=500, detail=f"Reset statistics failed: {str(e)}"

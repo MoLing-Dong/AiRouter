@@ -298,10 +298,29 @@ class ModelCreateRequest(LLMModelBase):
     capability_ids: Optional[List[int]] = Field(default=None)
 
 
+class ModelUpdateRequest(SQLModel):
+    """更新模型请求（所有字段可选）"""
+
+    name: Optional[str] = Field(default=None, max_length=100)
+    llm_type: Optional[LLMType] = Field(default=None)
+    description: Optional[str] = Field(default=None)
+    is_enabled: Optional[bool] = Field(default=None)
+
+
 class ProviderCreateRequest(LLMProviderBase):
     """创建提供商请求"""
 
     api_key: Optional[str] = Field(default=None, max_length=500)
+
+
+class ProviderUpdateRequest(SQLModel):
+    """更新提供商请求（所有字段可选）"""
+
+    name: Optional[str] = Field(default=None, max_length=100)
+    provider_type: Optional[ProviderType] = Field(default=None)
+    official_endpoint: Optional[str] = Field(default=None, max_length=255)
+    description: Optional[str] = Field(default=None)
+    is_enabled: Optional[bool] = Field(default=None)
 
 
 class ModelProviderCreateRequest(LLMModelProviderBase):

@@ -9,6 +9,7 @@ from typing import Optional
 from fastapi import APIRouter, HTTPException
 from app.services import adapter_manager
 from app.utils.logging_config import get_factory_logger
+from app.models import ApiResponse
 
 # 导入拆分后的模块
 from .cache_manager import models_cache
@@ -309,30 +310,31 @@ async def get_model_capabilities(model_name: str):
     return capability_service.get_model_capabilities(model_name)
 
 
-@models_router.post("/clear-cache")
-async def clear_cache():
+@models_router.post("/clear-cache", response_model=ApiResponse[dict])
+async def clear_cache() -> ApiResponse[dict]:
     """Clear models cache (admin only)"""
     try:
         models_cache.clear_cache()
-        return {
-            "message": "Models cache cleared successfully",
-            "timestamp": time.time(),
-        }
+        return ApiResponse.success(
+            data={"timestamp": time.time()}, message="Models cache cleared successfully"
+        )
     except Exception as e:
         logger.error(f"Clear cache failed: {e}")
         raise HTTPException(status_code=500, detail=f"Clear cache failed: {str(e)}")
 
 
-@models_router.get("/cache/stats")
-async def get_cache_stats():
+@models_router.get("/cache/stats", response_model=ApiResponse[dict])
+async def get_cache_stats() -> ApiResponse[dict]:
     """Get cache statistics"""
     try:
         stats = models_cache.get_cache_stats()
-        return {
-            "message": "Cache statistics retrieved successfully",
+        data = {
             "stats": stats,
             "timestamp": time.time(),
         }
+        return ApiResponse.success(
+            data=data, message="Cache statistics retrieved successfully"
+        )
     except Exception as e:
         logger.error(f"Get cache stats failed: {e}")
         raise HTTPException(status_code=500, detail=f"Get cache stats failed: {str(e)}")

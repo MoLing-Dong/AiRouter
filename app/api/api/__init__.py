@@ -7,16 +7,19 @@ from fastapi import APIRouter
 
 # auth目录为空，暂时注释
 # from .auth import auth_router
-from .database import db_router
+from .database import models_router, providers_router, capabilities_router
 from .load_balancing import router as load_balancing_router
 from .pool import pool_router
 
 # 创建api主路由
 api_router = APIRouter(prefix="/api", tags=["API"])
 
-# 注册子路由
-# api_router.include_router(auth_router, prefix="/auth", tags=["Auth"])
-api_router.include_router(db_router, prefix="/database", tags=["Database"])
+# 注册数据库子路由
+api_router.include_router(models_router, prefix="/database")
+api_router.include_router(providers_router, prefix="/database")
+api_router.include_router(capabilities_router, prefix="/database")
+
+# 注册其他子路由
 api_router.include_router(
     load_balancing_router, prefix="/load-balancing", tags=["Load Balancing"]
 )

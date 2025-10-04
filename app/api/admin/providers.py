@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException, Query
 from typing import List, Optional
 from app.services.database.database_service import db_service
 from app.utils.logging_config import get_factory_logger
+from app.models import ApiResponse
 
 # Get logger
 logger = get_factory_logger()
@@ -9,32 +10,33 @@ logger = get_factory_logger()
 providers_router = APIRouter(tags=["Provider Management"])
 
 
-@providers_router.get("/")
-async def get_all_providers():
+@providers_router.get("/", response_model=ApiResponse[dict])
+async def get_all_providers() -> ApiResponse[dict]:
     """Get all providers and their health status"""
     try:
         providers = db_service.get_all_providers()
-        return {
-            "providers": [
-                {
-                    "id": provider.id,
-                    "name": provider.name,
-                    "provider_type": provider.provider_type,
-                    "official_endpoint": provider.official_endpoint,
-                    "is_enabled": provider.is_enabled,
-                    "description": provider.description,
-                }
-                for provider in providers
-            ]
-        }
+        providers_list = [
+            {
+                "id": provider.id,
+                "name": provider.name,
+                "provider_type": provider.provider_type,
+                "official_endpoint": provider.official_endpoint,
+                "is_enabled": provider.is_enabled,
+                "description": provider.description,
+            }
+            for provider in providers
+        ]
+        return ApiResponse.success(
+            data={"providers": providers_list}, message="获取提供商列表成功"
+        )
     except Exception as e:
         raise HTTPException(
             status_code=500, detail=f"Get provider list failed: {str(e)}"
         )
 
 
-@providers_router.get("/{provider_name}/health")
-async def get_provider_health(provider_name: str):
+@providers_router.get("/{provider_name}/health", response_model=ApiResponse[dict])
+async def get_provider_health(provider_name: str) -> ApiResponse[dict]:
     """Get specified provider's health status"""
     try:
         health_info = db_service.get_provider_health_status(provider_name)
@@ -43,7 +45,7 @@ async def get_provider_health(provider_name: str):
                 status_code=404, detail=f"Provider {provider_name} does not exist"
             )
 
-        return health_info
+        return ApiResponse.success(data=health_info, message="获取提供商健康状态成功")
     except HTTPException:
         raise
     except Exception as e:
@@ -52,8 +54,8 @@ async def get_provider_health(provider_name: str):
         )
 
 
-@providers_router.get("/{provider_name}/performance")
-async def get_provider_performance(provider_name: str):
+@providers_router.get("/{provider_name}/performance", response_model=ApiResponse[dict])
+async def get_provider_performance(provider_name: str) -> ApiResponse[dict]:
     """Get specified provider's performance statistics"""
     try:
         performance_stats = db_service.get_provider_performance_stats(provider_name)
@@ -62,7 +64,9 @@ async def get_provider_performance(provider_name: str):
                 status_code=404, detail=f"Provider {provider_name} does not exist"
             )
 
-        return performance_stats
+        return ApiResponse.success(
+            data=performance_stats, message="获取提供商性能统计成功"
+        )
     except HTTPException:
         raise
     except Exception as e:
@@ -72,12 +76,14 @@ async def get_provider_performance(provider_name: str):
         )
 
 
-@providers_router.get("/recommendations")
-async def get_provider_recommendations(model_name: Optional[str] = Query(None)):
+@providers_router.get("/recommendations", response_model=ApiResponse[dict])
+async def get_provider_recommendations(
+    model_name: Optional[str] = Query(None),
+) -> ApiResponse[dict]:
     """Get provider recommendations"""
     try:
         recommendations = db_service.get_provider_recommendations(model_name)
-        return {
+        result = {
             "model_name": model_name,
             "recommendations": [
                 {
@@ -93,14 +99,17 @@ async def get_provider_recommendations(model_name: Optional[str] = Query(None)):
                 for rec in recommendations
             ],
         }
+        return ApiResponse.success(data=result, message="获取提供商推荐成功")
     except Exception as e:
         raise HTTPException(
             status_code=500, detail=f"Get provider recommendations failed: {str(e)}"
         )
 
 
-@providers_router.get("/{provider_name}/best-for-model")
-async def get_best_provider_for_model(model_name: str):
+@providers_router.get(
+    "/{provider_name}/best-for-model", response_model=ApiResponse[dict]
+)
+async def get_best_provider_for_model(model_name: str) -> ApiResponse[dict]:
     """Get best provider for specified model"""
     try:
         best_provider = db_service.get_best_provider_for_model(model_name)
@@ -109,7 +118,7 @@ async def get_best_provider_for_model(model_name: str):
                 status_code=404, detail=f"Model {model_name} has no available provider"
             )
 
-        return {
+        result = {
             "model_name": model_name,
             "best_provider": {
                 "id": best_provider.id,
@@ -118,6 +127,7 @@ async def get_best_provider_for_model(model_name: str):
                 "official_endpoint": best_provider.official_endpoint,
             },
         }
+        return ApiResponse.success(data=result, message="获取最佳提供商成功")
     except HTTPException:
         raise
     except Exception as e:
@@ -126,8 +136,10 @@ async def get_best_provider_for_model(model_name: str):
         )
 
 
-@providers_router.put("/{provider_name}/health")
-async def update_provider_health(provider_name: str, health_status: str):
+@providers_router.put("/{provider_name}/health", response_model=ApiResponse[None])
+async def update_provider_health(
+    provider_name: str, health_status: str
+) -> ApiResponse[None]:
     """Update provider's health status"""
     try:
         if health_status not in ["healthy", "degraded", "unhealthy"]:
@@ -142,9 +154,9 @@ async def update_provider_health(provider_name: str, health_status: str):
                 status_code=404, detail=f"Provider {provider_name} does not exist"
             )
 
-        return {
-            "message": f"Provider {provider_name}'s health status has been updated to {health_status}"
-        }
+        return ApiResponse.success(
+            message=f"Provider {provider_name}'s health status has been updated to {health_status}"
+        )
     except HTTPException:
         raise
     except Exception as e:
@@ -153,8 +165,8 @@ async def update_provider_health(provider_name: str, health_status: str):
         )
 
 
-@providers_router.get("/stats/overview")
-async def get_providers_overview():
+@providers_router.get("/stats/overview", response_model=ApiResponse[dict])
+async def get_providers_overview() -> ApiResponse[dict]:
     """Get provider overview statistics"""
     try:
         providers_with_health = db_service.get_all_providers_with_health()
@@ -189,7 +201,7 @@ async def get_providers_overview():
             else 0
         )
 
-        return {
+        overview = {
             "total_providers": total_providers,
             "healthy_providers": healthy_providers,
             "degraded_providers": degraded_providers,
@@ -213,6 +225,7 @@ async def get_providers_overview():
                 ),
             },
         }
+        return ApiResponse.success(data=overview, message="获取提供商概览统计成功")
     except Exception as e:
         raise HTTPException(
             status_code=500, detail=f"Get provider overview statistics failed: {str(e)}"

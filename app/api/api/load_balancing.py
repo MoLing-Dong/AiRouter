@@ -1,8 +1,9 @@
-from fastapi import APIRouter, HTTPException, Depends, Query
+from fastapi import APIRouter, HTTPException, Depends, Path, Query
 from typing import Dict, List, Optional, Any
 from pydantic import BaseModel
 from app.services.database.database_service import db_service
 from app.services.load_balancing.load_balancing_strategies import LoadBalancingStrategy
+from app.models import ApiResponse
 
 router = APIRouter(tags=["Load Balancing Strategy"])
 
@@ -36,26 +37,37 @@ class StrategyInfo(BaseModel):
     overall_score: float
 
 
-@router.get("/strategies", response_model=List[str])
-async def get_available_strategies():
+@router.get("/strategies", response_model=ApiResponse[List[str]])
+async def get_available_strategies() -> ApiResponse[List[str]]:
     """Get all available load balancing strategies"""
-    return db_service.get_available_strategies()
+    strategies = db_service.get_available_strategies()
+    return ApiResponse.success(data=strategies, message="获取负载均衡策略列表成功")
 
 
-@router.get("/model/{model_name}/strategies", response_model=List[StrategyInfo])
-async def get_model_strategies(model_name: str):
+@router.get(
+    "/model/{model_id}/strategies", response_model=ApiResponse[List[StrategyInfo]]
+)
+async def get_model_strategies(
+    model_id: int = Path(..., gt=0, description="模型ID", example=1, title="Model ID")
+) -> ApiResponse[List[StrategyInfo]]:
     """Get all provider strategies for specified model"""
-    strategies = db_service.get_model_strategies(model_name)
+    strategies = db_service.get_model_strategies(model_id)
     if not strategies:
         raise HTTPException(
-            status_code=404, detail=f"Model {model_name} has no strategy configuration"
+            status_code=404, detail=f"Model {model_id} has no strategy configuration"
         )
 
-    return [StrategyInfo(**strategy) for strategy in strategies]
+    strategy_list = [StrategyInfo(**strategy) for strategy in strategies]
+    return ApiResponse.success(data=strategy_list, message="获取模型策略成功")
 
 
-@router.get("/model/{model_name}/provider/{provider_name}/strategy")
-async def get_model_provider_strategy(model_name: str, provider_name: str):
+@router.get(
+    "/model/{model_name}/provider/{provider_name}/strategy",
+    response_model=ApiResponse[dict],
+)
+async def get_model_provider_strategy(
+    model_name: str, provider_name: str
+) -> ApiResponse[dict]:
     """Get model-provider load balancing strategy"""
     strategy = db_service.get_model_provider_strategy(model_name, provider_name)
     if not strategy:
@@ -64,13 +76,16 @@ async def get_model_provider_strategy(model_name: str, provider_name: str):
             detail=f"Model {model_name} and provider {provider_name} strategy configuration not found",
         )
 
-    return strategy
+    return ApiResponse.success(data=strategy, message="获取策略配置成功")
 
 
-@router.put("/model/{model_name}/provider/{provider_name}/strategy")
+@router.put(
+    "/model/{model_name}/provider/{provider_name}/strategy",
+    response_model=ApiResponse[None],
+)
 async def update_model_provider_strategy(
     model_name: str, provider_name: str, request: StrategyUpdateRequest
-):
+) -> ApiResponse[None]:
     """Update model-provider load balancing strategy"""
     # Validate strategy is valid
     if request.strategy not in db_service.get_available_strategies():
@@ -93,13 +108,16 @@ async def update_model_provider_strategy(
             detail=f"Update strategy failed, please check if model {model_name} and provider {provider_name} exist",
         )
 
-    return {"message": "Strategy updated successfully"}
+    return ApiResponse.success(message="Strategy updated successfully")
 
 
-@router.put("/model/{model_name}/provider/{provider_name}/circuit-breaker")
+@router.put(
+    "/model/{model_name}/provider/{provider_name}/circuit-breaker",
+    response_model=ApiResponse[None],
+)
 async def update_model_provider_circuit_breaker(
     model_name: str, provider_name: str, request: CircuitBreakerUpdateRequest
-):
+) -> ApiResponse[None]:
     """Update model-provider circuit breaker configuration"""
     success = db_service.update_model_provider_circuit_breaker(
         model_name, provider_name, request.enabled, request.threshold, request.timeout
@@ -111,10 +129,12 @@ async def update_model_provider_circuit_breaker(
             detail=f"Update circuit breaker configuration failed, please check if model {model_name} and provider {provider_name} exist",
         )
 
-    return {"message": "Circuit breaker configuration updated successfully"}
+    return ApiResponse.success(
+        message="Circuit breaker configuration updated successfully"
+    )
 
 
-@router.get("/statistics")
+@router.get("/statistics", response_model=ApiResponse[dict])
 async def get_strategy_statistics(
     model_name: Optional[str] = Query(
         None,
@@ -122,13 +142,14 @@ async def get_strategy_statistics(
         max_length=100,
         description="模型名称，如果提供则不能为空字符串",
     )
-):
+) -> ApiResponse[dict]:
     """Get strategy usage statistics"""
-    return db_service.get_strategy_statistics(model_name)
+    stats = db_service.get_strategy_statistics(model_name)
+    return ApiResponse.success(data=stats, message="获取策略统计成功")
 
 
-@router.get("/model/{model_name}/recommendations")
-async def get_strategy_recommendations(model_name: str):
+@router.get("/model/{model_name}/recommendations", response_model=ApiResponse[dict])
+async def get_strategy_recommendations(model_name: str) -> ApiResponse[dict]:
     """Get best strategy recommendations for model"""
     try:
         from app.services.load_balancing.router import SmartRouter
@@ -139,17 +160,17 @@ async def get_strategy_recommendations(model_name: str):
         if "error" in recommendations:
             raise HTTPException(status_code=404, detail=recommendations["error"])
 
-        return recommendations
+        return ApiResponse.success(data=recommendations, message="获取策略推荐成功")
     except Exception as e:
         raise HTTPException(
             status_code=500, detail=f"Get strategy recommendations failed: {str(e)}"
         )
 
 
-@router.post("/model/{model_name}/test-strategy")
+@router.post("/model/{model_name}/test-strategy", response_model=ApiResponse[dict])
 async def test_strategy(
     model_name: str, strategy: str, strategy_config: Optional[Dict[str, Any]] = None
-):
+) -> ApiResponse[dict]:
     """Test load balancing strategy"""
     try:
         from app.services.load_balancing.load_balancing_strategies import (
@@ -180,8 +201,7 @@ async def test_strategy(
             test_request, model_providers, strategy, strategy_config
         )
 
-        return {
-            "message": "Strategy test successful",
+        result_data = {
             "selected_provider": "Test completed",
             "response_preview": (
                 response.content[:100] + "..."
@@ -190,23 +210,26 @@ async def test_strategy(
             ),
         }
 
+        return ApiResponse.success(data=result_data, message="Strategy test successful")
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Strategy test failed: {str(e)}")
 
 
-@router.get("/info")
-async def get_load_balancing_info():
+@router.get("/info", response_model=ApiResponse[dict])
+async def get_load_balancing_info() -> ApiResponse[dict]:
     """Get load balancing system information"""
     try:
         from app.services.load_balancing.load_balancing_strategies import (
             strategy_manager,
         )
 
-        return {
+        info = {
             "available_strategies": db_service.get_available_strategies(),
             "strategy_manager_info": strategy_manager.get_strategy_info(),
             "system_statistics": db_service.get_strategy_statistics(),
         }
+        return ApiResponse.success(data=info, message="获取负载均衡系统信息成功")
     except Exception as e:
         raise HTTPException(
             status_code=500, detail=f"Get system information failed: {str(e)}"
