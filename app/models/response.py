@@ -1,87 +1,87 @@
 """
-统一的 API 响应模型
-提供类似 Java Result 的响应封装结构
+Unified API response model
 """
 
 from typing import TypeVar, Generic, Optional, Any
 from pydantic import BaseModel, Field
 
 
-# 定义泛型类型变量
+# Define generic type variable
 T = TypeVar("T")
 
 
 class ApiResponse(BaseModel, Generic[T]):
     """
-    统一的 API 响应封装类
+    Unified API response encapsulation class
 
     Examples:
-        >>> # 成功响应
+        >>> # Success response
         >>> create_success_response(data={"user": "John"})
-        >>> create_success_response(data=[], message="查询成功")
+        >>> create_success_response(data=[], message="Query successful")
 
-        >>> # 失败响应
-        >>> create_fail_response(message="用户不存在")
-        >>> create_fail_response(message="参数错误", code=400)
+        >>> # Failure response
+        >>> create_fail_response(message="User not found")
+        >>> create_fail_response(message="Parameter error", code=400)
     """
 
-    success: bool = Field(description="请求是否成功")
-    message: Optional[str] = Field(default=None, description="响应消息")
-    data: Optional[T] = Field(default=None, description="响应数据")
-    code: Optional[int] = Field(default=None, description="业务状态码（可选）")
+    success: bool = Field(description="Request whether successful")
+    message: Optional[str] = Field(default=None, description="Response message")
+    data: Optional[T] = Field(default=None, description="Response data")
+    code: Optional[int] = Field(
+        default=None, description="Business status code (optional)"
+    )
 
     class Config:
         from_attributes = True
 
 
-# 工厂函数（替代 classmethod）
 def create_success_response(
     data: Optional[T] = None,
-    message: str = "操作成功",
+    message: str = "Operation successful",
     code: Optional[int] = None,
 ) -> ApiResponse[T]:
     """
-    创建成功响应
+    Create successful response
 
     Args:
-        data: 响应数据
-        message: 成功消息
-        code: 业务状态码（可选）
+        data: Response data
+        message: Success message
+        code: Business status code (optional)
 
     Returns:
-        ApiResponse: 成功响应对象
+        ApiResponse: Success response object
     """
     return ApiResponse(success=True, message=message, data=data, code=code)
 
 
 def create_fail_response(
-    message: str = "操作失败",
+    message: str = "Operation failed",
     data: Optional[T] = None,
     code: Optional[int] = None,
 ) -> ApiResponse[T]:
     """
-    创建失败响应
+    Create failure response
 
     Args:
-        message: 失败消息
-        data: 响应数据（可选，用于返回错误详情）
-        code: 业务状态码（可选）
+        message: Failure message
+        data: Response data (optional, for returning error details)
+        code: Business status code (optional)
 
     Returns:
-        ApiResponse: 失败响应对象
+        ApiResponse: Failure response object
     """
     return ApiResponse(success=False, message=message, data=data, code=code)
 
 
-# 为了兼容性，添加别名
+# For compatibility, add aliases
 ApiResponse.success = staticmethod(create_success_response)  # type: ignore
 ApiResponse.fail = staticmethod(create_fail_response)  # type: ignore
 
 
-# ==================== 类型别名（便于使用） ====================
+# ==================== Type aliases (for convenience) ====================
 
-# 通用响应类型
+# Generic response type
 ApiResponseType = ApiResponse[Any]
 
-# 简单成功响应（无数据）
+# Simple success response (no data)
 SuccessResponse = ApiResponse[None]

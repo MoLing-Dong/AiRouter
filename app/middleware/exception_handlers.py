@@ -27,8 +27,9 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 
 async def general_exception_handler(request: Request, exc: Exception):
     """处理所有未捕获的异常"""
+    error_msg = str(exc).replace("{", "{{").replace("}", "}}")
     logger.error(
-        f"Unhandled exception on {request.url.path}: {str(exc)}", exc_info=True
+        f"Unhandled exception on {request.url.path}: {error_msg}", exc_info=True
     )
     return JSONResponse(
         status_code=status.HTTP_200_OK,  # 统一返回 200

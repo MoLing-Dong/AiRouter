@@ -17,7 +17,7 @@ models_router = APIRouter(prefix="/models", tags=["Database Models"])
 
 
 class ModelItemData(BaseModel):
-    """模型数据项"""
+    """Model data item"""
 
     id: int
     name: str
@@ -32,7 +32,7 @@ class ModelItemData(BaseModel):
 
 
 class ModelsListData(BaseModel):
-    """模型列表数据"""
+    """Model list data"""
 
     models: List[ModelItemData]
     total: Optional[int] = None
@@ -43,7 +43,7 @@ class ModelsListData(BaseModel):
 
 @models_router.get("", response_model=ApiResponse[ModelsListData])
 async def get_models() -> ApiResponse[ModelsListData]:
-    """获取所有模型列表"""
+    """Get all models list"""
     try:
         models = db_service.get_all_models()
         model_items = [
@@ -60,7 +60,7 @@ async def get_models() -> ApiResponse[ModelsListData]:
         ]
         return ApiResponse.success(
             data=ModelsListData(models=model_items, total=len(model_items)),
-            message="获取模型列表成功",
+            message="Get models list successfully",
         )
     except Exception as e:
         logger.error(f"Get models failed: {str(e)}")
@@ -69,12 +69,12 @@ async def get_models() -> ApiResponse[ModelsListData]:
 
 @models_router.post("", response_model=ApiResponse[dict])
 async def create_model(model_data: LLMModelCreate) -> ApiResponse[dict]:
-    """创建模型"""
+    """Create model"""
     try:
         # Check if model already exists
         existing_model = db_service.get_model_by_name(model_data.name)
         if existing_model:
-            return ApiResponse.fail(message=f"Model already exists: {model_data.name}")
+            return ApiResponse.fail(message=f"Model already exists: {model_data.name}", code=400)
 
         model = db_service.create_model(model_data)
 
@@ -130,44 +130,44 @@ async def create_model(model_data: LLMModelCreate) -> ApiResponse[dict]:
 async def delete_model(
     model_id: int = Path(..., gt=0, description="模型ID", example=1)
 ) -> ApiResponse[dict]:
-    """删除指定的模型"""
+    """Delete model"""
     try:
-        # 检查模型是否存在
+        # Check if model exists
         model = db_service.get_model_by_id(model_id)
         if not model:
-            return ApiResponse.fail(message=f"模型不存在：ID {model_id}", code=404)
+            return ApiResponse.fail(message=f"Model not found: ID {model_id}", code=404)
 
-        # 执行删除
+        # Delete model
         result = db_service.delete_model(model_id)
 
         if result:
             return ApiResponse.success(
                 data={"model_id": model_id, "model_name": model.name},
-                message=f"模型 '{model.name}' 已成功删除",
+                message=f"Model '{model.name}' deleted successfully",
             )
         else:
-            return ApiResponse.fail(message="删除模型失败")
+            return ApiResponse.fail(message="Failed to delete model")
 
     except Exception as e:
-        logger.error(f"删除模型失败 (ID: {model_id}): {str(e)}")
-        raise HTTPException(status_code=500, detail=f"删除模型时发生错误：{str(e)}")
+        logger.error(f"Failed to delete model (ID: {model_id}): {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to delete model: {str(e)}")
 
 
 @models_router.put("/{model_id}", response_model=ApiResponse[ModelItemData])
 async def update_model(
-    model_id: int = Path(..., gt=0, description="模型ID", example=1),
+    model_id: int = Path(..., gt=0, description="Model ID", example=1),
     model_data: LLMModelUpdate = Body(...),
 ) -> ApiResponse[ModelItemData]:
-    """更新模型"""
+    """Update model"""
     try:
         model = db_service.update_model(model_id, model_data)
         if not model:
             return ApiResponse.fail(
-                message=f"模型不存在：ID {model_id}",
+                message=f"Model not found: ID {model_id}",
                 code=404,
             )
 
-        # 转换为返回格式
+        # Convert to return format
         model_item = ModelItemData(
             id=model.id,
             name=model.name,
@@ -178,7 +178,10 @@ async def update_model(
             updated_at=model.updated_at,
         )
 
-        return ApiResponse.success(data=model_item, message="模型更新成功")
+        return ApiResponse.success(
+            data=model_item, message="Model updated successfully"
+        )
     except Exception as e:
-        logger.error(f"更新模型失败 (ID: {model_id}): {str(e)}")
-        raise HTTPException(status_code=500, detail=f"更新模型时发生错误：{str(e)}")
+        logger.error(f"Failed to update model (ID: {model_id}): {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to update model: {str(e)}")
+
