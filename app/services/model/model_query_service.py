@@ -5,8 +5,8 @@
 
 import time
 from typing import Dict, List, Any, Optional
-from app.services import adapter_manager
-from app.services.database.database_service import db_service
+from app.services.adapters import adapter_manager
+from app.services.database import db_service
 from app.utils.logging_config import get_factory_logger
 
 logger = get_factory_logger()
@@ -55,7 +55,7 @@ class ModelQueryService:
                     continue
 
             # 预热缓存
-            from .cache_manager import models_cache
+            from app.services.model.cache_manager import models_cache
 
             response_data = {"object": "list", "data": models}
             models_cache.prewarm_cache(response_data)
@@ -233,4 +233,4 @@ class ModelQueryService:
 
 
 # 全局模型查询服务实例
-model_service = ModelQueryService()
+model_query_service = ModelQueryService()

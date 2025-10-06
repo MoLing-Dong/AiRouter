@@ -1,61 +1,144 @@
 """
 AI Router Services Module
-AI路由器服务模块 - 重新组织后的清晰架构
+AI路由器服务模块 - 领域驱动设计架构
 
-服务分类：
-- database: 数据库相关服务
-- adapters: 适配器管理服务  
-- load_balancing: 负载均衡和路由服务
-- monitoring: 监控和性能分析服务
-- core: 核心业务服务
+架构设计：
+===================
+采用领域驱动设计（DDD）的垂直切分方式，按业务领域组织服务，
+而不是按技术层次（如MVC的水平切分）。
+
+业务领域（Domain）：
+├── Model Domain (模型领域)
+│   - 模型的全生命周期管理
+│   - 模型查询和展示
+│   - 模型缓存
+│   - 模型与提供商关联
+│
+├── Capability Domain (能力领域)
+│   - 能力定义和管理
+│   - 模型能力关联
+│
+├── Provider Domain (提供商领域)
+│   - 提供商管理
+│   - API Key 管理
+│
+└── Supporting Services (支撑服务)
+    - Database: 数据持久化
+    - Adapters: LLM 提供商适配器
+    - Load Balancing: 负载均衡和路由
+    - Monitoring: 监控和健康检查
+    - Infrastructure: 基础设施服务
+
+目录结构：
+===================
+- model/             模型领域服务
+- capability/        能力领域服务
+- provider/          提供商领域服务
+- database/          数据库服务
+- adapters/          适配器管理
+- load_balancing/    负载均衡
+- monitoring/        监控服务
+- infrastructure/    基础设施
 """
 
-# 核心服务导入
-from .model_service import ModelService
-from .model_provider_service import ModelProviderService
-from .provider_service import ProviderService
-from .service_factory import ServiceFactory
-from .service_manager import ServiceManager
+# ============================================================================
+# Model Domain Services (模型领域服务)
+# ============================================================================
+from .model import (
+    ModelService,
+    ModelQueryService,
+    model_query_service,
+    ModelsCacheManager,
+    models_cache,
+    ModelProviderService,
+)
 
-# 数据库服务导入
-from .database.database_service import db_service
-from .database.async_database_service import async_db_service
-from .database.sqlmodel_database_service import sqlmodel_db_service
+# ============================================================================
+# Capability Domain Services (能力领域服务)
+# ============================================================================
+from .capability import (
+    CapabilityService,
+    capability_service,
+)
 
-# 适配器服务导入
-from .adapters.adapter_manager import adapter_manager
-from .adapters.adapter_factory import AdapterFactory
-from .adapters.adapter_pool import AdapterPool
+# ============================================================================
+# Provider Domain Services (提供商领域服务)
+# ============================================================================
+from .provider import (
+    ProviderService,
+)
 
-# 负载均衡服务导入
-from .load_balancing.load_balancing_strategies import LoadBalancingStrategy, LoadBalancingStrategyManager
-from .load_balancing.router import SmartRouter
+# ============================================================================
+# Infrastructure Services (基础设施服务)
+# ============================================================================
+from .infrastructure import (
+    ServiceFactory,
+    ServiceManager,
+)
 
-# 监控服务导入
-from .monitoring.health_check_service import HealthCheckService
+# ============================================================================
+# Database Services (数据库服务)
+# ============================================================================
+from .database import (
+    db_service,
+    async_db_service,
+    sqlmodel_db_service,
+)
 
+# ============================================================================
+# Adapter Services (适配器服务)
+# ============================================================================
+from .adapters import (
+    adapter_manager,
+    AdapterFactory,
+    AdapterPool,
+)
+
+# ============================================================================
+# Load Balancing Services (负载均衡服务)
+# ============================================================================
+from .load_balancing import (
+    LoadBalancingStrategy,
+    LoadBalancingStrategyManager,
+    SmartRouter,
+)
+
+# ============================================================================
+# Monitoring Services (监控服务)
+# ============================================================================
+from .monitoring import HealthCheckService
+
+# ============================================================================
+# Public API - 对外暴露的服务接口
+# ============================================================================
 __all__ = [
-    # 核心服务
+    # ========== Model Domain ==========
     "ModelService",
-    "ModelProviderService", 
+    "ModelQueryService",
+    "model_query_service",
+    "ModelsCacheManager",
+    "models_cache",
+    "ModelProviderService",
+    # ========== Capability Domain ==========
+    "CapabilityService",
+    "capability_service",
+    # ========== Provider Domain ==========
     "ProviderService",
+    # ========== Infrastructure Services ==========
     "ServiceFactory",
     "ServiceManager",
-    
-    # 数据库服务
+    # ========== Database Services ==========
     "db_service",
     "async_db_service",
     "sqlmodel_db_service",
-    
-    # 适配器服务
+    # ========== Adapter Services ==========
     "adapter_manager",
     "AdapterFactory",
     "AdapterPool",
-    
-    # 负载均衡服务
+    # ========== Load Balancing Services ==========
     "LoadBalancingStrategy",
-    "Router",
-    
-    # 监控服务
+    "LoadBalancingStrategyManager",
+    "SmartRouter",
+    # ========== Monitoring Services ==========
     "HealthCheckService",
 ]

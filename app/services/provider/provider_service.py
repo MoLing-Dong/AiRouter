@@ -1,13 +1,13 @@
 from sqlalchemy.orm import Session
 from typing import List, Dict, Optional, Any
 from datetime import datetime
-from ..models import (
+from app.models import (
     LLMProvider,
     LLMProviderCreate,
     LLMProviderApiKey,
     LLMProviderApiKeyCreate,
 )
-from .database.database_service import DatabaseService
+from app.services.database import DatabaseService
 from app.utils.logging_config import get_factory_logger
 
 logger = get_factory_logger()

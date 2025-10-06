@@ -427,7 +427,7 @@ class ModelAdapterManager:
         """通知相关服务清理缓存"""
         try:
             # 清理models接口的缓存
-            from app.api.v1.models.cache_manager import models_cache
+            from app.services.model import models_cache
 
             models_cache.clear_cache()
             logger.info("✅ Notified models cache to clear")

@@ -11,10 +11,8 @@ from app.services import adapter_manager
 from app.utils.logging_config import get_factory_logger
 from app.models import ApiResponse
 
-# 导入拆分后的模块
-from .cache_manager import models_cache
-from .model_service import model_service
-from .capability_service import capability_service
+from app.services.model import models_cache, model_query_service as model_service
+from app.services.capability import capability_service
 
 models_router = APIRouter(tags=["Model Management"])
 

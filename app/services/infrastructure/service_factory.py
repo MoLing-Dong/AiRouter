@@ -4,6 +4,7 @@ Service Factory
 """
 
 from app.services.database.transaction_manager import DatabaseTransactionManager
+
 # 注释掉已删除的repositories和business导入
 # from app.services.repositories.model_repository import ModelRepository
 # from app.services.repositories.provider_repository import ProviderRepository
@@ -15,9 +16,8 @@ from app.services.database.transaction_manager import DatabaseTransactionManager
 # from app.services.business.api_key_service import ApiKeyService
 
 # 使用现有的服务
-from .model_service import ModelService
-from .provider_service import ProviderService
-from .model_provider_service import ModelProviderService
+from app.services.model import ModelService, ModelProviderService
+from app.services.provider import ProviderService
 from app.utils.logging_config import get_factory_logger
 
 logger = get_factory_logger()
@@ -52,6 +52,7 @@ class ServiceFactory:
         """Setup all repository instances - simplified"""
         # 使用数据库服务替代repositories
         from .database.database_service import DatabaseService
+
         self._db_service = DatabaseService()
         logger.debug("   📚 Database service initialized")
 

@@ -4,13 +4,16 @@
 """
 
 from .database_service import db_service, DatabaseService
-from .async_database_service import async_db_service, AsyncDatabaseService  
+from .async_database_service import async_db_service, AsyncDatabaseService
+from .sqlmodel_database_service import sqlmodel_db_service, SQLModelDatabaseService
 from .transaction_manager import DatabaseTransactionManager
 
 __all__ = [
     "db_service",
-    "DatabaseService", 
+    "DatabaseService",
     "async_db_service",
     "AsyncDatabaseService",
+    "sqlmodel_db_service",
+    "SQLModelDatabaseService",
     "DatabaseTransactionManager",
 ]

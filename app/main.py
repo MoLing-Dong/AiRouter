@@ -55,9 +55,9 @@ async def lifespan(app):
 
     # Preload models cache for faster first request
     logger.info("🔥 Preloading models cache...")
-    from app.api.admin.models.model_service import model_service
+    from app.services.model import model_query_service
 
-    await model_service.preload_models_cache()
+    await model_query_service.preload_models_cache()
 
     # Display load balancing strategy information
     logger.info("📊 Load balancing strategy system enabled")

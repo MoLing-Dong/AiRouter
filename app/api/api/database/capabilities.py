@@ -256,7 +256,7 @@ async def update_model_capabilities(
 
         result_data = {
             "model_id": model_id,
-            "model_name": model.model_name,
+            "model_name": model.name,
             "removed_count": deleted_count,
             "added_count": len(request.capability_ids),
             "capability_ids": request.capability_ids,
