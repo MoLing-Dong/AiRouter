@@ -38,11 +38,12 @@ const Dashboard: React.FC = () => {
     const fetchDashboardData = async () => {
         setLoading(true)
         try {
-            const [routingStats, systemMetrics, models, providers] = await Promise.all([
-                statsApi.getRoutingStats().catch(() => ({})),
-                statsApi.getSystemMetrics().catch(() => ({})),
-                modelsApi.getDbModels().catch(() => ({ models: [] })),
-                providersApi.getProviders().catch(() => ({ providers: [] }))
+            const [systemMetrics, models, providers] = await Promise.all([
+                statsApi.getSystemMetrics().then((res) => res.data).catch(() => ({})),
+                modelsApi.getDbModels().then((res) => {
+                    return res.data
+                }).catch(() => ({ models: [] })),
+                providersApi.getProviders().then((res) => res.data).catch(() => ({ providers: [] }))
             ])
 
             // 计算统计数据

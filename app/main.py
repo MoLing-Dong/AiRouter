@@ -117,10 +117,6 @@ async def root():
         "description": (
             settings.APP_DESCRIPTION if hasattr(settings, "APP_DESCRIPTION") else None
         ),
-        "docs": "/docs",
-        "models": "/v1/models",
-        "stats": "/v1/stats",
-        "load_balancing": "/v1/load-balancing",
         "use_database": adapter_manager.use_database,
         "available_models": len(adapter_manager.get_available_models()),
     }

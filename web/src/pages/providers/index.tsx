@@ -11,8 +11,7 @@ import {
     Card,
     Tag,
     Tooltip,
-    Popconfirm,
-    Badge
+    Popconfirm
 } from 'antd'
 import { PlusOutlined, EditOutlined, DeleteOutlined, ReloadOutlined, SettingOutlined } from '@ant-design/icons'
 import { providersApi } from '@/services/api'
@@ -38,29 +37,39 @@ const ProvidersPage: React.FC = () => {
     const [editingProvider, setEditingProvider] = useState<Provider | null>(null)
     const [form] = Form.useForm()
 
-    const fetchProviders = async () => {
+    // 分页状态
+    const [pagination, setPagination] = useState({
+        current: 1,
+        pageSize: 10,
+        total: 0
+    })
+
+    const fetchProviders = async (page: number = pagination.current, pageSize: number = pagination.pageSize) => {
         setLoading(true)
         try {
-            const [adminProviders, dbProviders] = await Promise.all([
-                providersApi.getProviders(),
-                providersApi.getDbProviders()
-            ])
-            // 合并数据，优先显示数据库中的供应商配置
-            const providersData = adminProviders?.providers || []
+            const response: any = await providersApi.getDbProviders(page, pageSize)
+
             // 转换数据格式以匹配前端接口
-            const formattedProviders = providersData.map((provider: any) => ({
+            const formattedProviders = (response.data?.providers || []).map((provider: any) => ({
                 id: provider.id,
                 name: provider.name,
-                type: provider.provider_type,
+                type: provider.type,
                 endpoint: provider.official_endpoint,
                 status: provider.is_enabled ? 'active' : 'inactive',
-                health: 'unknown', // 该接口不提供健康检查信息
                 performance: {
                     responseTime: 0,
                     successRate: 0
                 }
             }))
+
             setProviders(formattedProviders)
+
+            // 更新分页信息
+            setPagination({
+                current: response.data?.page || 1,
+                pageSize: response.data?.page_size || 10,
+                total: response.data?.total || 0
+            })
         } catch (error) {
             message.error('获取供应商列表失败')
             console.error('Failed to fetch providers:', error)
@@ -81,11 +90,11 @@ const ProvidersPage: React.FC = () => {
         setModalVisible(true)
     }
 
-    const handleDelete = async (provider: Provider) => {
+    const handleDelete = async (_provider: Provider) => {
         try {
             // 注意：API 中没有删除接口，这里仅作示例
             message.success('删除成功')
-            fetchProviders()
+            fetchProviders(pagination.current, pagination.pageSize)
         } catch (error) {
             message.error('删除失败')
         }
@@ -101,10 +110,15 @@ const ProvidersPage: React.FC = () => {
                 message.success('创建成功')
             }
             setModalVisible(false)
-            fetchProviders()
+            // 刷新当前页
+            fetchProviders(pagination.current, pagination.pageSize)
         } catch (error) {
             message.error(editingProvider ? '更新失败' : '创建失败')
         }
+    }
+
+    const handleTableChange = (newPagination: any) => {
+        fetchProviders(newPagination.current, newPagination.pageSize)
     }
 
     const handleHealthCheck = async (provider: Provider) => {
@@ -154,21 +168,7 @@ const ProvidersPage: React.FC = () => {
                 </Tag>
             )
         },
-        {
-            title: '健康状态',
-            dataIndex: 'health',
-            key: 'health',
-            render: (health: string) => {
-                const colorMap = { healthy: 'green', unhealthy: 'red', unknown: 'orange' }
-                const textMap = { healthy: '健康', unhealthy: '异常', unknown: '未知' }
-                return (
-                    <Badge
-                        status={colorMap[health as keyof typeof colorMap] as any || 'default'}
-                        text={textMap[health as keyof typeof textMap] || '未知'}
-                    />
-                )
-            }
-        },
+
         {
             title: '性能',
             dataIndex: 'performance',
@@ -224,7 +224,7 @@ const ProvidersPage: React.FC = () => {
                 <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between' }}>
                     <h2>供应商管理</h2>
                     <Space>
-                        <Button icon={<ReloadOutlined />} onClick={fetchProviders}>
+                        <Button icon={<ReloadOutlined />} onClick={() => fetchProviders()}>
                             刷新
                         </Button>
                         <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
@@ -239,10 +239,14 @@ const ProvidersPage: React.FC = () => {
                     loading={loading}
                     rowKey="id"
                     pagination={{
+                        current: pagination.current,
+                        pageSize: pagination.pageSize,
+                        total: pagination.total,
                         showSizeChanger: true,
                         showQuickJumper: true,
                         showTotal: (total) => `共 ${total} 个供应商`
                     }}
+                    onChange={handleTableChange}
                 />
             </Card>
 

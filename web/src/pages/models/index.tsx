@@ -32,24 +32,35 @@ const ModelsPage: React.FC = () => {
     const [editingModel, setEditingModel] = useState<Model | null>(null)
     const [form] = Form.useForm()
 
-    const fetchModels = async () => {
+    // 分页状态
+    const [pagination, setPagination] = useState({
+        current: 1,
+        pageSize: 10,
+        total: 0
+    })
+
+    const fetchModels = async (page: number = pagination.current, pageSize: number = pagination.pageSize) => {
         setLoading(true)
         try {
-            const [adminModels] = await Promise.all([
-                modelsApi.getModels(),
-            ])
-            // 合并数据，优先显示数据库中的模型配置
-            const modelsData = adminModels?.models || []
+            const response: any = await modelsApi.getDbModels(page, pageSize)
+
             // 转换数据格式以匹配前端接口
-            const formattedModels = modelsData.map((model: any) => ({
+            const formattedModels = (response.data?.models || []).map((model: any) => ({
                 id: model.id,
                 name: model.name,
                 provider: model.type === 'PUBLIC' ? 'public' : 'private',
                 capabilities: ['TEXT'], // 根据实际情况调整
                 status: model.is_enabled ? 'active' : 'inactive',
-                health: 'unknown'
             }))
+
             setModels(formattedModels)
+
+            // 更新分页信息
+            setPagination({
+                current: response.data?.page || 1,
+                pageSize: response.data?.page_size || 10,
+                total: response.data?.total || 0
+            })
         } catch (error) {
             message.error('获取模型列表失败')
             console.error('Failed to fetch models:', error)
@@ -75,7 +86,7 @@ const ModelsPage: React.FC = () => {
             // 注意：API 中没有删除接口，这里仅作示例
             await modelsApi.deleteModel(model.name)
             message.success('删除成功')
-            fetchModels()
+            fetchModels(pagination.current, pagination.pageSize)
         } catch (error) {
             message.error('删除失败')
         }
@@ -102,11 +113,16 @@ const ModelsPage: React.FC = () => {
                 message.success('创建成功')
             }
             setModalVisible(false)
-            fetchModels()
+            // 刷新当前页
+            fetchModels(pagination.current, pagination.pageSize)
         } catch (error) {
             message.error(editingModel ? '更新失败' : '创建失败')
             console.error('Submit error:', error)
         }
+    }
+
+    const handleTableChange = (newPagination: any) => {
+        fetchModels(newPagination.current, newPagination.pageSize)
     }
 
     const columns = [
@@ -143,20 +159,7 @@ const ModelsPage: React.FC = () => {
                 </Tag>
             )
         },
-        {
-            title: '健康状态',
-            dataIndex: 'health',
-            key: 'health',
-            render: (health: string) => {
-                const colorMap = { healthy: 'green', unhealthy: 'red', unknown: 'orange' }
-                const textMap = { healthy: '健康', unhealthy: '异常', unknown: '未知' }
-                return (
-                    <Tag color={colorMap[health as keyof typeof colorMap] || 'default'}>
-                        {textMap[health as keyof typeof textMap] || '未知'}
-                    </Tag>
-                )
-            }
-        },
+
         {
             title: '操作',
             key: 'actions',
@@ -192,7 +195,7 @@ const ModelsPage: React.FC = () => {
                 <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between' }}>
                     <h2>模型管理</h2>
                     <Space>
-                        <Button icon={<ReloadOutlined />} onClick={fetchModels}>
+                        <Button icon={<ReloadOutlined />} onClick={() => fetchModels()}>
                             刷新
                         </Button>
                         <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
@@ -207,10 +210,14 @@ const ModelsPage: React.FC = () => {
                     loading={loading}
                     rowKey="id"
                     pagination={{
+                        current: pagination.current,
+                        pageSize: pagination.pageSize,
+                        total: pagination.total,
                         showSizeChanger: true,
                         showQuickJumper: true,
                         showTotal: (total) => `共 ${total} 个模型`
                     }}
+                    onChange={handleTableChange}
                 />
             </Card>
 

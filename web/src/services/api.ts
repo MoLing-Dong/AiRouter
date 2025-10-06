@@ -95,9 +95,12 @@ export const modelsApi = {
 
   /**
    * 获取数据库中存储的模型
-   * @returns 数据库中的模型列表
+   * @param page - 页码（从1开始）
+   * @param limit - 每页数量
+   * @returns 数据库中的模型列表（支持分页）
    */
-  getDbModels: () => api.get("/api/database/models"),
+  getDbModels: (page: number = 1, limit: number = 10) =>
+    api.get("/api/database/models", { params: { page, limit } }),
 
   /**
    * 创建新模型
@@ -143,9 +146,12 @@ export const providersApi = {
 
   /**
    * 获取数据库中存储的供应商配置
-   * @returns 数据库中的供应商列表
+   * @param page - 页码（从1开始）
+   * @param limit - 每页数量
+   * @returns 数据库中的供应商列表（支持分页）
    */
-  getDbProviders: () => api.get("/api/database/providers"),
+  getDbProviders: (page: number = 1, limit: number = 10) =>
+    api.get("/api/database/providers", { params: { page, limit } }),
 
   /**
    * 创建新供应商

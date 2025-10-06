@@ -2,12 +2,12 @@
 数据库模型管理接口
 """
 
-from fastapi import APIRouter, Path, HTTPException, Body
-from pydantic import BaseModel
+from fastapi import APIRouter, Path, HTTPException, Body, Query
+from pydantic import BaseModel, Field
 from typing import Optional, Any, List
 from app.services.database.database_service import db_service
 from app.utils.logging_config import get_factory_logger
-from app.models import LLMModelCreate, ApiResponse, LLMModelUpdate
+from app.models import LLMModelCreate, ApiResponse, LLMModelUpdate, PaginatedResponse
 
 logger = get_factory_logger()
 models_router = APIRouter(prefix="/models", tags=["Database Models"])
@@ -31,37 +31,83 @@ class ModelItemData(BaseModel):
         from_attributes = True
 
 
-class ModelsListData(BaseModel):
-    """Model list data"""
+class ModelsPaginatedResponse(PaginatedResponse[ModelItemData]):
+    """模型分页响应，将data字段序列化为models"""
 
-    models: List[ModelItemData]
-    total: Optional[int] = None
+    data: List[ModelItemData] = Field(
+        description="模型列表", serialization_alias="models"
+    )
 
 
 # ==================== API Endpoints ====================
 
 
-@models_router.get("", response_model=ApiResponse[ModelsListData])
-async def get_models() -> ApiResponse[ModelsListData]:
-    """Get all models list"""
+@models_router.get("", response_model=ApiResponse[ModelsPaginatedResponse])
+async def get_models(
+    page: int = Query(1, ge=1, description="页码（从1开始）"),
+    limit: int = Query(10, ge=1, le=100, description="每页数量（最大100）"),
+    is_enabled: Optional[bool] = Query(None, description="是否启用筛选启用模型"),
+) -> ApiResponse[ModelsPaginatedResponse]:
+    """
+    Get models list
+    """
     try:
-        models = db_service.get_all_models()
-        model_items = [
-            ModelItemData(
-                id=model.id,
-                name=model.name,
-                type=model.llm_type.value if model.llm_type else "PUBLIC",
-                description=model.description,
-                is_enabled=model.is_enabled,
-                created_at=model.created_at,
-                updated_at=model.updated_at,
+        from app.models import LLMModel
+        from math import ceil
+
+        session = db_service.get_session()
+
+        try:
+            # 创建查询
+            query = session.query(LLMModel)
+
+            # 可选的筛选条件
+            if is_enabled is not None:
+                query = query.filter(LLMModel.is_enabled == is_enabled)
+
+            # 获取总数
+            total = query.count()
+
+            # 计算总页数
+            total_pages = ceil(total / limit) if limit > 0 else 0
+
+            # 排序并分页
+            offset = (page - 1) * limit
+            models = (
+                query.order_by(LLMModel.id.desc()).offset(offset).limit(limit).all()
             )
-            for model in models
-        ]
-        return ApiResponse.success(
-            data=ModelsListData(models=model_items, total=len(model_items)),
-            message="Get models list successfully",
-        )
+
+            # 转换为响应格式
+            model_items = [
+                ModelItemData(
+                    id=model.id,
+                    name=model.name,
+                    type=model.llm_type.value if model.llm_type else "PUBLIC",
+                    description=model.description,
+                    is_enabled=model.is_enabled,
+                    created_at=model.created_at,
+                    updated_at=model.updated_at,
+                )
+                for model in models
+            ]
+
+            # 构建响应
+            return ApiResponse.success(
+                data=ModelsPaginatedResponse(
+                    data=model_items,
+                    total=total,
+                    page=page,
+                    page_size=limit,
+                    total_pages=total_pages,
+                    has_prev=page > 1,
+                    has_next=page < total_pages,
+                ),
+                message=f"获取第 {page} 页数据成功，共 {total} 条记录",
+            )
+
+        finally:
+            session.close()
+
     except Exception as e:
         logger.error(f"Get models failed: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Get models failed: {str(e)}")
@@ -74,7 +120,9 @@ async def create_model(model_data: LLMModelCreate) -> ApiResponse[dict]:
         # Check if model already exists
         existing_model = db_service.get_model_by_name(model_data.name)
         if existing_model:
-            return ApiResponse.fail(message=f"Model already exists: {model_data.name}", code=400)
+            return ApiResponse.fail(
+                message=f"Model already exists: {model_data.name}", code=400
+            )
 
         model = db_service.create_model(model_data)
 
@@ -184,4 +232,3 @@ async def update_model(
     except Exception as e:
         logger.error(f"Failed to update model (ID: {model_id}): {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to update model: {str(e)}")
-
