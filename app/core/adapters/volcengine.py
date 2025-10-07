@@ -19,8 +19,8 @@ class VolcengineAdapter(BaseAdapter):
         self.client = openai.AsyncOpenAI(
             api_key=api_key,
             base_url=base_url,
-            timeout=10.0,  # 减少超时时间
-            max_retries=1,  # 减少重试次数以避免延迟
+            timeout=360.0,  # 超时时间 6 分钟
+            max_retries=2,  # 重试次数
         )
 
     def format_messages(self, messages: List[Message]) -> List[Dict]:
@@ -56,17 +56,25 @@ class VolcengineAdapter(BaseAdapter):
             }
 
             # Handle thinking parameter using extra_body (Volcengine specific)
+            # 默认为 disabled，除非请求中明确指定
+            thinking_type = "disabled"  # 默认值
+
             thinking_param = request.thinking
             if thinking_param and isinstance(thinking_param, dict):
-                thinking_type = thinking_param.get("type")
-                if thinking_type and thinking_type in ["enabled", "disabled", "auto"]:
-                    logger.info(f"🧠 Thinking参数: {thinking_type}")
-                    # Add thinking parameter to extra_body for Volcengine API
-                    params["extra_body"] = {
-                        "thinking": {
-                            "type": thinking_type  # "enabled", "disabled", or "auto"
-                        }
-                    }
+                # 如果请求中提供了 thinking 参数，使用请求中的值
+                request_thinking_type = thinking_param.get("type")
+                if request_thinking_type and request_thinking_type in [
+                    "enabled",
+                    "disabled",
+                    "auto",
+                ]:
+                    thinking_type = request_thinking_type
+
+            logger.info(f"🧠 Thinking参数: {thinking_type}")
+            # 始终添加 thinking 参数到 extra_body
+            params["extra_body"] = {
+                "thinking": {"type": thinking_type}  # "enabled", "disabled", or "auto"
+            }
 
             # Filter None values
             filtered_params = {k: v for k, v in params.items() if v is not None}
@@ -141,17 +149,25 @@ class VolcengineAdapter(BaseAdapter):
             }
 
             # Handle thinking parameter using extra_body (Volcengine specific)
+            # 默认为 disabled，除非请求中明确指定
+            thinking_type = "disabled"  # 默认值
+
             thinking_param = request.thinking
             if thinking_param and isinstance(thinking_param, dict):
-                thinking_type = thinking_param.get("type")
-                if thinking_type and thinking_type in ["enabled", "disabled", "auto"]:
-                    logger.info(f"🧠 流式请求Thinking参数: {thinking_type}")
-                    # Add thinking parameter to extra_body for Volcengine API
-                    params["extra_body"] = {
-                        "thinking": {
-                            "type": thinking_type  # "enabled", "disabled", or "auto"
-                        }
-                    }
+                # 如果请求中提供了 thinking 参数，使用请求中的值
+                request_thinking_type = thinking_param.get("type")
+                if request_thinking_type and request_thinking_type in [
+                    "enabled",
+                    "disabled",
+                    "auto",
+                ]:
+                    thinking_type = request_thinking_type
+
+            logger.info(f"🧠 流式请求Thinking参数: {thinking_type}")
+            # 始终添加 thinking 参数到 extra_body
+            params["extra_body"] = {
+                "thinking": {"type": thinking_type}  # "enabled", "disabled", or "auto"
+            }
 
             # Filter None values
             filtered_params = {k: v for k, v in params.items() if v is not None}

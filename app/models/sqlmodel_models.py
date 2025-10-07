@@ -306,6 +306,20 @@ class ModelUpdateRequest(SQLModel):
     description: Optional[str] = Field(default=None)
     is_enabled: Optional[bool] = Field(default=None)
 
+    # 更新能力关联
+    capability_ids: Optional[List[int]] = Field(
+        default=None, description="模型能力ID列表"
+    )
+
+    # 更新提供商关联
+    provider_id: Optional[int] = Field(default=None, description="提供商ID")
+    provider_weight: Optional[int] = Field(
+        default=None, ge=1, le=100, description="提供商权重"
+    )
+    is_provider_preferred: Optional[bool] = Field(
+        default=None, description="是否为优先提供商"
+    )
+
 
 class ProviderCreateRequest(LLMProviderBase):
     """创建提供商请求"""

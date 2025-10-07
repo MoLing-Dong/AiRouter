@@ -84,7 +84,7 @@ async def chat_completions(
             request.model, skip_version_check=True
         )
 
-        # 如果没有找到适配器，尝试重新加载配置（仅在必要时）
+        # 如果没有找到适配器，尝试重新加载配置
         if not adapter:
             logger.info(f"⚠️ 未找到模型适配器，尝试重新加载配置: {request.model}")
 

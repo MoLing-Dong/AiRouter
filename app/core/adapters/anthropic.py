@@ -15,7 +15,7 @@ class AnthropicAdapter(BaseAdapter):
         # 重新创建具有优化配置的httpx客户端
         self.client = httpx.AsyncClient(
             base_url=self.base_url,
-            timeout=10.0,  # 减少超时时间
+            timeout=360.0,  # 超时时间 6 分钟
             limits=httpx.Limits(max_connections=20, max_keepalive_connections=5),
             headers={
                 "anthropic-version": "2023-06-01",

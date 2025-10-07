@@ -145,16 +145,23 @@ async def create_message(
         logger.info(f"⚡ Anthropic请求预处理完成，总耗时: {total_prep_time*1000:.1f}ms")
 
         if request.stream:
-            logger.info(f"Stream response: {chat_request}")
-            # Stream response
+            logger.info(f"🌊 启动Anthropic流式响应: {chat_request.model}")
+            # Stream response - 使用与 Anthropic API 兼容的响应头
             return StreamingResponse(
                 stream_anthropic_message(chat_request),
                 media_type="text/event-stream",
                 headers={
-                    "Cache-Control": "no-cache",
+                    "Cache-Control": "no-cache, no-store, must-revalidate",
                     "Connection": "keep-alive",
-                    "X-Accel-Buffering": "no",
+                    "X-Accel-Buffering": "no",  # 禁用 nginx 缓冲
+                    "X-Content-Type-Options": "nosniff",
+                    "Access-Control-Allow-Origin": "*",
+                    "Access-Control-Allow-Headers": "*",
+                    "Transfer-Encoding": "chunked",
+                    "Content-Encoding": "identity",  # 禁用压缩
+                    "Pragma": "no-cache",  # HTTP/1.0 兼容
                 },
+                background=None,  # 不使用后台任务
             )
         else:
             # Normal response - 使用快速适配器方法获得更好性能
@@ -241,10 +248,15 @@ async def stream_anthropic_message(request: ChatRequest):
                         "usage": {"input_tokens": 0, "output_tokens": 0},
                     },
                 }
-                yield f"event: message_start\ndata: {json.dumps(message_start_data)}\n\n"
+                message_start_event = (
+                    f"event: message_start\ndata: {json.dumps(message_start_data)}\n\n"
+                )
+                logger.info(f"📤 发送 message_start 事件")
+                yield message_start_event
 
                 # 性能监控标志
                 first_chunk_received = False
+                content_block_started = False
 
                 async for chunk in adapter.stream_chat_completion(request):
                     # 首个chunk性能记录
@@ -254,29 +266,84 @@ async def stream_anthropic_message(request: ChatRequest):
                         logger.info(
                             f"⚡ Anthropic首chunk到达，总延迟: {total_delay:.3f}s"
                         )
+
                     # Convert OpenAI-style chunk to Anthropic-style
                     if chunk.startswith("data: "):
-                        chunk_data = json.loads(chunk[6:])
-                        if "choices" in chunk_data and chunk_data["choices"]:
-                            delta = chunk_data["choices"][0].get("delta", {})
-                            if "content" in delta:
-                                # Send content block delta
-                                content_delta = {
-                                    "type": "content_block_delta",
-                                    "index": 0,
-                                    "delta": {
-                                        "type": "text_delta",
-                                        "text": delta["content"],
-                                    },
-                                }
-                                yield f"event: content_block_delta\ndata: {json.dumps(content_delta)}\n\n"
+                        data_str = chunk[6:].strip()
+
+                        # 忽略 [DONE] 标记
+                        if data_str == "[DONE]":
+                            continue
+
+                        try:
+                            chunk_data = json.loads(data_str)
+
+                            if "choices" in chunk_data and chunk_data["choices"]:
+                                delta = chunk_data["choices"][0].get("delta", {})
+
+                                # 发送 content_block_start（第一次有内容时）
+                                if (
+                                    not content_block_started
+                                    and "content" in delta
+                                    and delta["content"]
+                                ):
+                                    content_block_started = True
+                                    content_start = {
+                                        "type": "content_block_start",
+                                        "index": 0,
+                                        "content_block": {"type": "text", "text": ""},
+                                    }
+                                    logger.debug(f"📤 发送 content_block_start 事件")
+                                    yield f"event: content_block_start\ndata: {json.dumps(content_start)}\n\n"
+
+                                # 发送 content_block_delta
+                                if "content" in delta and delta["content"]:
+                                    content_delta = {
+                                        "type": "content_block_delta",
+                                        "index": 0,
+                                        "delta": {
+                                            "type": "text_delta",
+                                            "text": delta["content"],
+                                        },
+                                    }
+                                    # 只记录第一个和每隔10个delta（避免日志过多）
+                                    if not hasattr(
+                                        stream_anthropic_message, "delta_count"
+                                    ):
+                                        stream_anthropic_message.delta_count = 0
+                                    stream_anthropic_message.delta_count += 1
+                                    yield f"event: content_block_delta\ndata: {json.dumps(content_delta)}\n\n"
+
+                        except json.JSONDecodeError as e:
+                            logger.warning(
+                                f"⚠️ JSON解析失败: {data_str[:100]}... 错误: {e}"
+                            )
+                            continue
+                        except Exception as e:
+                            logger.error(f"❌ chunk处理错误: {e}")
+                            continue
+
+                # Send content_block_stop event
+                if content_block_started:
+                    content_stop = {"type": "content_block_stop", "index": 0}
+                    yield f"event: content_block_stop\ndata: {json.dumps(content_stop)}\n\n"
+
+                # Send message_delta event (可选，用于传递最终状态)
+                message_delta = {
+                    "type": "message_delta",
+                    "delta": {"stop_reason": "end_turn", "stop_sequence": None},
+                    "usage": {"output_tokens": 0},  # 可以在这里传递实际的 token 使用量
+                }
+                logger.debug(f"📤 发送 message_delta 事件")
+                yield f"event: message_delta\ndata: {json.dumps(message_delta)}\n\n"
 
                 # Send message_stop event
+                logger.debug(f"📤 发送 message_stop 事件")
                 yield f"event: message_stop\ndata: {json.dumps({'type': 'message_stop'})}\n\n"
 
                 # 流式响应完成日志
                 total_time = time.time() - start_time
-                logger.info(f"✅ Anthropic流式响应完成 - 总耗时: {total_time:.3f}秒")
+                logger.debug(f"✅ Anthropic流式响应完成 - 总耗时: {total_time:.3f}秒")
             else:
                 # If adapter does not support stream, return error
                 error_data = {

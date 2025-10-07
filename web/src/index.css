@@ -1,13 +1,39 @@
-
-*{
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
 }
 
-body{
-    background-color: #f0f2f5;
-    font-family: 'Roboto', sans-serif;
-    color: #333;
-    line-height: 1.5;
+body {
+  background-color: #f0f2f5;
+  font-family: "Roboto", sans-serif;
+  color: #333;
+  line-height: 1.5;
+}
+
+/* 自定义滚动条样式 */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #a72222;
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cf2a2a;
+  border-radius: 10px;
+  transition: background 0.3s ease;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
+}
+
+/* Firefox 滚动条样式 */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #c1c1c1 #f1f1f1;
 }

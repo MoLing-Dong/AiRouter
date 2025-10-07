@@ -108,13 +108,23 @@ export const modelsApi = {
    * @returns 创建结果
    */
   createModel: (data: any) => api.post("/api/database/models", data),
+
+  /**
+   * 更新模型
+   * @param modelId - 模型ID
+   * @param data - 模型数据
+   * @returns 更新结果
+   */
+  updateModel: (modelId: number, data: any) =>
+    api.put(`/api/database/models/${modelId}`, data),
+
   /**
    * 删除指定模型
-   * @param modelName - 模型名称
+   * @param modelId - 模型ID
    * @returns 删除结果
    */
-  deleteModel: (modelName: string) =>
-    api.delete(`/api/database/models/${modelName}`),
+  deleteModel: (modelId: number) =>
+    api.delete(`/api/database/models/${modelId}`),
 
   /**
    * 获取指定模型的详细信息
@@ -176,6 +186,19 @@ export const providersApi = {
    */
   updateProviderHealth: (providerName: string, data: any) =>
     api.put(`/admin/providers/${providerName}/health`, data),
+};
+
+/**
+ * 能力相关 API
+ *
+ * 管理模型能力（如对话、补全、嵌入等）
+ */
+export const capabilitiesApi = {
+  /**
+   * 获取所有能力列表
+   * @returns 能力列表
+   */
+  getCapabilities: () => api.get("/api/database/capabilities"),
 };
 
 /**

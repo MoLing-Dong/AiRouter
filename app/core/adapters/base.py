@@ -88,7 +88,9 @@ class BaseAdapter(ABC):
     def __init__(self, model_config: Dict[str, Any], api_key: str):
         self.model_config = model_config
         self.api_key = api_key
-        self.base_url = model_config.get("base_url")
+        # 规范化 base_url - 移除末尾的斜杠以避免双斜杠问题
+        raw_base_url = model_config.get("base_url", "")
+        self.base_url = raw_base_url.rstrip("/") if raw_base_url else ""
         self.model_name = model_config.get("model")
         self.provider = model_config.get("provider")
         self.model_id = model_config.get("model_id")  # 添加模型ID
@@ -104,7 +106,7 @@ class BaseAdapter(ABC):
 
         # HTTP client
         self.client = httpx.AsyncClient(
-            timeout=30.0,
+            timeout=360.0,  # 超时时间 6 分钟
             headers={
                 "Authorization": f"Bearer {api_key}",
                 "Content-Type": "application/json",

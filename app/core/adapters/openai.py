@@ -222,8 +222,8 @@ class OpenAIAdapter(BaseAdapter):
                 openai_client = openai.AsyncOpenAI(
                     api_key=self.api_key,
                     base_url=self.base_url,
-                    timeout=10.0,  # 减少超时时间
-                    max_retries=1,  # 减少重试次数以避免延迟
+                    timeout=360.0,  # 超时时间 6 分钟
+                    max_retries=2,  # 重试次数
                 )
 
                 # 计时：API调用

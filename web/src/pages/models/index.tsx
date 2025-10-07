@@ -15,14 +15,32 @@ import {
 } from 'antd'
 import { PlusOutlined, EditOutlined, DeleteOutlined, ReloadOutlined } from '@ant-design/icons'
 import { modelsApi } from '@/services/api'
+import { useCapabilitiesStore } from '@/stores/capabilitiesStore'
+
+interface Provider {
+    id: number
+    name: string
+    provider_type: string
+    weight: number
+    is_preferred: boolean
+    health_status: string
+}
+
+interface Capability {
+    capability_id: number
+    capability_name: string
+    description?: string
+}
 
 interface Model {
     id?: number
     name: string
-    provider: string
-    capabilities: string[]
+    type: string
+    description?: string
+    is_enabled: boolean
+    providers: Provider[]
+    capabilities: Capability[]
     status: 'active' | 'inactive'
-    health?: 'healthy' | 'unhealthy' | 'unknown'
 }
 
 const ModelsPage: React.FC = () => {
@@ -31,6 +49,9 @@ const ModelsPage: React.FC = () => {
     const [modalVisible, setModalVisible] = useState(false)
     const [editingModel, setEditingModel] = useState<Model | null>(null)
     const [form] = Form.useForm()
+
+    // 从 Zustand store 获取能力数据
+    const { capabilities, loading: capabilitiesLoading, fetchCapabilities } = useCapabilitiesStore()
 
     // 分页状态
     const [pagination, setPagination] = useState({
@@ -44,12 +65,9 @@ const ModelsPage: React.FC = () => {
         try {
             const response: any = await modelsApi.getDbModels(page, pageSize)
 
-            // 转换数据格式以匹配前端接口
+            // 直接使用后端返回的数据，只需添加 status 字段
             const formattedModels = (response.data?.models || []).map((model: any) => ({
-                id: model.id,
-                name: model.name,
-                provider: model.type === 'PUBLIC' ? 'public' : 'private',
-                capabilities: ['TEXT'], // 根据实际情况调整
+                ...model,
                 status: model.is_enabled ? 'active' : 'inactive',
             }))
 
@@ -77,14 +95,24 @@ const ModelsPage: React.FC = () => {
 
     const handleEdit = (model: Model) => {
         setEditingModel(model)
-        form.setFieldsValue(model)
+        // 转换数据格式以匹配表单字段
+        form.setFieldsValue({
+            name: model.name,
+            llm_type: model.type,
+            description: model.description,
+            status: model.status,
+            capabilities: model.capabilities?.map(cap => cap.capability_id) || []
+        })
         setModalVisible(true)
     }
 
     const handleDelete = async (model: Model) => {
         try {
-            // 注意：API 中没有删除接口，这里仅作示例
-            await modelsApi.deleteModel(model.name)
+            if (!model.id) {
+                message.error('模型ID不存在')
+                return
+            }
+            await modelsApi.deleteModel(model.id)
             message.success('删除成功')
             fetchModels(pagination.current, pagination.pageSize)
         } catch (error) {
@@ -94,24 +122,28 @@ const ModelsPage: React.FC = () => {
 
     const handleSubmit = async (values: any) => {
         try {
-            if (editingModel) {
-                // 更新模型（API 中没有更新接口）
+            // 转换数据格式以匹配后端 API
+            const payload = {
+                name: values.name,
+                llm_type: values.llm_type || 'PUBLIC',
+                description: values.description || null,
+                is_enabled: values.status === 'active',
+                capability_ids: values.capabilities || null, // 关联能力
+                provider_id: values.provider_id || null, // 关联供应商
+                provider_weight: values.provider_weight || 10,
+                is_provider_preferred: values.is_provider_preferred || false,
+            }
+
+            if (editingModel && editingModel.id) {
+                // 更新模型
+                await modelsApi.updateModel(editingModel.id, payload)
                 message.success('更新成功')
             } else {
-                // 转换数据格式以匹配后端 API
-                const payload = {
-                    name: values.name,
-                    llm_type: values.llm_type || 'PUBLIC',
-                    description: values.description || null,
-                    is_enabled: values.status === 'active',
-                    provider_id: null, // 暂时不关联供应商
-                    provider_weight: 10,
-                    is_provider_preferred: false,
-                    capability_ids: values.capabilities || null // 关联能力
-                }
+                // 创建模型
                 await modelsApi.createModel(payload)
                 message.success('创建成功')
             }
+
             setModalVisible(false)
             // 刷新当前页
             fetchModels(pagination.current, pagination.pageSize)
@@ -133,19 +165,60 @@ const ModelsPage: React.FC = () => {
             render: (text: string) => <strong>{text}</strong>
         },
         {
+            title: '类型',
+            dataIndex: 'type',
+            key: 'type',
+            render: (type: string) => (
+                <Tag color={type === 'PUBLIC' ? 'blue' : 'purple'}>
+                    {type === 'PUBLIC' ? '公开' : '私有'}
+                </Tag>
+            )
+        },
+        {
             title: '供应商',
-            dataIndex: 'provider',
-            key: 'provider',
+            dataIndex: 'providers',
+            key: 'providers',
+            render: (providers: Provider[], record: Model) => (
+                <Space wrap>
+                    {providers?.length > 0 ? (
+                        providers.map((provider, index) => (
+                            <Tooltip
+                                key={`${record.id}-provider-${provider.id}-${index}`}
+                                title={`权重: ${provider.weight} | 健康: ${provider.health_status}`}
+                            >
+                                <Tag
+                                    color={provider.is_preferred ? 'gold' : 'default'}
+                                    style={{ cursor: 'pointer' }}
+                                >
+                                    {provider.name}
+                                    {provider.is_preferred && ' ⭐'}
+                                </Tag>
+                            </Tooltip>
+                        ))
+                    ) : (
+                        <Tag color="default">未绑定</Tag>
+                    )}
+                </Space>
+            )
         },
         {
             title: '能力',
             dataIndex: 'capabilities',
             key: 'capabilities',
-            render: (capabilities: string[]) => (
+            render: (capabilities: Capability[], record: Model) => (
                 <Space wrap>
-                    {capabilities?.map(cap => (
-                        <Tag key={cap} color="blue">{cap}</Tag>
-                    ))}
+                    {capabilities?.length > 0 ? (
+                        capabilities.map((cap, index) => (
+                            <Tooltip
+                                key={`${record.id}-cap-${cap.capability_id}-${index}`}
+                                title={cap.description || cap.capability_name}
+                            >
+                                <Tag color="cyan">{cap.capability_name}</Tag>
+                            </Tooltip>
+                        ))
+                    ) : (
+                        <Tag color="default">无</Tag>
+                    )}
                 </Space>
             )
         },
@@ -159,7 +232,6 @@ const ModelsPage: React.FC = () => {
                 </Tag>
             )
         },
-
         {
             title: '操作',
             key: 'actions',
@@ -186,6 +258,7 @@ const ModelsPage: React.FC = () => {
     ]
 
     useEffect(() => {
+        fetchCapabilities()
         fetchModels()
     }, [])
 
@@ -259,11 +332,13 @@ const ModelsPage: React.FC = () => {
                         label="模型能力"
                         tooltip="选择模型支持的功能,可多选"
                     >
-                        <Select mode="multiple" placeholder="选择模型能力">
-                            <Select.Option value={1}>对话(Chat)</Select.Option>
-                            <Select.Option value={2}>补全(Completion)</Select.Option>
-                            <Select.Option value={3}>嵌入(Embedding)</Select.Option>
-                            <Select.Option value={4}>图像生成(Image)</Select.Option>
+                        <Select mode="multiple" placeholder="选择模型能力" loading={capabilitiesLoading}>
+                            {capabilities.map(cap => (
+                                <Select.Option key={cap.capability_id} value={cap.capability_id}>
+                                    {cap.capability_name}
+                                    {cap.description && ` - ${cap.description}`}
+                                </Select.Option>
+                            ))}
                         </Select>
                     </Form.Item>
 

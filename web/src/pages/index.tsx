@@ -146,15 +146,6 @@ const Dashboard: React.FC = () => {
 
     return (
         <div>
-            <Alert
-                message="欢迎使用 AiRouter 控制台"
-                description="这里展示系统运行状态和关键指标，您可以通过侧边栏管理模型和供应商。"
-                type="info"
-                showIcon
-                closable
-                style={{ marginBottom: 24 }}
-            />
-
             {/* 统计卡片 */}
             <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
                 <Col xs={24} sm={12} md={6}>
