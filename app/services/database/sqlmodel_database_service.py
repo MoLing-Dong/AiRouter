@@ -13,15 +13,16 @@ from app.models.sqlmodel_models import (
     LLMProvider,
     LLMModelProvider,
     LLMProviderApiKey,
+    HealthStatus,
+)
+from app.models.requests import (
     ModelCreateRequest,
     ProviderCreateRequest,
     ModelProviderCreateRequest,
     ModelProviderUpdateRequest,
     LLMProviderApiKeyCreateRequest,
-    HealthStatus,
-    QueryBuilder,
-    PerformanceMetrics,
 )
+from app.models.query_builder import QueryBuilder
 from config.settings import settings
 from app.utils.logging_config import get_factory_logger
 

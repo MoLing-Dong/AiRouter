@@ -31,6 +31,12 @@ export const translations = {
     unknown: { "zh-CN": "未知", "en-US": "Unknown" },
     responseTime: { "zh-CN": "响应时间", "en-US": "Response Time" },
     none: { "zh-CN": "无", "en-US": "None" },
+    degraded: { "zh-CN": "降级", "en-US": "Degraded" },
+    unhealthy: { "zh-CN": "不健康", "en-US": "Unhealthy" },
+    healthy: { "zh-CN": "健康", "en-US": "Healthy" },
+    models: { "zh-CN": "模型", "en-US": "Models" },
+    details: { "zh-CN": "详情", "en-US": "Details" },
+    console: { "zh-CN": "控制台", "en-US": "Console" },
   },
 
   // 供应商页面
@@ -107,7 +113,13 @@ export const translations = {
     inactive: { "zh-CN": "停用", "en-US": "Inactive" },
     healthy: { "zh-CN": "健康", "en-US": "Healthy" },
     unhealthy: { "zh-CN": "不健康", "en-US": "Unhealthy" },
+    degraded: { "zh-CN": "降级", "en-US": "Degraded" },
     unknown: { "zh-CN": "未知", "en-US": "Unknown" },
+    models: { "zh-CN": "模型", "en-US": "Models" },
+    servingModels: { "zh-CN": "服务模型数", "en-US": "Serving Models" },
+    details: { "zh-CN": "详情", "en-US": "Details" },
+    total: { "zh-CN": "总计", "en-US": "Total" },
+    warning: { "zh-CN": "警告", "en-US": "Warning" },
   },
 
   // 模型页面
@@ -203,6 +215,11 @@ export const translations = {
     healthStatus: { "zh-CN": "健康状态", "en-US": "Health Status" },
     public: { "zh-CN": "公共", "en-US": "Public" },
     private: { "zh-CN": "私有", "en-US": "Private" },
+    connections: { "zh-CN": "连接数", "en-US": "Connections" },
+    modelProviderPairs: {
+      "zh-CN": "模型-供应商对",
+      "en-US": "Model-Provider Pairs",
+    },
   },
 
   // 菜单

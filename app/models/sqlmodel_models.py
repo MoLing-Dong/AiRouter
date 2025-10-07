@@ -1,6 +1,6 @@
 """
-SQLModel模型定义 - 现代化的ORM模型
-结合了Pydantic和SQLAlchemy的优势，提供更好的类型安全和性能
+SQLModel数据库表模型定义
+只包含数据库表模型和相关的枚举、基类
 """
 
 from sqlmodel import SQLModel, Field, Relationship, select
@@ -8,7 +8,9 @@ from sqlalchemy import Column, JSON, ForeignKey, Integer
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 from enum import Enum
-import uuid
+
+
+# ==================== 枚举类型 ====================
 
 
 class HealthStatus(str, Enum):
@@ -61,7 +63,7 @@ class ProviderType(str, Enum):
 ProviderTypeEnum = ProviderType
 
 
-# ==================== Base Models ====================
+# ==================== Mixin 类 ====================
 
 
 class TimestampMixin(SQLModel):
@@ -69,6 +71,9 @@ class TimestampMixin(SQLModel):
 
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+# ==================== 数据库表模型基类 ====================
 
 
 class LLMModelBase(SQLModel):
@@ -83,23 +88,6 @@ class LLMModelBase(SQLModel):
     is_enabled: bool = Field(default=True, index=True)
 
 
-class LLMModel(LLMModelBase, TimestampMixin, table=True):
-    """LLM模型表"""
-
-    __tablename__ = "llm_models"
-
-    id: Optional[int] = Field(default=None, primary_key=True, index=True)
-
-    # 关系定义 - 配置 ORM 级联删除
-    providers: List["LLMModelProvider"] = Relationship(
-        back_populates="model", sa_relationship_kwargs={"cascade": "all, delete-orphan"}
-    )
-    capabilities: List["LLMModelCapability"] = Relationship(
-        back_populates="llm_model",
-        sa_relationship_kwargs={"cascade": "all, delete-orphan"},
-    )
-
-
 class LLMProviderBase(SQLModel):
     """LLM提供商基础类 - 匹配现有数据库结构"""
 
@@ -109,18 +97,6 @@ class LLMProviderBase(SQLModel):
     official_endpoint: Optional[str] = Field(default=None, max_length=255)
     description: Optional[str] = Field(default=None)
     is_enabled: bool = Field(default=True)
-
-
-class LLMProvider(LLMProviderBase, TimestampMixin, table=True):
-    """LLM提供商表"""
-
-    __tablename__ = "llm_providers"
-
-    id: Optional[int] = Field(default=None, primary_key=True, index=True)
-
-    # 关系定义
-    models: List["LLMModelProvider"] = Relationship(back_populates="provider")
-    api_keys: List["LLMProviderApiKey"] = Relationship(back_populates="provider")
 
 
 class LLMModelProviderBase(SQLModel):
@@ -172,18 +148,6 @@ class LLMModelProviderBase(SQLModel):
     last_health_check: Optional[datetime] = Field(default=None)
 
 
-class LLMModelProvider(LLMModelProviderBase, TimestampMixin, table=True):
-    """模型-提供商关联表"""
-
-    __tablename__ = "llm_model_providers"
-
-    id: Optional[int] = Field(default=None, primary_key=True)
-
-    # 关系定义
-    model: LLMModel = Relationship(back_populates="providers")
-    provider: LLMProvider = Relationship(back_populates="models")
-
-
 class LLMProviderApiKeyBase(SQLModel):
     """API密钥基础类 - 匹配现有数据库结构"""
 
@@ -198,159 +162,11 @@ class LLMProviderApiKeyBase(SQLModel):
     description: Optional[str] = Field(default=None)
 
 
-class LLMProviderApiKey(LLMProviderApiKeyBase, TimestampMixin, table=True):
-    """API密钥表"""
-
-    __tablename__ = "llm_provider_apikeys"
-
-    id: Optional[int] = Field(default=None, primary_key=True)
-
-    # 关系定义
-    provider: LLMProvider = Relationship(back_populates="api_keys")
-
-
-# ==================== 响应模型 ====================
-
-
-class ModelResponse(SQLModel):
-    """模型响应模型"""
-
-    id: int
-    name: str
-    llm_type: LLMType
-    description: Optional[str] = None
-    is_enabled: bool = True
-    providers: List[Dict[str, Any]] = []
-    created_at: datetime
-    updated_at: datetime
-
-
-class ProviderResponse(SQLModel):
-    """提供商响应模型"""
-
-    id: int
-    name: str
-    provider_type: ProviderType
-    official_endpoint: Optional[str] = None
-    description: Optional[str] = None
-    is_enabled: bool = True
-    models: List[Dict[str, Any]] = []
-    api_keys_count: int = 0
-    created_at: datetime
-    updated_at: datetime
-
-
-class ModelProviderResponse(LLMModelProviderBase):
-    """模型-提供商关联响应模型"""
-
-    id: int
-    model_name: str
-    provider_name: str
-
-    class Config:
-        protected_namespaces = ()
-
-
-# ==================== 请求模型 ====================
-
-
-class ModelCreateRequest(LLMModelBase):
-    """创建模型请求"""
-
-    provider_id: Optional[int] = None
-    provider_weight: int = Field(default=10, ge=1, le=100)
-    is_provider_preferred: bool = Field(default=False)
-    capability_ids: Optional[List[int]] = Field(default=None)
-
-
-class ModelUpdateRequest(SQLModel):
-    """更新模型请求（所有字段可选）"""
-
-    name: Optional[str] = Field(default=None, max_length=100)
-    llm_type: Optional[LLMType] = Field(default=None)
-    description: Optional[str] = Field(default=None)
-    is_enabled: Optional[bool] = Field(default=None)
-
-    # 更新能力关联
-    capability_ids: Optional[List[int]] = Field(
-        default=None, description="模型能力ID列表"
-    )
-
-    # 更新提供商关联
-    provider_id: Optional[int] = Field(default=None, description="提供商ID")
-    provider_weight: Optional[int] = Field(
-        default=None, ge=1, le=100, description="提供商权重"
-    )
-    is_provider_preferred: Optional[bool] = Field(
-        default=None, description="是否为优先提供商"
-    )
-
-
-class ProviderCreateRequest(LLMProviderBase):
-    """创建提供商请求"""
-
-    api_key: Optional[str] = Field(default=None, max_length=500)
-
-
-class ProviderUpdateRequest(SQLModel):
-    """更新提供商请求（所有字段可选）"""
-
-    name: Optional[str] = Field(default=None, max_length=100)
-    provider_type: Optional[ProviderType] = Field(default=None)
-    official_endpoint: Optional[str] = Field(default=None, max_length=255)
-    description: Optional[str] = Field(default=None)
-    is_enabled: Optional[bool] = Field(default=None)
-
-
-class ModelProviderCreateRequest(LLMModelProviderBase):
-    """创建模型-提供商关联请求"""
-
-    pass
-
-
-class ModelProviderUpdateRequest(SQLModel):
-    """更新模型-提供商关联请求"""
-
-    weight: Optional[int] = Field(default=None, ge=1, le=100)
-    priority: Optional[int] = Field(default=None, ge=0, le=100)
-    is_enabled: Optional[bool] = Field(default=None)
-    is_preferred: Optional[bool] = Field(default=None)
-    health_status: Optional[HealthStatus] = Field(default=None)
-
-
-class LLMProviderApiKeyCreateRequest(SQLModel):
-    """创建API密钥请求"""
-
-    provider_id: int
-    name: Optional[str] = None
-    api_key: str
-    is_enabled: bool = True
-    is_preferred: bool = False
-    weight: int = 10
-    daily_quota: Optional[int] = None
-    usage_count: int = 0
-    description: Optional[str] = None
-
-
-# ==================== 能力相关模型 ====================
-
-
 class CapabilityBase(SQLModel):
     """能力基础类"""
 
     capability_name: str = Field(max_length=50, unique=True, index=True)
     description: Optional[str] = Field(default=None)
-
-
-class Capability(CapabilityBase, table=True):
-    """能力表 - 匹配实际数据库结构（无时间戳字段）"""
-
-    __tablename__ = "capabilities"
-
-    capability_id: Optional[int] = Field(default=None, primary_key=True)
-
-    # 关系定义
-    llm_models: List["LLMModelCapability"] = Relationship(back_populates="capability")
 
 
 class LLMModelCapabilityBase(SQLModel):
@@ -373,6 +189,72 @@ class LLMModelCapabilityBase(SQLModel):
         protected_namespaces = ()
 
 
+# ==================== 数据库表模型 ====================
+
+
+class LLMModel(LLMModelBase, TimestampMixin, table=True):
+    """LLM模型表"""
+
+    __tablename__ = "llm_models"
+
+    id: Optional[int] = Field(default=None, primary_key=True, index=True)
+
+    # 关系定义 - 配置 ORM 级联删除
+    providers: List["LLMModelProvider"] = Relationship(
+        back_populates="model", sa_relationship_kwargs={"cascade": "all, delete-orphan"}
+    )
+    capabilities: List["LLMModelCapability"] = Relationship(
+        back_populates="llm_model",
+        sa_relationship_kwargs={"cascade": "all, delete-orphan"},
+    )
+
+
+class LLMProvider(LLMProviderBase, TimestampMixin, table=True):
+    """LLM提供商表"""
+
+    __tablename__ = "llm_providers"
+
+    id: Optional[int] = Field(default=None, primary_key=True, index=True)
+
+    # 关系定义
+    models: List["LLMModelProvider"] = Relationship(back_populates="provider")
+    api_keys: List["LLMProviderApiKey"] = Relationship(back_populates="provider")
+
+
+class LLMModelProvider(LLMModelProviderBase, TimestampMixin, table=True):
+    """模型-提供商关联表"""
+
+    __tablename__ = "llm_model_providers"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+
+    # 关系定义
+    model: LLMModel = Relationship(back_populates="providers")
+    provider: LLMProvider = Relationship(back_populates="models")
+
+
+class LLMProviderApiKey(LLMProviderApiKeyBase, TimestampMixin, table=True):
+    """API密钥表"""
+
+    __tablename__ = "llm_provider_apikeys"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+
+    # 关系定义
+    provider: LLMProvider = Relationship(back_populates="api_keys")
+
+
+class Capability(CapabilityBase, table=True):
+    """能力表 - 匹配实际数据库结构（无时间戳字段）"""
+
+    __tablename__ = "capabilities"
+
+    capability_id: Optional[int] = Field(default=None, primary_key=True)
+
+    # 关系定义
+    llm_models: List["LLMModelCapability"] = Relationship(back_populates="capability")
+
+
 class LLMModelCapability(LLMModelCapabilityBase, table=True):
     """模型-能力关联表（多对多关系）"""
 
@@ -385,73 +267,3 @@ class LLMModelCapability(LLMModelCapabilityBase, table=True):
 
 # 更新LLMModel以包含capabilities关系
 LLMModel.model_rebuild()
-
-
-# ==================== 查询优化类 ====================
-
-
-class QueryBuilder:
-    """查询构建器 - 提供复杂查询的构建方法"""
-
-    @staticmethod
-    def get_models_with_healthy_providers():
-        """获取有健康提供商的模型"""
-        return (
-            select(LLMModel)
-            .join(LLMModelProvider)
-            .where(
-                LLMModel.is_enabled == True,
-                LLMModelProvider.is_enabled == True,
-                LLMModelProvider.health_status == HealthStatus.healthy,
-            )
-            .distinct()
-        )
-
-    @staticmethod
-    def get_top_performing_providers(limit: int = 10):
-        """获取性能最佳的提供商"""
-        return (
-            select(LLMProvider, LLMModelProvider.overall_score.label("avg_score"))
-            .join(LLMModelProvider)
-            .where(LLMProvider.is_enabled == True, LLMModelProvider.is_enabled == True)
-            .group_by(LLMProvider.id)
-            .order_by(LLMModelProvider.overall_score.desc())
-            .limit(limit)
-        )
-
-    @staticmethod
-    def get_models_by_performance_threshold(min_score: float = 0.8):
-        """获取性能超过阈值的模型"""
-        return (
-            select(LLMModel)
-            .join(LLMModelProvider)
-            .where(
-                LLMModel.is_enabled == True, LLMModelProvider.overall_score >= min_score
-            )
-            .distinct()
-        )
-
-
-# ==================== 性能监控模型 ====================
-
-
-class PerformanceMetrics(SQLModel):
-    """性能指标模型"""
-
-    total_requests: int = 0
-    successful_requests: int = 0
-    failed_requests: int = 0
-    avg_response_time: float = 0.0
-    success_rate: float = 0.0
-    total_cost: float = 0.0
-    cost_per_request: float = 0.0
-
-
-class HealthCheckResult(SQLModel):
-    """健康检查结果模型"""
-
-    status: HealthStatus
-    response_time: float
-    error_message: Optional[str] = None
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
-    extra_metadata: Optional[Dict[str, Any]] = Field(default_factory=dict)

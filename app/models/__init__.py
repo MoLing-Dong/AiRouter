@@ -1,4 +1,4 @@
-# Import SQLModel models and components
+# Import database table models and enums
 from .sqlmodel_models import (
     # Enums
     HealthStatus,
@@ -14,7 +14,12 @@ from .sqlmodel_models import (
     LLMModelProvider,
     Capability,
     LLMModelCapability,
-    # Request/Response models
+    # Mixin
+    TimestampMixin,
+)
+
+# Import request models
+from .requests import (
     ModelCreateRequest as LLMModelCreate,
     ModelUpdateRequest as LLMModelUpdate,
     ProviderCreateRequest as LLMProviderCreate,
@@ -22,15 +27,10 @@ from .sqlmodel_models import (
     ModelProviderCreateRequest as LLMModelProviderCreate,
     ModelProviderUpdateRequest as LLMModelProviderUpdate,
     LLMProviderApiKeyCreateRequest as LLMProviderApiKeyCreate,
-    ModelResponse,
-    ProviderResponse,
-    ModelProviderResponse,
-    # Utility classes
-    QueryBuilder,
-    PerformanceMetrics,
-    HealthCheckResult,
-    TimestampMixin,
 )
+
+# Import utility classes
+from .query_builder import QueryBuilder
 
 # Import unified API response models
 from .response import (
@@ -73,10 +73,6 @@ __all__ = [
     "LLMModelProviderCreate",
     "LLMModelProviderUpdate",
     "LLMProviderApiKeyCreate",
-    # Response models (SQLModel)
-    "ModelResponse",
-    "ProviderResponse",
-    "ModelProviderResponse",
     # Unified API Response models
     "ApiResponse",
     "ApiResponseType",
@@ -88,7 +84,5 @@ __all__ = [
     "PagedData",
     # Utility classes
     "QueryBuilder",
-    "PerformanceMetrics",
-    "HealthCheckResult",
     "TimestampMixin",
 ]

@@ -183,28 +183,48 @@ const ModelsPage: React.FC = () => {
             title: tDashboard('provider'),
             dataIndex: 'providers',
             key: 'providers',
-            render: (providers: Provider[], record: Model) => (
-                <Space wrap>
-                    {providers?.length > 0 ? (
-                        providers.map((provider, index) => (
-                            <Tooltip
-                                key={`${record.id}-provider-${provider.id}-${index}`}
-                                title={`${tModels('weight')}: ${provider.weight} | ${tModels('health')}: ${provider.health_status}`}
-                            >
-                                <Tag
-                                    color={provider.is_preferred ? 'gold' : 'default'}
-                                    style={{ cursor: 'pointer' }}
+            render: (providers: Provider[], record: Model) => {
+                // 健康状态颜色映射
+                const getHealthColor = (status: string) => {
+                    switch (status?.toLowerCase()) {
+                        case 'healthy':
+                            return 'success'
+                        case 'degraded':
+                            return 'warning'
+                        case 'unhealthy':
+                            return 'error'
+                        default:
+                            return 'default'
+                    }
+                }
+
+                return (
+                    <Space wrap>
+                        {providers?.length > 0 ? (
+                            providers.map((provider, index) => (
+                                <Tooltip
+                                    key={`${record.id}-provider-${provider.id}-${index}`}
+                                    title={`${tModels('weight')}: ${provider.weight} | ${tModels('health')}: ${provider.health_status}`}
                                 >
-                                    {provider.name}
-                                    {provider.is_preferred && ' ⭐'}
-                                </Tag>
-                            </Tooltip>
-                        ))
-                    ) : (
-                        <Tag color="default">{tModels('unbound')}</Tag>
-                    )}
-                </Space>
-            )
+                                    <Tag
+                                        color={provider.is_preferred ? 'gold' : getHealthColor(provider.health_status)}
+                                        style={{ cursor: 'pointer' }}
+                                    >
+                                        {provider.name}
+                                        {provider.is_preferred && ' ⭐'}
+                                        {/* 健康状态图标 */}
+                                        {provider.health_status === 'healthy' && ' ✓'}
+                                        {provider.health_status === 'degraded' && ' ⚠'}
+                                        {provider.health_status === 'unhealthy' && ' ✗'}
+                                    </Tag>
+                                </Tooltip>
+                            ))
+                        ) : (
+                            <Tag color="default">{tModels('unbound')}</Tag>
+                        )}
+                    </Space>
+                )
+            }
         },
         {
             title: tModels('capabilities'),

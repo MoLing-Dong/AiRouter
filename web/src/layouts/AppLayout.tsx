@@ -33,6 +33,7 @@ const AppLayout = () => {
     const { token } = theme.useToken()
     const [collapsed, setCollapsed] = useState(false)
     const { mode, setMode } = useTheme()
+    const { t: tCommon } = useTranslation('common')
     const { t: tMenu } = useTranslation('menu')
     const { t: tSettings } = useTranslation('settings')
 
@@ -147,7 +148,7 @@ const AppLayout = () => {
             </Sider>
             <Layout>
                 <Header style={headerStyle}>
-                    <span>AiRouter Console</span>
+                    <span>AiRouter {tCommon('console')}</span>
                     <Space>
                         <LocaleSwitcher />
                         <Dropdown menu={{ items: themeMenuItems, selectedKeys: [mode] }} placement="bottomRight">
