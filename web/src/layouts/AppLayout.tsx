@@ -1,5 +1,5 @@
 import type { CSSProperties } from 'react'
-import { Layout, Menu, type MenuProps, theme, Dropdown, Button } from 'antd'
+import { Layout, Menu, type MenuProps, theme, Dropdown, Button, Space } from 'antd'
 import { Link, Outlet, useLocation } from 'react-router-dom'
 import {
     DashboardOutlined,
@@ -12,35 +12,39 @@ import {
     DesktopOutlined,
 } from '@ant-design/icons'
 import { useTheme } from '@/contexts/ThemeContext'
+import { LocaleSwitcher } from '@/components/LocaleSwitcher'
+import { useTranslation } from '@/hooks/useTranslation'
 
 const { Header, Sider, Content, Footer } = Layout
 
 /**
- * 导航菜单配置
- * 每个菜单项包含唯一标识、显示文本、路由路径和图标
+ * 导航菜单配置基础数据
+ * 每个菜单项包含唯一标识、路由路径和图标
  */
-const navItems = [
-    { key: 'dashboard', label: '控制台总览', path: '/', icon: <DashboardOutlined /> },
-    { key: 'models', label: '模型管理', path: '/models', icon: <ApiOutlined /> },
-    { key: 'providers', label: '供应商管理', path: '/providers', icon: <CloudServerOutlined /> },
-    { key: 'settings', label: '系统设置', path: '/settings', icon: <SettingOutlined /> },
+const navItemsBase = [
+    { key: 'dashboard', path: '/', icon: <DashboardOutlined />, labelKey: 'dashboard' },
+    { key: 'models', path: '/models', icon: <ApiOutlined />, labelKey: 'models' },
+    { key: 'providers', path: '/providers', icon: <CloudServerOutlined />, labelKey: 'providers' },
+    { key: 'settings', path: '/settings', icon: <SettingOutlined />, labelKey: 'settings' },
 ]
-
-/**
- * 生成菜单项配置
- * 包含图标和链接，折叠时自动只显示图标
- */
-const menuItems: MenuProps['items'] = navItems.map((item) => ({
-    key: item.key,
-    icon: item.icon,
-    label: <Link to={item.path}>{item.label}</Link>,
-}))
 
 const AppLayout = () => {
     const location = useLocation()
     const { token } = theme.useToken()
     const [collapsed, setCollapsed] = useState(false)
     const { mode, setMode } = useTheme()
+    const { t: tMenu } = useTranslation('menu')
+    const { t: tSettings } = useTranslation('settings')
+
+    /**
+     * 生成菜单项配置（动态翻译）
+     * 包含图标和链接，折叠时自动只显示图标
+     */
+    const menuItems: MenuProps['items'] = navItemsBase.map((item) => ({
+        key: item.key,
+        icon: item.icon,
+        label: <Link to={item.path}>{tMenu(item.labelKey)}</Link>,
+    }))
 
     const headerStyle: CSSProperties = {
         display: 'flex',
@@ -54,24 +58,24 @@ const AppLayout = () => {
         paddingInline: 24,
     }
 
-    // 主题切换菜单配置
+    // 主题切换菜单配置（动态翻译）
     const themeMenuItems = [
         {
             key: 'light',
             icon: <SunOutlined />,
-            label: '亮色模式',
+            label: tSettings('lightMode'),
             onClick: () => setMode('light'),
         },
         {
             key: 'dark',
             icon: <MoonOutlined />,
-            label: '暗色模式',
+            label: tSettings('darkMode'),
             onClick: () => setMode('dark'),
         },
         {
             key: 'auto',
             icon: <DesktopOutlined />,
-            label: '跟随系统',
+            label: tSettings('autoMode'),
             onClick: () => setMode('auto'),
         },
     ]
@@ -113,7 +117,7 @@ const AppLayout = () => {
         gap: 8,
     }
 
-    const activeKey = navItems.find((item) => {
+    const activeKey = navItemsBase.find((item) => {
         if (item.path === '/') {
             return location.pathname === '/'
         }
@@ -143,16 +147,19 @@ const AppLayout = () => {
             </Sider>
             <Layout>
                 <Header style={headerStyle}>
-                    <span>模型路由控制台</span>
-                    <Dropdown menu={{ items: themeMenuItems, selectedKeys: [mode] }} placement="bottomRight">
-                        <Button
-                            type="text"
-                            icon={themeIcon}
-                            style={{ color: token.colorTextLightSolid }}
-                        >
-                            主题
-                        </Button>
-                    </Dropdown>
+                    <span>AiRouter Console</span>
+                    <Space>
+                        <LocaleSwitcher />
+                        <Dropdown menu={{ items: themeMenuItems, selectedKeys: [mode] }} placement="bottomRight">
+                            <Button
+                                type="text"
+                                icon={themeIcon}
+                                style={{ color: token.colorTextLightSolid }}
+                            >
+                                {tSettings('theme')}
+                            </Button>
+                        </Dropdown>
+                    </Space>
                 </Header>
                 <Content style={contentStyle}>
                     <Outlet />

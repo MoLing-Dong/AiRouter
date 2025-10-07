@@ -94,9 +94,6 @@ class LLMModel(LLMModelBase, TimestampMixin, table=True):
     providers: List["LLMModelProvider"] = Relationship(
         back_populates="model", sa_relationship_kwargs={"cascade": "all, delete-orphan"}
     )
-    parameters: List["LLMModelParam"] = Relationship(
-        back_populates="model", sa_relationship_kwargs={"cascade": "all, delete-orphan"}
-    )
     capabilities: List["LLMModelCapability"] = Relationship(
         back_populates="llm_model",
         sa_relationship_kwargs={"cascade": "all, delete-orphan"},
@@ -187,37 +184,6 @@ class LLMModelProvider(LLMModelProviderBase, TimestampMixin, table=True):
     provider: LLMProvider = Relationship(back_populates="models")
 
 
-class LLMModelParamBase(SQLModel):
-    """模型参数基础类"""
-
-    llm_id: int = Field(
-        sa_column=Column(
-            Integer, ForeignKey("llm_models.id", ondelete="CASCADE"), index=True
-        )
-    )
-    provider_id: Optional[int] = Field(
-        default=None,
-        sa_column=Column(
-            Integer, ForeignKey("llm_providers.id", ondelete="CASCADE"), nullable=True
-        ),
-    )
-    param_key: str = Field(max_length=100, index=True)
-    param_value: Any = Field(sa_column=Column(JSON))
-    is_enabled: bool = Field(default=True, index=True)
-    description: Optional[str] = Field(default=None, max_length=500)
-
-
-class LLMModelParam(LLMModelParamBase, TimestampMixin, table=True):
-    """模型参数表"""
-
-    __tablename__ = "llm_model_params"
-
-    id: Optional[int] = Field(default=None, primary_key=True)
-
-    # 关系定义
-    model: LLMModel = Relationship(back_populates="parameters")
-
-
 class LLMProviderApiKeyBase(SQLModel):
     """API密钥基础类 - 匹配现有数据库结构"""
 
@@ -255,7 +221,6 @@ class ModelResponse(SQLModel):
     description: Optional[str] = None
     is_enabled: bool = True
     providers: List[Dict[str, Any]] = []
-    parameters: List[Dict[str, Any]] = []
     created_at: datetime
     updated_at: datetime
 
@@ -351,17 +316,6 @@ class ModelProviderUpdateRequest(SQLModel):
     is_enabled: Optional[bool] = Field(default=None)
     is_preferred: Optional[bool] = Field(default=None)
     health_status: Optional[HealthStatus] = Field(default=None)
-
-
-class LLMModelParamCreateRequest(SQLModel):
-    """创建模型参数请求"""
-
-    llm_id: int
-    provider_id: Optional[int] = None
-    param_key: str
-    param_value: Any
-    is_enabled: bool = True
-    description: Optional[str] = None
 
 
 class LLMProviderApiKeyCreateRequest(SQLModel):

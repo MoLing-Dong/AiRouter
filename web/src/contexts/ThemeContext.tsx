@@ -6,7 +6,7 @@
  */
 import { createContext, useContext, useEffect, useState } from 'react'
 import { ConfigProvider, theme as antdTheme } from 'antd'
-import zhCN from 'antd/locale/zh_CN'
+import { useLocale } from './LocaleContext'
 
 type ThemeMode = 'light' | 'dark' | 'auto'
 
@@ -71,10 +71,13 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         localStorage.setItem(THEME_STORAGE_KEY, newMode)
     }
 
+    // 获取国际化配置
+    const { antdLocale } = useLocale()
+
     return (
         <ThemeContext.Provider value={{ mode, setMode, isDark }}>
             <ConfigProvider
-                locale={zhCN}
+                locale={antdLocale}
                 theme={{
                     algorithm: isDark ? antdTheme.darkAlgorithm : antdTheme.defaultAlgorithm,
                     token: {

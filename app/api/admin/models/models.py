@@ -97,9 +97,6 @@ async def get_all_models_details():
         # 批量获取所有模型的capabilities
         capabilities_by_model = db_service.get_all_models_capabilities_batch(model_ids)
 
-        # 批量获取所有模型的parameters
-        params_by_model = db_service.get_all_models_params_batch(model_ids)
-
         all_models_details = []
 
         for model in all_models:
@@ -143,11 +140,6 @@ async def get_all_models_details():
                         else time.time()
                     ),
                 }
-
-                # 添加模型参数（从批量查询结果中）
-                model_params = params_by_model.get(model.id, [])
-                if model_params:
-                    model_detail["parameters"] = model_params
 
                 # 添加模型能力（从批量查询结果中）
                 model_capabilities = capabilities_by_model.get(model.id, [])

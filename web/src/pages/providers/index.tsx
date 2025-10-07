@@ -15,6 +15,7 @@ import {
 } from 'antd'
 import { PlusOutlined, EditOutlined, DeleteOutlined, ReloadOutlined, SettingOutlined } from '@ant-design/icons'
 import { providersApi } from '@/services/api'
+import { useTranslation } from '@/hooks/useTranslation'
 
 interface Provider {
     id?: number
@@ -31,6 +32,9 @@ interface Provider {
 }
 
 const ProvidersPage: React.FC = () => {
+    const { t: tProviders } = useTranslation('providers')
+    const { t: tCommon } = useTranslation('common')
+
     const [providers, setProviders] = useState<Provider[]>([])
     const [loading, setLoading] = useState(false)
     const [modalVisible, setModalVisible] = useState(false)
@@ -71,7 +75,7 @@ const ProvidersPage: React.FC = () => {
                 total: response.data?.total || 0
             })
         } catch (error) {
-            message.error('获取供应商列表失败')
+            message.error(tProviders('fetchFailed'))
             console.error('Failed to fetch providers:', error)
         } finally {
             setLoading(false)
@@ -93,10 +97,10 @@ const ProvidersPage: React.FC = () => {
     const handleDelete = async (_provider: Provider) => {
         try {
             // 注意：API 中没有删除接口，这里仅作示例
-            message.success('删除成功')
+            message.success(tProviders('deleteSuccess'))
             fetchProviders(pagination.current, pagination.pageSize)
         } catch (error) {
-            message.error('删除失败')
+            message.error(tProviders('deleteFailed'))
         }
     }
 
@@ -104,16 +108,16 @@ const ProvidersPage: React.FC = () => {
         try {
             if (editingProvider) {
                 // 更新供应商（API 中没有更新接口）
-                message.success('更新成功')
+                message.success(tProviders('updateSuccess'))
             } else {
                 await providersApi.createProvider(values)
-                message.success('创建成功')
+                message.success(tProviders('createSuccess'))
             }
             setModalVisible(false)
             // 刷新当前页
             fetchProviders(pagination.current, pagination.pageSize)
         } catch (error) {
-            message.error(editingProvider ? '更新失败' : '创建失败')
+            message.error(editingProvider ? tProviders('updateFailed') : tProviders('createFailed'))
         }
     }
 
@@ -124,22 +128,22 @@ const ProvidersPage: React.FC = () => {
     const handleHealthCheck = async (provider: Provider) => {
         try {
             await providersApi.getProviderHealth(provider.name)
-            message.success('健康检查完成')
+            message.success(tProviders('healthCheckSuccess'))
             fetchProviders()
         } catch (error) {
-            message.error('健康检查失败')
+            message.error(tProviders('healthCheckFailed'))
         }
     }
 
     const columns = [
         {
-            title: '供应商名称',
+            title: tProviders('providerName'),
             dataIndex: 'name',
             key: 'name',
             render: (text: string) => <strong>{text}</strong>
         },
         {
-            title: '类型',
+            title: tProviders('providerType'),
             dataIndex: 'type',
             key: 'type',
             render: (type: string) => (
@@ -147,54 +151,54 @@ const ProvidersPage: React.FC = () => {
             )
         },
         {
-            title: '端点',
+            title: tProviders('endpoint'),
             dataIndex: 'endpoint',
             key: 'endpoint',
             render: (endpoint: string) => (
                 <Tooltip title={endpoint}>
-                    <span style={{ maxWidth: 200, display: 'inline-block', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    <span style={{ display: 'inline-block', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                         {endpoint}
                     </span>
                 </Tooltip>
             )
         },
         {
-            title: '状态',
+            title: tCommon('status'),
             dataIndex: 'status',
             key: 'status',
             render: (status: string) => (
                 <Tag color={status === 'active' ? 'green' : 'red'}>
-                    {status === 'active' ? '启用' : '禁用'}
+                    {status === 'active' ? tCommon('enabled') : tCommon('disabled')}
                 </Tag>
             )
         },
 
         {
-            title: '性能',
+            title: tProviders('performance'),
             dataIndex: 'performance',
             key: 'performance',
             render: (performance: Provider['performance']) => (
                 performance ? (
                     <Space direction="vertical" size="small">
-                        <span>响应时间: {performance.responseTime}ms</span>
-                        <span>成功率: {(performance.successRate * 100).toFixed(1)}%</span>
+                        <span>{tCommon('responseTime')}: {performance.responseTime}ms</span>
+                        <span>{tProviders('successRate')}: {(performance.successRate * 100).toFixed(1)}%</span>
                     </Space>
                 ) : <span>-</span>
             )
         },
         {
-            title: '操作',
+            title: tCommon('actions'),
             key: 'actions',
             render: (_: any, record: Provider) => (
                 <Space>
-                    <Tooltip title="健康检查">
+                    <Tooltip title={tProviders('healthCheck')}>
                         <Button
                             type="text"
                             icon={<SettingOutlined />}
                             onClick={() => handleHealthCheck(record)}
                         />
                     </Tooltip>
-                    <Tooltip title="编辑">
+                    <Tooltip title={tCommon('edit')}>
                         <Button
                             type="text"
                             icon={<EditOutlined />}
@@ -202,10 +206,10 @@ const ProvidersPage: React.FC = () => {
                         />
                     </Tooltip>
                     <Popconfirm
-                        title="确定要删除这个供应商吗？"
+                        title={tProviders('deleteConfirm')}
                         onConfirm={() => handleDelete(record)}
                     >
-                        <Tooltip title="删除">
+                        <Tooltip title={tCommon('delete')}>
                             <Button type="text" danger icon={<DeleteOutlined />} />
                         </Tooltip>
                     </Popconfirm>
@@ -222,13 +226,13 @@ const ProvidersPage: React.FC = () => {
         <div>
             <Card>
                 <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between' }}>
-                    <h2>供应商管理</h2>
+                    <h2>{tProviders('title')}</h2>
                     <Space>
                         <Button icon={<ReloadOutlined />} onClick={() => fetchProviders()}>
-                            刷新
+                            {tCommon('refresh')}
                         </Button>
                         <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
-                            新增供应商
+                            {tProviders('addProvider')}
                         </Button>
                     </Space>
                 </div>
@@ -244,17 +248,19 @@ const ProvidersPage: React.FC = () => {
                         total: pagination.total,
                         showSizeChanger: true,
                         showQuickJumper: true,
-                        showTotal: (total) => `共 ${total} 个供应商`
+                        showTotal: (total) => tProviders('totalProviders').replace('{total}', String(total))
                     }}
                     onChange={handleTableChange}
                 />
             </Card>
 
             <Modal
-                title={editingProvider ? '编辑供应商' : '新增供应商'}
+                title={editingProvider ? tProviders('editProvider') : tProviders('addProvider')}
                 open={modalVisible}
                 onCancel={() => setModalVisible(false)}
                 onOk={() => form.submit()}
+                okText={tCommon('confirm')}
+                cancelText={tCommon('cancel')}
                 width={600}
             >
                 <Form
@@ -264,18 +270,18 @@ const ProvidersPage: React.FC = () => {
                 >
                     <Form.Item
                         name="name"
-                        label="供应商名称"
-                        rules={[{ required: true, message: '请输入供应商名称' }]}
+                        label={tProviders('providerName')}
+                        rules={[{ required: true, message: tProviders('pleaseInputName') }]}
                     >
-                        <Input placeholder="例如：openai" />
+                        <Input placeholder={tProviders('providerNamePlaceholder')} />
                     </Form.Item>
 
                     <Form.Item
                         name="type"
-                        label="类型"
-                        rules={[{ required: true, message: '请选择供应商类型' }]}
+                        label={tProviders('providerType')}
+                        rules={[{ required: true, message: tProviders('pleaseSelectType') }]}
                     >
-                        <Select placeholder="选择供应商类型">
+                        <Select placeholder={tProviders('selectProviderType')}>
                             <Select.Option value="openai">OpenAI</Select.Option>
                             <Select.Option value="anthropic">Anthropic</Select.Option>
                             <Select.Option value="google">Google</Select.Option>
@@ -287,28 +293,28 @@ const ProvidersPage: React.FC = () => {
 
                     <Form.Item
                         name="endpoint"
-                        label="API 端点"
-                        rules={[{ required: true, message: '请输入 API 端点' }]}
+                        label={tProviders('apiEndpoint')}
+                        rules={[{ required: true, message: tProviders('pleaseInputEndpoint') }]}
                     >
-                        <Input placeholder="例如：https://api.openai.com/v1" />
+                        <Input placeholder={tProviders('endpointPlaceholder')} />
                     </Form.Item>
 
                     <Form.Item
                         name="apiKey"
-                        label="API Key"
-                        rules={[{ required: true, message: '请输入 API Key' }]}
+                        label={tProviders('apiKey')}
+                        rules={[{ required: true, message: tProviders('pleaseInputApiKey') }]}
                     >
-                        <Input.Password placeholder="请输入 API Key" />
+                        <Input.Password placeholder={tProviders('pleaseInputApiKey')} />
                     </Form.Item>
 
                     <Form.Item
                         name="status"
-                        label="状态"
+                        label={tCommon('status')}
                         initialValue="active"
                     >
                         <Select>
-                            <Select.Option value="active">启用</Select.Option>
-                            <Select.Option value="inactive">禁用</Select.Option>
+                            <Select.Option value="active">{tCommon('enabled')}</Select.Option>
+                            <Select.Option value="inactive">{tCommon('disabled')}</Select.Option>
                         </Select>
                     </Form.Item>
                 </Form>

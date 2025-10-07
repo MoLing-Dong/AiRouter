@@ -18,6 +18,7 @@ import {
     CheckCircleOutlined
 } from '@ant-design/icons'
 import { statsApi, modelsApi, providersApi } from '@/services/api'
+import { useTranslation } from '@/hooks/useTranslation'
 
 interface SystemStats {
     activeModels: number
@@ -26,6 +27,9 @@ interface SystemStats {
 }
 
 const Dashboard: React.FC = () => {
+    const { t: tDashboard } = useTranslation('dashboard')
+    const { t: tCommon } = useTranslation('common')
+
     const [stats, setStats] = useState<SystemStats>({
         activeModels: 0,
         healthyProviders: 0,
@@ -86,22 +90,23 @@ const Dashboard: React.FC = () => {
 
     const modelColumns = [
         {
-            title: '模型名称',
+            title: tDashboard('modelName'),
             dataIndex: 'name',
             key: 'name',
         },
         {
-            title: '供应商',
+            title: tDashboard('provider'),
             dataIndex: 'provider',
             key: 'provider',
+            render: (provider: string) => provider === 'public' ? tDashboard('public') : tDashboard('private'),
         },
         {
-            title: '状态',
+            title: tCommon('status'),
             dataIndex: 'status',
             key: 'status',
             render: (status: string) => (
                 <Tag color={status === 'active' ? 'green' : 'red'}>
-                    {status === 'active' ? '启用' : '禁用'}
+                    {status === 'active' ? tCommon('enabled') : tCommon('disabled')}
                 </Tag>
             )
         }
@@ -109,23 +114,23 @@ const Dashboard: React.FC = () => {
 
     const providerColumns = [
         {
-            title: '供应商',
+            title: tDashboard('provider'),
             dataIndex: 'name',
             key: 'name',
         },
         {
-            title: '健康状态',
+            title: tDashboard('healthStatus'),
             dataIndex: 'health',
             key: 'health',
             render: (health: string) => (
                 <Badge
                     status={health === 'healthy' ? 'success' : health === 'unhealthy' ? 'error' : 'warning'}
-                    text={health === 'healthy' ? '健康' : health === 'unhealthy' ? '异常' : '未知'}
+                    text={health === 'healthy' ? tDashboard('healthy') : health === 'unhealthy' ? tDashboard('unhealthy') : tCommon('unknown')}
                 />
             )
         },
         {
-            title: '响应时间',
+            title: tCommon('responseTime'),
             dataIndex: 'responseTime',
             key: 'responseTime',
             render: (time: number) => time ? `${time}ms` : '-'
@@ -151,7 +156,7 @@ const Dashboard: React.FC = () => {
                 <Col xs={24} sm={12} md={6}>
                     <Card>
                         <Statistic
-                            title="活跃模型"
+                            title={tDashboard('activeModels')}
                             value={stats.activeModels}
                             prefix={<DatabaseOutlined />}
                             valueStyle={{ color: '#52c41a' }}
@@ -161,7 +166,7 @@ const Dashboard: React.FC = () => {
                 <Col xs={24} sm={12} md={6}>
                     <Card>
                         <Statistic
-                            title="健康供应商"
+                            title={tDashboard('healthyProviders')}
                             value={stats.healthyProviders}
                             prefix={<CloudServerOutlined />}
                             valueStyle={{ color: '#52c41a' }}
@@ -173,7 +178,7 @@ const Dashboard: React.FC = () => {
             {/* 详细信息 */}
             <Row gutter={[16, 16]}>
                 <Col xs={24} lg={12}>
-                    <Card title="最近模型" size="small">
+                    <Card title={tDashboard('recentModels')} size="small">
                         <Table
                             columns={modelColumns}
                             dataSource={recentModels}
@@ -184,7 +189,7 @@ const Dashboard: React.FC = () => {
                     </Card>
                 </Col>
                 <Col xs={24} lg={12}>
-                    <Card title="供应商健康状态" size="small">
+                    <Card title={tDashboard('providerHealth')} size="small">
                         <Table
                             columns={providerColumns}
                             dataSource={providerHealth}

@@ -1,11 +1,16 @@
 import React from 'react'
+import { useTranslation } from '@/hooks/useTranslation'
 
-const SettingsPage: React.FC = () => (
-    <div className="page">
-        <h1>系统设置</h1>
-        <p>配置全局参数、访问控制与其他系统选项。</p>
-    </div>
-)
+const SettingsPage: React.FC = () => {
+    const { t } = useTranslation('menu')
+
+    return (
+        <div className="page">
+            <h1>{t('settings')}</h1>
+            <p>Configuration page coming soon...</p>
+        </div>
+    )
+}
 
 export default SettingsPage
 

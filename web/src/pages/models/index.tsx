@@ -16,6 +16,7 @@ import {
 import { PlusOutlined, EditOutlined, DeleteOutlined, ReloadOutlined } from '@ant-design/icons'
 import { modelsApi } from '@/services/api'
 import { useCapabilitiesStore } from '@/stores/capabilitiesStore'
+import { useTranslation } from '@/hooks/useTranslation'
 
 interface Provider {
     id: number
@@ -44,6 +45,10 @@ interface Model {
 }
 
 const ModelsPage: React.FC = () => {
+    const { t: tModels } = useTranslation('models')
+    const { t: tCommon } = useTranslation('common')
+    const { t: tDashboard } = useTranslation('dashboard')
+
     const [models, setModels] = useState<Model[]>([])
     const [loading, setLoading] = useState(false)
     const [modalVisible, setModalVisible] = useState(false)
@@ -80,7 +85,7 @@ const ModelsPage: React.FC = () => {
                 total: response.data?.total || 0
             })
         } catch (error) {
-            message.error('获取模型列表失败')
+            message.error(tModels('fetchFailed'))
             console.error('Failed to fetch models:', error)
         } finally {
             setLoading(false)
@@ -109,14 +114,14 @@ const ModelsPage: React.FC = () => {
     const handleDelete = async (model: Model) => {
         try {
             if (!model.id) {
-                message.error('模型ID不存在')
+                message.error(tModels('modelIdNotExist'))
                 return
             }
             await modelsApi.deleteModel(model.id)
-            message.success('删除成功')
+            message.success(tModels('deleteSuccess'))
             fetchModels(pagination.current, pagination.pageSize)
         } catch (error) {
-            message.error('删除失败')
+            message.error(tModels('deleteFailed'))
         }
     }
 
@@ -137,18 +142,18 @@ const ModelsPage: React.FC = () => {
             if (editingModel && editingModel.id) {
                 // 更新模型
                 await modelsApi.updateModel(editingModel.id, payload)
-                message.success('更新成功')
+                message.success(tModels('updateSuccess'))
             } else {
                 // 创建模型
                 await modelsApi.createModel(payload)
-                message.success('创建成功')
+                message.success(tModels('createSuccess'))
             }
 
             setModalVisible(false)
             // 刷新当前页
             fetchModels(pagination.current, pagination.pageSize)
         } catch (error) {
-            message.error(editingModel ? '更新失败' : '创建失败')
+            message.error(editingModel ? tModels('updateFailed') : tModels('createFailed'))
             console.error('Submit error:', error)
         }
     }
@@ -159,23 +164,23 @@ const ModelsPage: React.FC = () => {
 
     const columns = [
         {
-            title: '模型名称',
+            title: tModels('modelName'),
             dataIndex: 'name',
             key: 'name',
             render: (text: string) => <strong>{text}</strong>
         },
         {
-            title: '类型',
+            title: tModels('modelType'),
             dataIndex: 'type',
             key: 'type',
             render: (type: string) => (
                 <Tag color={type === 'PUBLIC' ? 'blue' : 'purple'}>
-                    {type === 'PUBLIC' ? '公开' : '私有'}
+                    {type === 'PUBLIC' ? tModels('public') : tModels('private')}
                 </Tag>
             )
         },
         {
-            title: '供应商',
+            title: tDashboard('provider'),
             dataIndex: 'providers',
             key: 'providers',
             render: (providers: Provider[], record: Model) => (
@@ -184,7 +189,7 @@ const ModelsPage: React.FC = () => {
                         providers.map((provider, index) => (
                             <Tooltip
                                 key={`${record.id}-provider-${provider.id}-${index}`}
-                                title={`权重: ${provider.weight} | 健康: ${provider.health_status}`}
+                                title={`${tModels('weight')}: ${provider.weight} | ${tModels('health')}: ${provider.health_status}`}
                             >
                                 <Tag
                                     color={provider.is_preferred ? 'gold' : 'default'}
@@ -196,13 +201,13 @@ const ModelsPage: React.FC = () => {
                             </Tooltip>
                         ))
                     ) : (
-                        <Tag color="default">未绑定</Tag>
+                        <Tag color="default">{tModels('unbound')}</Tag>
                     )}
                 </Space>
             )
         },
         {
-            title: '能力',
+            title: tModels('capabilities'),
             dataIndex: 'capabilities',
             key: 'capabilities',
             render: (capabilities: Capability[], record: Model) => (
@@ -217,27 +222,27 @@ const ModelsPage: React.FC = () => {
                             </Tooltip>
                         ))
                     ) : (
-                        <Tag color="default">无</Tag>
+                        <Tag color="default">{tCommon('none')}</Tag>
                     )}
                 </Space>
             )
         },
         {
-            title: '状态',
+            title: tCommon('status'),
             dataIndex: 'status',
             key: 'status',
             render: (status: string) => (
                 <Tag color={status === 'active' ? 'green' : 'red'}>
-                    {status === 'active' ? '启用' : '禁用'}
+                    {status === 'active' ? tModels('enabled') : tModels('disabled')}
                 </Tag>
             )
         },
         {
-            title: '操作',
+            title: tCommon('actions'),
             key: 'actions',
             render: (_: any, record: Model) => (
                 <Space>
-                    <Tooltip title="编辑">
+                    <Tooltip title={tCommon('edit')}>
                         <Button
                             type="text"
                             icon={<EditOutlined />}
@@ -245,10 +250,10 @@ const ModelsPage: React.FC = () => {
                         />
                     </Tooltip>
                     <Popconfirm
-                        title="确定要删除这个模型吗？"
+                        title={tModels('deleteConfirm')}
                         onConfirm={() => handleDelete(record)}
                     >
-                        <Tooltip title="删除">
+                        <Tooltip title={tCommon('delete')}>
                             <Button type="text" danger icon={<DeleteOutlined />} />
                         </Tooltip>
                     </Popconfirm>
@@ -266,13 +271,13 @@ const ModelsPage: React.FC = () => {
         <div>
             <Card>
                 <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between' }}>
-                    <h2>模型管理</h2>
+                    <h2>{tModels('title')}</h2>
                     <Space>
                         <Button icon={<ReloadOutlined />} onClick={() => fetchModels()}>
-                            刷新
+                            {tCommon('refresh')}
                         </Button>
                         <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
-                            新增模型
+                            {tModels('addModel')}
                         </Button>
                     </Space>
                 </div>
@@ -288,17 +293,19 @@ const ModelsPage: React.FC = () => {
                         total: pagination.total,
                         showSizeChanger: true,
                         showQuickJumper: true,
-                        showTotal: (total) => `共 ${total} 个模型`
+                        showTotal: (total) => tModels('totalModels').replace('{total}', String(total))
                     }}
                     onChange={handleTableChange}
                 />
             </Card>
 
             <Modal
-                title={editingModel ? '编辑模型' : '新增模型'}
+                title={editingModel ? tModels('editModel') : tModels('addModel')}
                 open={modalVisible}
                 onCancel={() => setModalVisible(false)}
                 onOk={() => form.submit()}
+                okText={tCommon('confirm')}
+                cancelText={tCommon('cancel')}
                 width={600}
             >
                 <Form
@@ -308,31 +315,31 @@ const ModelsPage: React.FC = () => {
                 >
                     <Form.Item
                         name="name"
-                        label="模型名称"
-                        rules={[{ required: true, message: '请输入模型名称' }]}
+                        label={tModels('modelName')}
+                        rules={[{ required: true, message: tModels('pleaseInputName') }]}
                     >
-                        <Input placeholder="例如：gpt-4" />
+                        <Input placeholder={tModels('examplePlaceholder')} />
                     </Form.Item>
 
                     <Form.Item
                         name="llm_type"
-                        label="访问类型"
-                        rules={[{ required: true, message: '请选择访问类型' }]}
+                        label={tModels('accessType')}
+                        rules={[{ required: true, message: tModels('pleaseSelectAccessType') }]}
                         initialValue="PUBLIC"
-                        tooltip="模型的具体能力(对话、补全、嵌入、图像)通过下方的能力设置"
+                        tooltip={tModels('accessTypeTooltip')}
                     >
-                        <Select placeholder="选择访问类型">
-                            <Select.Option value="PUBLIC">公开模型</Select.Option>
-                            <Select.Option value="PRIVATE">私有模型</Select.Option>
+                        <Select placeholder={tModels('selectAccessType')}>
+                            <Select.Option value="PUBLIC">{tModels('publicModel')}</Select.Option>
+                            <Select.Option value="PRIVATE">{tModels('privateModel')}</Select.Option>
                         </Select>
                     </Form.Item>
 
                     <Form.Item
                         name="capabilities"
-                        label="模型能力"
-                        tooltip="选择模型支持的功能,可多选"
+                        label={tModels('modelCapabilities')}
+                        tooltip={tModels('capabilityTooltip')}
                     >
-                        <Select mode="multiple" placeholder="选择模型能力" loading={capabilitiesLoading}>
+                        <Select mode="multiple" placeholder={tModels('selectCapabilities')} loading={capabilitiesLoading}>
                             {capabilities.map(cap => (
                                 <Select.Option key={cap.capability_id} value={cap.capability_id}>
                                     {cap.capability_name}
@@ -344,19 +351,19 @@ const ModelsPage: React.FC = () => {
 
                     <Form.Item
                         name="description"
-                        label="模型描述"
+                        label={tModels('modelDescription')}
                     >
-                        <Input.TextArea placeholder="请输入模型描述（可选）" rows={3} />
+                        <Input.TextArea placeholder={tModels('pleaseInputDescription')} rows={3} />
                     </Form.Item>
 
                     <Form.Item
                         name="status"
-                        label="状态"
+                        label={tCommon('status')}
                         initialValue="active"
                     >
                         <Select>
-                            <Select.Option value="active">启用</Select.Option>
-                            <Select.Option value="inactive">禁用</Select.Option>
+                            <Select.Option value="active">{tModels('enabled')}</Select.Option>
+                            <Select.Option value="inactive">{tModels('disabled')}</Select.Option>
                         </Select>
                     </Form.Item>
                 </Form>

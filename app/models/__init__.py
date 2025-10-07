@@ -12,7 +12,6 @@ from .sqlmodel_models import (
     LLMProvider,
     LLMProviderApiKey,
     LLMModelProvider,
-    LLMModelParam,
     Capability,
     LLMModelCapability,
     # Request/Response models
@@ -22,7 +21,6 @@ from .sqlmodel_models import (
     ProviderUpdateRequest as LLMProviderUpdate,
     ModelProviderCreateRequest as LLMModelProviderCreate,
     ModelProviderUpdateRequest as LLMModelProviderUpdate,
-    LLMModelParamCreateRequest as LLMModelParamCreate,
     LLMProviderApiKeyCreateRequest as LLMProviderApiKeyCreate,
     ModelResponse,
     ProviderResponse,
@@ -65,7 +63,6 @@ __all__ = [
     "LLMProvider",
     "LLMProviderApiKey",
     "LLMModelProvider",
-    "LLMModelParam",
     "Capability",
     "LLMModelCapability",
     # Request models (for backward compatibility)
@@ -75,7 +72,6 @@ __all__ = [
     "LLMProviderUpdate",
     "LLMModelProviderCreate",
     "LLMModelProviderUpdate",
-    "LLMModelParamCreate",
     "LLMProviderApiKeyCreate",
     # Response models (SQLModel)
     "ModelResponse",

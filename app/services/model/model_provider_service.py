@@ -5,8 +5,6 @@ from app.models import (
     LLMModelProvider,
     LLMModelProviderCreate,
     LLMModelProviderUpdate,
-    LLMModelParam,
-    LLMModelParamCreate,
     HealthStatusEnum,
 )
 from app.services.database import DatabaseService
@@ -48,28 +46,6 @@ class ModelProviderService:
         return self.db_service.update_model_provider(
             model_provider_id, model_provider_data
         )
-
-    def get_model_params(
-        self, model_id: int, provider_id: Optional[int] = None, is_enabled: bool = None
-    ) -> List[LLMModelParam]:
-        """Get model parameters"""
-        return self.db_service.get_model_params(model_id, provider_id, is_enabled)
-
-    def get_model_param_by_key(
-        self,
-        model_id: int,
-        provider_id: Optional[int],
-        param_key: str,
-        is_enabled: bool = None,
-    ) -> Optional[LLMModelParam]:
-        """Get model parameters by model ID, provider ID and parameter key"""
-        return self.db_service.get_model_param_by_key(
-            model_id, provider_id, param_key, is_enabled
-        )
-
-    def create_model_param(self, param_data: LLMModelParamCreate) -> LLMModelParam:
-        """Create model parameters"""
-        return self.db_service.create_model_param(param_data)
 
     def get_all_models_providers_batch(
         self, model_ids: List[int]

@@ -23,7 +23,6 @@ from app.models import (
     LLMModel,
     LLMProvider,
     LLMModelProvider,
-    LLMModelParam,
     LLMProviderApiKey,
     HealthStatusEnum,
     QueryBuilder,
